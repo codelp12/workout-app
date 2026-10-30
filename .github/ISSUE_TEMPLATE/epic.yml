@@ -1,0 +1,29 @@
+name: Epic
+description: A user-facing feature, broken down into task sub-issues.
+title: "[Epic] "
+labels: ["epic"]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What the user can do once this is done, and why it matters.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: What is in and out of scope.
+  - type: textarea
+    id: tasks
+    attributes:
+      label: Tasks
+      description: Link task sub-issues here, one per line (e.g. "- [ ] #12").
+      value: |
+        - [ ]
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+      description: Acceptance criteria for the whole epic.
