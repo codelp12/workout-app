@@ -2,7 +2,7 @@
 
 One personal fitness app to replace the stack of $10/month single-purpose apps (running, lifting, etc.).
 
-**Status:** spec approved, no implementation yet. See [docs/VISION.md](docs/VISION.md) and [docs/SPEC.md](docs/SPEC.md).
+**Status:** hello-world scaffold; feature work not started. See [docs/VISION.md](docs/VISION.md) and [docs/SPEC.md](docs/SPEC.md).
 
 ## Principles
 
@@ -10,3 +10,33 @@ One personal fitness app to replace the stack of $10/month single-purpose apps (
 - **No bloat.** No social feeds, follower counts, badges-for-engagement, or ads.
 - **No subscription treadmill.** Built for personal use first.
 - **Own your data.** Easy export; no lock-in.
+
+## Development
+
+Requires Node 24 LTS (see `.nvmrc`) and pnpm 12 (pinned in `package.json` `packageManager`).
+
+```sh
+nvm use               # or install Node 24 another way
+npm install -g pnpm@12  # or: corepack enable
+pnpm install
+pnpm dev              # web on http://localhost:5173, API on http://127.0.0.1:3000
+```
+
+`pnpm dev` runs the Vite dev server (`apps/web`) and the Hono server (`apps/server`) together; Vite proxies `/api` and `/healthz` to the server.
+
+Production-style run (one process serves the API and the built PWA):
+
+```sh
+pnpm build
+pnpm start            # http://127.0.0.1:3000
+```
+
+Other commands: `pnpm typecheck`.
+
+Server env vars: `HOST` (default `127.0.0.1`), `PORT` (default `3000`), `WEB_DIST` (default `../web/dist`, relative to `apps/server`).
+
+## Layout
+
+- `apps/web`: React + TypeScript + Vite client.
+- `apps/server`: Node + Hono server (API, `/healthz`, serves the built client).
+- `packages/*`: shared libraries (engine, shared types, exercise data), added as they're needed.
