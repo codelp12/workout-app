@@ -2,6 +2,17 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-10-30: Platform and stack (#3)
+
+**Decision:** an installable PWA (iPhone at the gym, laptop browser at home) backed by a self-hosted Node server, using the stack in SPEC §2. Approved by the owner with the spec. (§2, §3.4, §8)
+
+Options considered:
+
+- **PWA + self-hosted Node/SQLite (chosen).** One TypeScript codebase for client, server and engine, so the engine runs offline on the phone and authoritatively on the server. Works on iPhone and laptop from one build. No App Store or Apple developer fee; deploys like any other homelab service. Costs: iOS PWA limits (no Background Sync, no HealthKit or Bluetooth, possible storage eviction, unreliable timers when the screen is locked), mitigated per §3.4 and §11. Offline needs HTTPS, hence Tailscale Serve.
+- **Native iOS (Swift/SwiftUI).** Best device integration: HealthKit, background GPS, reliable timers and notifications. Rejected: iPhone only (the laptop view needs a second client), App Store/TestFlight distribution or re-signing sideloaded builds, and the engine would have to be written twice or run server-side only, which breaks offline adaptation. HealthKit and live wearables are v1 non-goals anyway.
+- **React Native / Expo.** Shares TypeScript with the server and reaches native APIs. Rejected for v1: still needs iOS signing and distribution, adds a mobile build toolchain, and the laptop view needs react-native-web or a separate app. Revisit if HealthKit or in-app GPS recording becomes a goal.
+- **Storage within the chosen option:** SQLite over Postgres. Single user, one file to back up, light enough for a Pi-class host.
+
 ## 2026-10-30: Spec review (Draft v1 → v2)
 
 - **Stack approved.** The stack in SPEC §2 is approved. Anything outside the spec still needs owner sign-off.
