@@ -1,0 +1,25 @@
+name: Task
+description: One PR-sized unit of work, usually part of an epic.
+title: "[Task] "
+labels: ["task"]
+body:
+  - type: input
+    id: epic
+    attributes:
+      label: Parent epic
+      description: Issue number of the parent epic, e.g. "#3". Leave blank if standalone.
+  - type: textarea
+    id: what
+    attributes:
+      label: What
+      description: The change to make.
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Acceptance criteria
+      value: |
+        - [ ]
+    validations:
+      required: true
