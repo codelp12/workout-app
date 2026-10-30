@@ -14,8 +14,11 @@ pnpm 12 (`packageManager` in `package.json`). Node 24 comes from `devEngines.run
 - `pnpm build`: typecheck and build every package.
 - `pnpm start`: run the built server, which also serves the built web app.
 - `pnpm typecheck`: typecheck every package.
+- `pnpm test`: run every test once with Vitest. `pnpm test:watch` reruns on change.
 - `pnpm lint`: ESLint (typescript-eslint type-checked rules, plus React hooks/refresh rules in `apps/web`) over the whole repo. `pnpm lint:fix` applies autofixes.
 - `pnpm format`: format everything with Prettier (default options). `pnpm format:check` checks without writing; run it before pushing.
+
+Tests are `*.test.ts(x)` files next to the code they cover. The root `vitest.config.js` runs each folder in `apps/*` and `packages/*` as its own Vitest project, using that package's `vite.config.ts` if it has one. The server keeps its routes in `src/app.ts` so tests can call `app.request()` without opening a port; `tsconfig.build.json` keeps test files out of `dist`.
 
 Lint config is `eslint.config.js` at the root; Prettier skips `.gitignore`d files and anything in `.prettierignore`. Formatting is Prettier's job, so don't add style rules to ESLint.
 
