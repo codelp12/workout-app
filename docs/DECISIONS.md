@@ -2,6 +2,12 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-10-30: CI on pull requests (#7)
+
+- **One GitHub Actions job on `ubuntu-latest`.** It runs on PRs to `main` and pushes to `main`: frozen-lockfile install, then `lint`, `format:check`, `typecheck`, `test`, `build`, the same commands as local dev. One job keeps a single required check (`Lint, test and build`) for the `protect-main` ruleset; the steps are cheap enough that splitting them into parallel jobs isn't worth the extra installs yet. No arm64 or macOS matrix until something platform-specific (better-sqlite3) lands. (§2, §10)
+- **Node comes from `devEngines.runtime`, not `actions/setup-node`.** `pnpm/action-setup@v6` installs the pnpm 12 standalone binary from `packageManager`, and `pnpm install` downloads the pinned Node, so CI runs the exact Node in the lockfile. `pnpm/setup` (installs pnpm and the runtime in one step) was considered; it is newer, and the older action already covers this. The pnpm store is cached on the lockfile hash. (§2)
+- **Least privilege.** The workflow token is read-only (`contents: read`), and a newer push to the same branch cancels the older run. Actions are pinned to major tags from GitHub and the pnpm org. (§10)
+
 ## 2026-10-30: Test runner (#6)
 
 - **Vitest for unit and integration tests.** SPEC §5.6 and §10 call for table-driven, property (fast-check) and simulation tests but don't name a runner. Vitest is the standard for Vite projects: it reuses each package's Vite config and TypeScript handling, so there is no separate Babel or ts-jest setup, and it runs the same way for the server, the web app and the future `packages/*`. Jest was the alternative; it needs its own TypeScript and ESM transform. Playwright stays the E2E tool per §10. (§5.6, §10)

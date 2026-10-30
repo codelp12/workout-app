@@ -22,6 +22,8 @@ Tests are `*.test.ts(x)` files next to the code they cover. The root `vitest.con
 
 Lint config is `eslint.config.js` at the root; Prettier skips `.gitignore`d files and anything in `.prettierignore`. Formatting is Prettier's job, so don't add style rules to ESLint.
 
+CI (`.github/workflows/ci.yml`) runs on every PR to `main` and every push to `main`: `pnpm install --frozen-lockfile`, then `lint`, `format:check`, `typecheck`, `test` and `build`. Run the same commands locally before pushing; the `protect-main` ruleset requires the `Lint, test and build` check to pass. If you rename the job, the owner has to update the ruleset.
+
 Dependency build scripts are blocked unless listed under `allowBuilds` in `pnpm-workspace.yaml`; adding one there needs a reason.
 
 ## Workflow

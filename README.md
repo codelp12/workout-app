@@ -29,7 +29,7 @@ pnpm build
 pnpm start            # http://127.0.0.1:3000
 ```
 
-Other commands: `pnpm test` (`test:watch`), `pnpm typecheck`, `pnpm lint` (`lint:fix`), `pnpm format` (`format:check`).
+Other commands: `pnpm test` (`test:watch`), `pnpm typecheck`, `pnpm lint` (`lint:fix`), `pnpm format` (`format:check`). CI runs lint, format check, typecheck, tests and build on every PR (`.github/workflows/ci.yml`).
 
 Server env vars: `HOST` (default `127.0.0.1`), `PORT` (default `3000`), `WEB_DIST` (default `../web/dist`, relative to `apps/server`).
 
