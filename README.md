@@ -2,7 +2,7 @@
 
 One personal fitness app to replace the stack of $10/month single-purpose apps (running, lifting, etc.).
 
-**Status:** concept stage — no implementation yet. See [docs/VISION.md](docs/VISION.md).
+**Status:** spec approved, no implementation yet. See [docs/VISION.md](docs/VISION.md) and [docs/SPEC.md](docs/SPEC.md).
 
 ## Principles
 
