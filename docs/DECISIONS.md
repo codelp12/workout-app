@@ -2,6 +2,12 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-10-30: Test runner (#6)
+
+- **Vitest for unit and integration tests.** SPEC §5.6 and §10 call for table-driven, property (fast-check) and simulation tests but don't name a runner. Vitest is the standard for Vite projects: it reuses each package's Vite config and TypeScript handling, so there is no separate Babel or ts-jest setup, and it runs the same way for the server, the web app and the future `packages/*`. Jest was the alternative; it needs its own TypeScript and ESM transform. Playwright stays the E2E tool per §10. (§5.6, §10)
+- **One root config with per-package projects.** `vitest.config.js` treats every folder in `apps/*` and `packages/*` as a project, so `pnpm test` is one run with one report and new packages are picked up automatically. Pinned `~5.0.5`. (§10)
+- **Server routes split into `app.ts`.** `index.ts` only starts the listener, so tests exercise the real Hono app with `app.request()` and no open port. `tsconfig.build.json` excludes tests from the build. (§10)
+
 ## 2026-10-30: Linting and formatting (#5)
 
 - **ESLint 10 + typescript-eslint, with Prettier for formatting.** The standard pairing for a React + TypeScript + Vite project, and what the TypeScript 6.0 pin was made for. One root `eslint.config.js` covers every package: `@eslint/js` recommended, typescript-eslint `recommendedTypeChecked` (catches floating promises and unsafe `any`, which matter for sync and engine code), and `eslint-plugin-react-hooks` + `eslint-plugin-react-refresh` for `apps/web`. Biome (one faster tool for both) was considered and rejected: its type-aware linting is newer and narrower than typescript-eslint's, and the React rules here come from the React team's own plugin. (§2, §10)
