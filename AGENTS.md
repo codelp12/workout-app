@@ -1,7 +1,8 @@
 # Agent guidance
 
-- Read `docs/VISION.md` before proposing features; respect its out-of-scope list (no social/bloat features).
-- The tech stack is not chosen yet. Do not introduce frameworks or dependencies without the owner agreeing to the choice first.
+- Read `docs/VISION.md` and `docs/SPEC.md` before proposing features; respect the out-of-scope and non-goals lists (no social/bloat features).
+- `docs/SPEC.md` is the source of truth. Its defaults, including the stack in Section 2, are owner-approved. Anything it doesn't cover (new dependencies, scope changes, changed defaults) needs owner sign-off on an issue or PR first.
+- Log decisions in `docs/DECISIONS.md`.
 - Once a stack exists, keep lint/test/build commands documented here.
 
 ## Workflow
