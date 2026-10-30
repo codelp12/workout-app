@@ -29,7 +29,7 @@ pnpm build
 pnpm start            # http://127.0.0.1:3000
 ```
 
-Other commands: `pnpm typecheck`.
+Other commands: `pnpm typecheck`, `pnpm lint` (`lint:fix`), `pnpm format` (`format:check`).
 
 Server env vars: `HOST` (default `127.0.0.1`), `PORT` (default `3000`), `WEB_DIST` (default `../web/dist`, relative to `apps/server`).
 

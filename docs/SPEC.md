@@ -1,6 +1,6 @@
 # Training Planner: Implementation Game Plan
 
-*Self-hosted lifting, running and climbing planner · Draft v2 · October 30, 2026*
+_Self-hosted lifting, running and climbing planner · Draft v2 · October 30, 2026_
 
 ## 0. How to use this document
 
@@ -56,7 +56,7 @@ This is the product spec and build plan for a private, single-user training app,
 
 ### 3.1 Shape
 
-- The home server is the source of truth and owns plan generation. The phone may compute *provisional* plan changes offline (in-session trims, moved sessions, replans, next week's plan) with the shared engine. These are stored as client-owned `plan_override` rows, and the server's recomputation wins on the next pull.
+- The home server is the source of truth and owns plan generation. The phone may compute _provisional_ plan changes offline (in-session trims, moved sessions, replans, next week's plan) with the shared engine. These are stored as client-owned `plan_override` rows, and the server's recomputation wins on the next pull.
 - Each client (iPhone, laptop) keeps a local IndexedDB copy sufficient to run about two weeks of sessions offline: plan, exercise library with core images, recent history, and an outbox of unsynced writes.
 - Every write is applied locally first (optimistic UI), queued in the outbox, and pushed when the server is reachable.
 - The in-progress workout is persisted to IndexedDB after every set. iOS can kill the app at any time, and the player must resume exactly where it left off.
