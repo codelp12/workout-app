@@ -7,7 +7,7 @@
 
 ## Commands
 
-Node 24 (`.nvmrc`), pnpm 12 (`packageManager` in `package.json`). Run from the repo root:
+pnpm 12 (`packageManager` in `package.json`). Node 24 comes from `devEngines.runtime` in `package.json`, which `pnpm install` downloads; keep `.nvmrc` and `engines` in sync with it. Run from the repo root:
 
 - `pnpm install`: install all workspace deps.
 - `pnpm dev`: web (Vite, :5173) + server (Hono, :3000) with hot reload.

@@ -13,11 +13,9 @@ One personal fitness app to replace the stack of $10/month single-purpose apps (
 
 ## Development
 
-Requires Node 24 LTS (see `.nvmrc`) and pnpm 12 (pinned in `package.json` `packageManager`).
+Requires pnpm ([install](https://pnpm.io/installation)); it switches itself to the version pinned in `packageManager` (12.16.1). You don't need a system Node: `pnpm install` downloads the pinned Node 24 LTS (`devEngines.runtime` in `package.json`) into the project, and every `pnpm` script runs with it. `.nvmrc` is kept for editors and tools run outside pnpm.
 
 ```sh
-nvm use               # or install Node 24 another way
-npm install -g pnpm@12  # or: corepack enable
 pnpm install
 pnpm dev              # web on http://localhost:5173, API on http://127.0.0.1:3000
 ```

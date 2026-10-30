@@ -2,6 +2,10 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-10-30: pnpm installs the Node runtime
+
+**Decision:** pin Node in `devEngines.runtime` (`24`, `onFail: download`) so `pnpm install` fetches it into `node_modules` and records the exact version and per-platform checksums in the lockfile. Every `pnpm` script then runs on that Node. A pnpm without a system Node (standalone installer) failed `pnpm dev` with `exec: node: not found`; this removes the separate Node install step and keeps the version identical on the laptop, the host and CI. `.nvmrc` and `engines` stay for editors and tools that run outside pnpm. (§2)
+
 ## 2026-10-30: Hello world scaffold toolchain (#4)
 
 - **Node 24 LTS (Krypton), not 26.** Node 26 only entered LTS on 2026-10-28; 24 is the mature LTS and native modules like better-sqlite3 reliably ship prebuilds for it. Pinned in `.nvmrc` and `engines`. Revisit in 2027. (§2)
