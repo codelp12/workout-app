@@ -2,6 +2,12 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-10-30: Linting and formatting (#5)
+
+- **ESLint 10 + typescript-eslint, with Prettier for formatting.** The standard pairing for a React + TypeScript + Vite project, and what the TypeScript 6.0 pin was made for. One root `eslint.config.js` covers every package: `@eslint/js` recommended, typescript-eslint `recommendedTypeChecked` (catches floating promises and unsafe `any`, which matter for sync and engine code), and `eslint-plugin-react-hooks` + `eslint-plugin-react-refresh` for `apps/web`. Biome (one faster tool for both) was considered and rejected: its type-aware linting is newer and narrower than typescript-eslint's, and the React rules here come from the React team's own plugin. (§2, §10)
+- **Prettier defaults, no style rules in ESLint.** `.prettierrc.json` is empty so editors pick Prettier up; the lockfile is ignored. None of the configs used enable formatting rules, so `eslint-config-prettier` isn't needed. (§10)
+- **ESLint pinned `~10.13.0`.** 10.14.0 came out the day this landed; take it once it has settled. (§10)
+
 ## 2026-10-30: pnpm installs the Node runtime
 
 **Decision:** pin Node in `devEngines.runtime` (`24`, `onFail: download`) so `pnpm install` fetches it into `node_modules` and records the exact version and per-platform checksums in the lockfile. Every `pnpm` script then runs on that Node. A pnpm without a system Node (standalone installer) failed `pnpm dev` with `exec: node: not found`; this removes the separate Node install step and keeps the version identical on the laptop, the host and CI. `.nvmrc` and `engines` stay for editors and tools that run outside pnpm. (§2)

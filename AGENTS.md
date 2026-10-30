@@ -14,6 +14,10 @@ pnpm 12 (`packageManager` in `package.json`). Node 24 comes from `devEngines.run
 - `pnpm build`: typecheck and build every package.
 - `pnpm start`: run the built server, which also serves the built web app.
 - `pnpm typecheck`: typecheck every package.
+- `pnpm lint`: ESLint (typescript-eslint type-checked rules, plus React hooks/refresh rules in `apps/web`) over the whole repo. `pnpm lint:fix` applies autofixes.
+- `pnpm format`: format everything with Prettier (default options). `pnpm format:check` checks without writing; run it before pushing.
+
+Lint config is `eslint.config.js` at the root; Prettier skips `.gitignore`d files and anything in `.prettierignore`. Formatting is Prettier's job, so don't add style rules to ESLint.
 
 Dependency build scripts are blocked unless listed under `allowBuilds` in `pnpm-workspace.yaml`; adding one there needs a reason.
 
