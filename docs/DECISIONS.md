@@ -2,6 +2,13 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-10-30: Hello world scaffold toolchain (#4)
+
+- **Node 24 LTS (Krypton), not 26.** Node 26 only entered LTS on 2026-10-28; 24 is the mature LTS and native modules like better-sqlite3 reliably ship prebuilds for it. Pinned in `.nvmrc` and `engines`. Revisit in 2027. (§2)
+- **pnpm 12, pinned via `packageManager`.** Current major. Dependency build scripts are off by default; `esbuild` (via `tsx`) is explicitly denied in `allowBuilds` because it ships its binary as an optional dependency and doesn't need its postinstall. (§2)
+- **TypeScript 6.0, not 7.** TS 7 (the native port) is `latest`, but typescript-eslint, needed for #5, supports only `<6.1.0`. Pinned to `~6.0.3`; move to 7 once the lint toolchain supports it. (§2, §10)
+- **Minimal skeleton.** Only `apps/web` (React + Vite) and `apps/server` (Hono, `/healthz`, serves the built client) exist. Tailwind, Dexie, vite-plugin-pwa, SQLite/Drizzle and the `packages/*` libraries arrive with the first task that needs them, per the §2 stack. The server binds `127.0.0.1` by default. (§2, §8)
+
 ## 2026-10-30: Platform and stack (#3)
 
 **Decision:** an installable PWA (iPhone at the gym, laptop browser at home) backed by a self-hosted Node server, using the stack in SPEC §2. Approved by the owner with the spec. (§2, §3.4, §8)

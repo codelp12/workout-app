@@ -3,7 +3,19 @@
 - Read `docs/VISION.md` and `docs/SPEC.md` before proposing features; respect the out-of-scope and non-goals lists (no social/bloat features).
 - `docs/SPEC.md` is the source of truth. Its defaults, including the stack in Section 2, are owner-approved. Anything it doesn't cover (new dependencies, scope changes, changed defaults) needs owner sign-off on an issue or PR first.
 - Log decisions in `docs/DECISIONS.md`.
-- Once a stack exists, keep lint/test/build commands documented here.
+- Keep lint/test/build commands documented here.
+
+## Commands
+
+Node 24 (`.nvmrc`), pnpm 12 (`packageManager` in `package.json`). Run from the repo root:
+
+- `pnpm install`: install all workspace deps.
+- `pnpm dev`: web (Vite, :5173) + server (Hono, :3000) with hot reload.
+- `pnpm build`: typecheck and build every package.
+- `pnpm start`: run the built server, which also serves the built web app.
+- `pnpm typecheck`: typecheck every package.
+
+Dependency build scripts are blocked unless listed under `allowBuilds` in `pnpm-workspace.yaml`; adding one there needs a reason.
 
 ## Workflow
 
