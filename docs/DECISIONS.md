@@ -2,6 +2,11 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-10-31: iPhone check passed (#24)
+
+- **The offline design works on a real iPhone.** The owner ran every step in `docs/IPHONE-CHECKLIST.md`: install from Safari over HTTPS, launch and write a note in airplane mode, relaunch, reconnect, and see the note on the laptop exactly once. All passed, so SPEC §3.3 and §3.4 hold and Phase 1 can build on the Dexie outbox and service worker. Results are on #24. (§3.3, §3.4, §9)
+- **MacBook as the temporary Phase 0 host.** It runs the app in Docker Desktop with `tailscale serve --bg 3000`. That's fine for testing, but the phone can't sync while the Mac sleeps, so it isn't the permanent host. §12 Q1 and #23 stay open until the always-on box exists. (§8, §12 Q1)
+
 ## 2026-10-31: Core schema (#26)
 
 - **Zod schemas in `packages/shared` are the row contract.** Server and web import the types from `@workout-app/shared`; the Drizzle tables in `apps/server/src/schema.ts` mirror them, and `schema.test.ts` fails (at compile time and at runtime) if a table's row type or columns drift from its zod schema. Hand-written, so no `drizzle-zod` dependency. (§2, §4)
