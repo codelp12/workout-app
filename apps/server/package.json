@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx watch --conditions=@workout-app/source src/index.ts",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/index.js",
     "set-password": "node dist/set-password.js",
@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.1.5",
+    "@workout-app/shared": "workspace:*",
     "better-sqlite3": "^13.0.3",
     "drizzle-orm": "~0.45.4",
     "hono": "^4.13.14",

@@ -2,6 +2,19 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-10-31: Core schema (#26)
+
+- **Zod schemas in `packages/shared` are the row contract.** Server and web import the types from `@workout-app/shared`; the Drizzle tables in `apps/server/src/schema.ts` mirror them, and `schema.test.ts` fails (at compile time and at runtime) if a table's row type or columns drift from its zod schema. Hand-written, so no `drizzle-zod` dependency. (§2, §4)
+- **Workspace packages resolve to TypeScript source in dev.** The `@workout-app/source` export condition (set in `tsconfig.base.json`, Vite, Vitest and `tsx watch`) points at `src/`; builds and production use `dist/`. The server imports only types from shared, so `drizzle-kit` and the built server don't load it at runtime.
+- **UUIDv7 ids from `uuid`'s `v7()`**, via `newId()`, as approved on the roadmap. (§3.2)
+- **Every synced table has `id`, `user_id`, `created_at`, `updated_at`, `deleted_at` and `server_seq`, with `server_seq` indexed** for pull-since queries. Timestamps are epoch milliseconds (UTC); training dates are ISO `YYYY-MM-DD` text, stored next to a timezone where a log needs one. (§3.2, §4)
+- **Weights are a value and a unit.** `set_log` has `load_value` + `load_unit` columns; nested weights (exercise increment, goal loads) are `{ value, unit }` JSON. (§4)
+- **No foreign keys; parent ids are indexed.** Rows arrive through sync ops in any order and deletes are tombstones, so an FK failure would wedge the outbox. Referential checks belong in the sync endpoints (#27). (§3.2)
+- **Nested data is JSON text** (equipment, availability, template slots, planned-item targets, run splits, exercise media). It's always read and written with its row, and SQLite's JSON functions can still query it.
+- **`op_receipt` is server-only**, keyed by op id, not a synced entity. (§3.2)
+- **`spike_note` and `/api/spike` stay until the iPhone check (#24) has run.** The checklist and the offline E2E test use them; the client sync engine (#28) replaces both and drops the table.
+- **`readiness_checkin`, `fitness_state` and `engine_decision` are deferred** to the epics that first write them; #26 covers the Phase 1 logging entities. (§4)
+
 ## 2026-10-31: Deploy runbook and iPhone checklist (#23, #24)
 
 - **Tailscale runs on the host, not as a sidecar container.** `tailscale serve --bg 3000` proxies HTTPS on :443 to the existing `127.0.0.1:3000` port, so `compose.yaml` doesn't change and the tailnet node outlives app rebuilds. The server's key expiry is disabled so it doesn't fall off the tailnet after 180 days. (§3.3, §8)
