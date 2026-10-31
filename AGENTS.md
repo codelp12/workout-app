@@ -20,7 +20,7 @@ pnpm 12 (`packageManager` in `package.json`). Node 24 comes from `devEngines.run
 - `docker compose up -d --build`: build and run the production container on `127.0.0.1:3000` (`Dockerfile`, `compose.yaml`).
 - `pnpm format`: format everything with Prettier (default options). `pnpm format:check` checks without writing; run it before pushing.
 
-Tests are `*.test.ts(x)` files next to the code they cover. The root `vitest.config.js` runs each folder in `apps/*` and `packages/*` as its own Vitest project, using that package's `vite.config.ts` if it has one. The server keeps its routes in `src/app.ts` so tests can call `app.request()` without opening a port; `tsconfig.build.json` keeps test files out of `dist`.
+Tests are `*.test.ts(x)` files next to the code they cover. The root `vitest.config.js` runs each folder in `apps/*` and `packages/*` as its own Vitest project, using that package's `vite.config.ts` if it has one. The server builds its routes with `createApp(db)` in `src/app.ts`, so tests pass an in-memory database (`openDb(":memory:")`) and call `app.request()` without opening a port; `tsconfig.build.json` keeps test files out of `dist`.
 
 Lint config is `eslint.config.js` at the root; Prettier skips `.gitignore`d files and anything in `.prettierignore`. Formatting is Prettier's job, so don't add style rules to ESLint.
 

@@ -2,6 +2,13 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-10-31: Offline write spike (#21)
+
+- **Throwaway `spike_note` table and `/api/spike` routes.** They prove the offline write path end to end before the real sync protocol (#27/#28) exists. The core schema (#26) should add a migration that drops `spike_note`, and Epic B replaces the routes and `apps/web/src/spike-db.ts`. (§3.2, §4)
+- **Idempotency is a unique `op_id`.** The client generates the op ID and the note ID (UUIDs). The server inserts with `ON CONFLICT DO NOTHING` and returns `duplicate: true` on a retry, so a lost response can be retried safely. This is the same shape §3.2 uses for the real outbox. (§3.2)
+- **Dexie `^4.4.7` on the client, zod `^4.6.7` on the server.** Both come from §2. The note and its outbox entry are written in one Dexie transaction; the outbox is pushed oldest first, stops at the first failure, and an entry is removed only after the server acknowledges it. Pushes run on load, on `online`, when the tab becomes visible, and from a "Sync now" button. (§2, §3.2)
+- **`createApp(db)` instead of a module-level app.** The server now opens and migrates the database before building routes, so tests pass an in-memory database. (§10)
+
 ## 2026-10-31: SQLite and Drizzle on the server (#20)
 
 - **better-sqlite3 `^13.0.3` + drizzle-orm `~0.45.4` + drizzle-kit `~0.31.11`.** These come from §2. Drizzle stays on the stable 0.45 line rather than the 1.0 betas. better-sqlite3 13 bundles prebuilt binaries for linux (glibc and musl), macOS and Windows on x64 and arm64, and has no install script. So nothing is compiled, and it does **not** need an `allowBuilds` entry, despite what the issue suggested. `@types/better-sqlite3` provides its types. (§2)
