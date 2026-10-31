@@ -9,6 +9,8 @@ dist/
 *.sqlite
 *.sqlite-journal
 *.db
+*.db-wal
+*.db-shm
 .env
 .env.*
 !.env.example

@@ -19,11 +19,13 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
 FROM node:${NODE_VERSION}-slim
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
-    PORT=3000
+    PORT=3000 \
+    DATABASE_PATH=/data/app.db
 WORKDIR /app/server
 COPY --from=build /out/server/package.json ./
 COPY --from=build /out/server/node_modules ./node_modules
 COPY --from=build /out/server/dist ./dist
+COPY --from=build /out/server/drizzle ./drizzle
 COPY --from=build /out/web ../web/dist
 RUN mkdir /data && chown node:node /data
 VOLUME /data

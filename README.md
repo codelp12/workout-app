@@ -45,10 +45,14 @@ docker compose down            # keeps the data volume; add -v to delete it
 ```
 
 - The port is published on `127.0.0.1` only, so nothing else on the network can reach it; Tailscale Serve will provide HTTPS and tailnet access (#23). Set `PORT` to use a different host port, e.g. `PORT=8080 docker compose up -d`.
-- App data lives in the `data` volume, mounted at `/data` in the container (the SQLite file goes there once #20 lands).
+- App data lives in the `data` volume, mounted at `/data` in the container (`/data/app.db` plus its `backups/`).
 - The image runs as the unprivileged `node` user and has a built-in healthcheck on `/healthz`. It builds for `linux/amd64` and `linux/arm64`; CI builds and smoke-tests both on every PR, but nothing is pushed to a registry yet.
 
-Server env vars: `HOST` (default `127.0.0.1`), `PORT` (default `3000`), `WEB_DIST` (default `../web/dist`, relative to `apps/server`).
+Server env vars: `HOST` (default `127.0.0.1`), `PORT` (default `3000`), `WEB_DIST` (default `../web/dist`, relative to `apps/server`), `DATABASE_PATH` (default `data/app.db`, relative to `apps/server`; `/data/app.db` in Docker).
+
+## Database
+
+SQLite through better-sqlite3 and Drizzle. Pending migrations in `apps/server/drizzle/` run when the server starts, and an existing database is first copied to `backups/` next to the DB file. To change the schema, edit `apps/server/src/schema.ts`, run `pnpm --filter @workout-app/server db:generate` and commit the generated SQL. Migrations are forward-only: fix a bad one with a new migration, never by editing an applied one.
 
 ## Layout
 

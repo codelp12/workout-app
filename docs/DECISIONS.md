@@ -2,6 +2,13 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-10-31: SQLite and Drizzle on the server (#20)
+
+- **better-sqlite3 `^13.0.3` + drizzle-orm `~0.45.4` + drizzle-kit `~0.31.11`.** These come from §2. Drizzle stays on the stable 0.45 line rather than the 1.0 betas. better-sqlite3 13 bundles prebuilt binaries for linux (glibc and musl), macOS and Windows on x64 and arm64, and has no install script. So nothing is compiled, and it does **not** need an `allowBuilds` entry, despite what the issue suggested. `@types/better-sqlite3` provides its types. (§2)
+- **`src/db.ts`: `openDb(path)` + `runMigrations(db)`.** The path comes from `DATABASE_PATH`: `data/app.db` relative to the server in dev, `/data/app.db` (the Compose volume) in Docker, and `:memory:` in tests. Connections use WAL, `foreign_keys = ON` and a 5 s busy timeout. Migrations are drizzle-kit SQL files in `apps/server/drizzle/`, applied in one transaction on every start; a failure rolls back and the server doesn't start. (§2, §8)
+- **Pre-migration backup with `VACUUM INTO`.** This happens only when the file already has tables and at least one migration is pending. The copy goes to `<db dir>/backups/<name>-pre-migrate-<timestamp>.db` and is a consistent snapshot even in WAL mode. Old copies aren't pruned yet; the nightly backup job (§8) will own retention. (§8)
+- **Schema starts empty.** `src/schema.ts` and an empty migration journal are committed. Real tables arrive with the core schema (#26), so this task adds no throwaway table. Migration tests build their own fixture migrations: fresh DB, existing DB, backup, rollback. (§4, §10)
+
 ## 2026-10-31: Installable PWA (#19)
 
 - **vite-plugin-pwa `~2.0.0` in `generateSW` mode, with `workbox-window` as its peer.** This is the §2 choice. Workbox precaches the built shell (JS, CSS, HTML, icons, manifest) and answers navigations with `index.html`, so deep links work offline; `/api/*` and `/healthz` are never served from the cache. 2.0.0 had been out for four weeks; its only breaking change is the peer range for `@vite-pwa/assets-generator`, which isn't used here. (§2, §3.4)
