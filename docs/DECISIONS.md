@@ -2,6 +2,17 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-10-31: Single-user sign-in (#29)
+
+- **Password only, one account.** A single `account` row (id 1) holds the password hash. Passkeys (also allowed by §8) can come later; a password is enough behind Tailscale and needs no extra dependency. (§8)
+- **Node's built-in `crypto.argon2` (argon2id), no new dependency.** Node 24 ships it. Parameters are OWASP's baseline (19 MiB, 2 passes, 1 lane), stored in a PHC string so they can be raised later without breaking old hashes. (§2, §8)
+- **Password is set with a CLI, not a setup page.** `node dist/set-password.js` prompts (or reads stdin) and writes the hash to the database, so no secret lives in git, env files or the image, and there's no unauthenticated "first visitor sets the password" window. Setting it signs out every session. (§8)
+- **Opaque session tokens, stored hashed.** The cookie holds 32 random bytes; the `auth_session` table stores only their SHA-256, so a copy of the database can't be used to sign in. Sessions last 90 days and slide forward, but the row and cookie are only rewritten once a day has passed, not on every request. Logout deletes the row. (§8)
+- **Cookie is HttpOnly, Secure, SameSite=Lax.** Secure is on by default; `COOKIE_SECURE=false` exists for plain-HTTP testing (WebKit drops Secure cookies on `http://127.0.0.1`, so the E2E server sets it). Hono's `csrf()` also rejects cross-origin form posts to `/api/*`. (§8)
+- **Login rate limit is in memory: 5 failures per 15 minutes, global.** One user and one process, so a per-IP or persistent limiter adds nothing; a restart clears it. Over the limit, login returns 429 with `Retry-After`, even for the right password. (§8)
+- **Signed-out writes stay local.** The UI always shows the local notes; a 401 on push keeps the outbox entry, and signing in triggers a sync. Offline, the app shows "Offline" instead of the sign-in form. The "Sign in to sync" chip waits for the sync engine (#28). (§3.2, §8)
+- **E2E uses a temp-file database instead of `:memory:`**, so `set-password.js` can set the test password before the server starts. (§10)
+
 ## 2026-10-31: Playwright E2E (#22)
 
 - **`@playwright/test` `~1.64.1` in its own `e2e/` workspace package.** Playwright is named in §10. A separate package keeps it out of the Vitest projects (`apps/*`, `packages/*`) and gives it its own tsconfig, while `pnpm typecheck` and `pnpm lint` still cover it. (§10)
