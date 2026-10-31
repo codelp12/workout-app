@@ -16,6 +16,7 @@ pnpm 12 (`packageManager` in `package.json`). Node 24 comes from `devEngines.run
 - `pnpm typecheck`: typecheck every package.
 - `pnpm test`: run every test once with Vitest. `pnpm test:watch` reruns on change.
 - `pnpm lint`: ESLint (typescript-eslint type-checked rules, plus React hooks/refresh rules in `apps/web`) over the whole repo. `pnpm lint:fix` applies autofixes.
+- `pnpm --filter @workout-app/server db:generate`: generate a migration in `apps/server/drizzle/` after editing `apps/server/src/schema.ts`. Commit it; never edit an applied migration.
 - `docker compose up -d --build`: build and run the production container on `127.0.0.1:3000` (`Dockerfile`, `compose.yaml`).
 - `pnpm format`: format everything with Prettier (default options). `pnpm format:check` checks without writing; run it before pushing.
 
