@@ -20,6 +20,7 @@
     "typecheck": "pnpm --recursive run typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "pnpm --filter @workout-app/e2e test",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",

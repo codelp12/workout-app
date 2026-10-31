@@ -2,6 +2,14 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-10-31: Playwright E2E (#22)
+
+- **`@playwright/test` `~1.64.1` in its own `e2e/` workspace package.** Playwright is named in §10. A separate package keeps it out of the Vitest projects (`apps/*`, `packages/*`) and gives it its own tsconfig, while `pnpm typecheck` and `pnpm lint` still cover it. (§10)
+- **Tests run against the production build.** The Playwright `webServer` starts the built server on :4173 with `DATABASE_PATH=:memory:`, so the real service worker and precache are exercised and every run starts with an empty database. (§10)
+- **Chromium and WebKit, both at 390×844.** The offline test waits for the service worker to control the page, goes offline with `context.setOffline`, reloads from the precache, writes a spike note, reloads again to check the outbox survives, then reconnects and relies on the `online` event (no "Sync now" click) to push. It checks that the server holds the note exactly once and saves offline and synced screenshots. (§10)
+- **E2E runs in the existing `Lint, test and build` job**, after `build`, so the required check name doesn't change. Browsers are installed with `--with-deps` on each run (not cached yet), and `e2e/test-results/` is uploaded as the `e2e-results` artifact. Job timeout raised from 15 to 20 minutes. (§10)
+- **The spike test goes when the spike does.** When the spike UI is replaced in Epic B, this test becomes the real outbox test; the Playwright setup and offline-load steps carry into the infra template. (§10)
+
 ## 2026-10-31: Offline write spike (#21)
 
 - **Throwaway `spike_note` table and `/api/spike` routes.** They prove the offline write path end to end before the real sync protocol (#27/#28) exists. The core schema (#26) should add a migration that drops `spike_note`, and Epic B replaces the routes and `apps/web/src/spike-db.ts`. (§3.2, §4)
