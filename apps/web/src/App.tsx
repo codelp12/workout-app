@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { SpikeNotes } from "./SpikeNotes";
 
 type ServerStatus = "checking" | "ok" | "unreachable";
 
@@ -15,6 +16,7 @@ export function App() {
     <main>
       <h1>Hello, world</h1>
       <p>Server: {status}</p>
+      <SpikeNotes />
     </main>
   );
 }

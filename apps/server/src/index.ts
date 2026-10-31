@@ -1,5 +1,5 @@
 import { serve } from "@hono/node-server";
-import { app } from "./app.js";
+import { createApp } from "./app.js";
 import { openDb, runMigrations } from "./db.js";
 
 const host = process.env.HOST ?? "127.0.0.1";
@@ -11,9 +11,12 @@ const { applied, backup } = runMigrations(db);
 if (backup) console.log(`Backed up database to ${backup}`);
 console.log(`Database ${dbPath}: ${applied} migration(s) applied`);
 
-const server = serve({ fetch: app.fetch, hostname: host, port }, (info) => {
-  console.log(`Server listening on http://${info.address}:${info.port}`);
-});
+const server = serve(
+  { fetch: createApp(db).fetch, hostname: host, port },
+  (info) => {
+    console.log(`Server listening on http://${info.address}:${info.port}`);
+  },
+);
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => {
