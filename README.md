@@ -29,7 +29,7 @@ pnpm build
 pnpm start            # http://127.0.0.1:3000
 ```
 
-The built app is an installable PWA (manifest, service worker via vite-plugin-pwa). The service worker only runs from `pnpm build` output, not `pnpm dev`, and only on a secure origin: `localhost`/`127.0.0.1` on the laptop, HTTPS (Tailscale Serve, #23) on the phone. A new build shows an "Update available" bar instead of reloading on its own.
+The built app is an installable PWA (manifest, service worker via vite-plugin-pwa). The service worker only runs from `pnpm build` output, not `pnpm dev`, and only on a secure origin: `localhost`/`127.0.0.1` on the laptop, HTTPS (Tailscale Serve, see [docs/DEPLOY.md](docs/DEPLOY.md)) on the phone. A new build shows an "Update available" bar instead of reloading on its own.
 
 Other commands: `pnpm test` (`test:watch`), `pnpm test:e2e` (after `pnpm build`; see AGENTS.md for the browser install), `pnpm typecheck`, `pnpm lint` (`lint:fix`), `pnpm format` (`format:check`). CI runs lint, format check, typecheck, tests, build and E2E on every PR (`.github/workflows/ci.yml`).
 
@@ -44,7 +44,7 @@ docker compose logs -f
 docker compose down            # keeps the data volume; add -v to delete it
 ```
 
-- The port is published on `127.0.0.1` only, so nothing else on the network can reach it; Tailscale Serve will provide HTTPS and tailnet access (#23). Set `PORT` to use a different host port, e.g. `PORT=8080 docker compose up -d`.
+- The port is published on `127.0.0.1` only, so nothing else on the network can reach it; Tailscale Serve provides HTTPS and tailnet access; [docs/DEPLOY.md](docs/DEPLOY.md) covers setting up a host. Set `PORT` to use a different host port, e.g. `PORT=8080 docker compose up -d`.
 - App data lives in the `data` volume, mounted at `/data` in the container (`/data/app.db` plus its `backups/`).
 - The image runs as the unprivileged `node` user and has a built-in healthcheck on `/healthz`. It builds for `linux/amd64` and `linux/arm64`; CI builds and smoke-tests both on every PR, but nothing is pushed to a registry yet.
 
