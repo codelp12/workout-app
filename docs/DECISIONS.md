@@ -140,3 +140,13 @@ Options considered:
 - **Readiness thresholds.** Readiness is a composite z-score: green ≥ −0.5, yellow down to −1.5, red below that. Engines treat readiness as green until the check-in ships in Phase 5. (§5.5)
 - **Templates carry intensity class and intent**, which the scheduler needs. (§4, §5.4)
 - **AM and PM slots satisfy the 6-hour gap.** The "one light day" rule is now a hard constraint. (§5.4)
+
+## 2026-10-31: Sync endpoints (#27)
+
+- **Ops carry whole rows.** An `upsert` sends the full row except `userId` and `serverSeq`, which the server fills in. A `delete` sends `{id, deletedAt}`. Last-write-wins per record replaces the whole row anyway, so field-level patches would add complexity for nothing. The first write's `createdAt` is kept. (§3.2)
+- **One global `sync_counter`.** Every accepted write takes the next number from a single counter, so the pull cursor is one integer across every table and pages never skip or repeat a row. `MAX(server_seq)` across tables would avoid the table, but purging old tombstones later could hand out a number twice. (§3.2)
+- **Bad ops are rejected one at a time.** An invalid op gets `rejected` with the error and no receipt, and the rest of the batch still applies, so one bad op can't block the outbox behind it. The client sync engine (#28) decides what to do with rejected ops. Only a malformed envelope (no ops, a bad `opId`, more than 500 ops) fails the whole request. (§3.2)
+- **Deletes follow last-write-wins too.** A later upsert of a tombstoned row brings it back, as §3.2 says. A delete of a row the server never had is applied as a no-op.
+- **The push response's cursor is informational.** It's the server's latest `serverSeq`. Clients keep pulling from their own cursor, since jumping to it would skip other clients' writes.
+- **Not done yet: engine re-runs and plan ownership.** §3.2 has push re-run the engine and validate `plan_override` ops, and treats plan rows as server-owned. There's no engine yet, so for now every entity is accepted as a plain row. Enforcing plan ownership comes with the engine epics. (§3.1, §3.2)
+- **The server now imports `@workout-app/shared` at runtime**, not just its types. `pnpm deploy` already copies the package's `dist`, so the Docker image needs no change.
