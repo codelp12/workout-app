@@ -29,6 +29,8 @@ pnpm build
 pnpm start            # http://127.0.0.1:3000
 ```
 
+The built app is an installable PWA (manifest, service worker via vite-plugin-pwa). The service worker only runs from `pnpm build` output, not `pnpm dev`, and only on a secure origin: `localhost`/`127.0.0.1` on the laptop, HTTPS (Tailscale Serve, #23) on the phone. A new build shows an "Update available" bar instead of reloading on its own.
+
 Other commands: `pnpm test` (`test:watch`), `pnpm typecheck`, `pnpm lint` (`lint:fix`), `pnpm format` (`format:check`). CI runs lint, format check, typecheck, tests and build on every PR (`.github/workflows/ci.yml`).
 
 ## Run with Docker Compose

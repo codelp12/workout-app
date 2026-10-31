@@ -2,6 +2,14 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-10-31: Installable PWA (#19)
+
+- **vite-plugin-pwa `~2.0.0` in `generateSW` mode, with `workbox-window` as its peer.** This is the §2 choice. Workbox precaches the built shell (JS, CSS, HTML, icons, manifest) and answers navigations with `index.html`, so deep links work offline; `/api/*` and `/healthz` are never served from the cache. 2.0.0 had been out for four weeks; its only breaking change is the peer range for `@vite-pwa/assets-generator`, which isn't used here. (§2, §3.4)
+- **`registerType: "prompt"`, never `autoUpdate`.** A new build installs in the background and waits. The "Update available" bar lets the user pick Reload or Later, so an update can't reload the page mid-workout. (§8)
+- **Icons are committed PNGs from one `icon.svg`.** They come in 64, 192 and 512 px, plus a 180 px apple-touch-icon. The 512 px icon doubles as the maskable one, since the artwork sits inside the safe zone. They were rendered once by hand, so the build has no image dependency; `@vite-pwa/assets-generator` (sharp) can replace this if icons start changing often. (§7)
+- **`navigator.storage.persist()` on every start**, skipped when storage is already persisted. The result isn't shown anywhere yet; the unsynced-data warning (#30) is where it will matter. (§3.4)
+- **Installability is checked with Chrome's own installability check (the one DevTools shows), not Lighthouse.** Lighthouse 12 removed its PWA category, so there is no Lighthouse PWA audit left to run. (§10)
+
 ## 2026-10-31: Docker Compose packaging (#18)
 
 - **One image, two stages, on `node:24.22.2-slim`.** The build stage installs pnpm with npm, runs `pnpm install --frozen-lockfile` and `pnpm build`, then `pnpm deploy --prod` copies the server with production deps only. The runtime stage holds that, the server `dist` and the web `dist`. No pnpm, TypeScript or dev deps ship (335 MB, most of it the Node base image). The Node tag matches `node@runtime` in the lockfile, so the container runs the same Node as dev and CI. Debian slim over Alpine: glibc gets the standard prebuilt binaries for native modules like better-sqlite3 (#20). (§2, §8)
