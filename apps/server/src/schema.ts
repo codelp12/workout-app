@@ -10,3 +10,17 @@ export const spikeNotes = sqliteTable("spike_note", {
   createdAt: integer("created_at").notNull(),
   receivedAt: integer("received_at").notNull(),
 });
+
+// Single-user sign-in (#29). One row, id 1.
+export const account = sqliteTable("account", {
+  id: integer("id").primaryKey(),
+  passwordHash: text("password_hash").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
+
+// `id` is the SHA-256 of the cookie token, so a copy of the DB can't be used to sign in.
+export const authSession = sqliteTable("auth_session", {
+  id: text("id").primaryKey(),
+  createdAt: integer("created_at").notNull(),
+  expiresAt: integer("expires_at").notNull(),
+});

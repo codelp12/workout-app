@@ -6,6 +6,7 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/index.js",
+    "set-password": "node dist/set-password.js",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate"
   },

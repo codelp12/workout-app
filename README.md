@@ -48,7 +48,19 @@ docker compose down            # keeps the data volume; add -v to delete it
 - App data lives in the `data` volume, mounted at `/data` in the container (`/data/app.db` plus its `backups/`).
 - The image runs as the unprivileged `node` user and has a built-in healthcheck on `/healthz`. It builds for `linux/amd64` and `linux/arm64`; CI builds and smoke-tests both on every PR, but nothing is pushed to a registry yet.
 
-Server env vars: `HOST` (default `127.0.0.1`), `PORT` (default `3000`), `WEB_DIST` (default `../web/dist`, relative to `apps/server`), `DATABASE_PATH` (default `data/app.db`, relative to `apps/server`; `/data/app.db` in Docker).
+Server env vars: `HOST` (default `127.0.0.1`), `PORT` (default `3000`), `WEB_DIST` (default `../web/dist`, relative to `apps/server`), `DATABASE_PATH` (default `data/app.db`, relative to `apps/server`; `/data/app.db` in Docker), `COOKIE_SECURE` (default `true`; set `false` only to sign in over plain HTTP from a non-localhost origin).
+
+## Sign in
+
+The app has one account, protected by a password. Every `/api` route except `/api/auth/login` needs a session; `/healthz` stays public. Nobody can sign in until a password is set, and the server logs a warning on startup until then. Set or reset it (this also signs out every session):
+
+```sh
+docker compose exec app node dist/set-password.js        # Docker; prompts twice
+pnpm --filter @workout-app/server set-password            # local, after pnpm build
+printf %s "$PASSWORD" | node dist/set-password.js         # non-interactive
+```
+
+The password is hashed with argon2id in the database; nothing goes in git or env files. Sessions are an HttpOnly, Secure, SameSite=Lax cookie that lasts 90 days and slides forward while you use the app. Five wrong passwords in 15 minutes lock login for the rest of the window. Notes written while signed out or with an expired session stay queued on the device and sync after you sign in.
 
 ## Database
 

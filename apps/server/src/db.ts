@@ -20,6 +20,8 @@ export const defaultMigrationsFolder = fileURLToPath(
 
 const MEMORY = ":memory:";
 
+export const databasePath = process.env.DATABASE_PATH ?? "data/app.db";
+
 /** Opens the SQLite file at `path` (created if missing), or an in-memory DB for `:memory:`. */
 export function openDb(path: string): Db {
   if (path !== MEMORY) mkdirSync(dirname(path), { recursive: true });

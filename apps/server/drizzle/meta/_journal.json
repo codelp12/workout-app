@@ -8,6 +8,13 @@
       "when": 1793454671517,
       "tag": "0000_spike_note",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1793455946438,
+      "tag": "0001_auth",
+      "breakpoints": true
     }
   ]
 }
