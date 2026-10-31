@@ -10,7 +10,7 @@ Any always-on Linux box that runs Docker works. The image builds for `amd64` and
 
 - **Mini PC (x86, Debian or Ubuntu Server).** The homelab plan's first host. Recommended.
 - **Raspberry Pi 4/5 with a 64-bit OS.** Works (`arm64`). 32-bit Raspberry Pi OS does not. Keep the data on an SSD, not the SD card, if you can.
-- **Not the Windows desktops.** Forced reboots take the app down. The phone keeps logging offline, but it can't sync until the box is back up.
+- **A Windows PC, as a stopgap.** Works with Docker Desktop; see [Windows host](#windows-host-interim). A forced Windows Update restart takes the app down until someone signs in. The phone keeps logging offline and syncs once it's back.
 
 Log the choice in `docs/DECISIONS.md` (SPEC §12 Q1).
 
@@ -76,6 +76,42 @@ Install the Tailscale app on the iPhone (App Store) and the laptop, and sign in 
 
 Next, run the iPhone checklist in [IPHONE-CHECKLIST.md](IPHONE-CHECKLIST.md).
 
+## Windows host (interim)
+
+The same app, run with Docker Desktop on a Windows 10 or 11 PC that stays on. Run the commands in PowerShell.
+
+1. **Install the tools:** [Git for Windows](https://git-scm.com/download/win), [Docker Desktop](https://www.docker.com/products/docker-desktop/) (keep the default WSL 2 backend; it may install WSL and ask for a reboot) and [Tailscale for Windows](https://tailscale.com/download/windows). Sign in to Tailscale with the same account as the phone.
+2. **Keep it awake and starting on its own:**
+   - Settings → System → Power: set sleep to **Never** when plugged in.
+   - Docker Desktop → Settings → General: turn on **Start Docker Desktop when you sign in**.
+   - Tailscale tray icon → Preferences: turn on **Run unattended**, so it stays connected while nobody is signed in.
+   - Settings → Windows Update → Advanced options → **Active hours**: cover the hours you train, so forced restarts happen overnight.
+3. **Run the app:**
+
+   ```powershell
+   git clone --config core.autocrlf=false https://github.com/codelp12/workout-app.git $HOME\workout-app
+   cd $HOME\workout-app
+   docker compose up -d --build
+   docker compose ps                                   # wait for (healthy)
+   curl.exe -s http://127.0.0.1:3000/healthz           # {"ok":true,...}
+   docker compose exec app node dist/set-password.js   # pick the sign-in password
+   ```
+
+   `core.autocrlf=false` keeps the repo's LF line endings, so the image builds the same as on Linux.
+
+4. **Name the machine and serve the app.** On the admin console's [Machines](https://login.tailscale.com/admin/machines) page, rename the PC to a name that isn't tied to the hardware, like `workout`, and disable key expiry (as in step 5). Then:
+
+   ```powershell
+   tailscale serve --bg 3000
+   tailscale serve status       # shows https://workout.<tailnet>.ts.net
+   ```
+
+   If it says access is denied, run it again in an Administrator PowerShell.
+
+5. **Move the phone over.** The URL is new, so on the old host run `tailscale serve reset` and `docker compose down`. On the iPhone, delete the old home-screen icon, open the new URL in Safari and add it to the Home Screen again. Run steps 4–10 of [IPHONE-CHECKLIST.md](IPHONE-CHECKLIST.md) once as a check.
+
+**What a restart does.** A Windows Update restart, a crash or a power cut stops the app. It doesn't delete anything. The database lives in the `data` Docker volume, and SQLite keeps every write the server confirmed. A write cut off mid-request was never confirmed, so it's still in the phone's outbox and gets sent again. Compose restarts the container (`restart: unless-stopped`) as soon as Docker Desktop is running, but Docker Desktop only starts after someone signs in to Windows. Until then the phone keeps logging offline. Data is only deleted by `docker compose down -v`, removing the `data` volume, or Docker Desktop's purge/uninstall.
+
 ## Day to day
 
 | Task         | Command (in `~/workout-app` on the host)                            |
@@ -88,6 +124,8 @@ Next, run the iPhone checklist in [IPHONE-CHECKLIST.md](IPHONE-CHECKLIST.md).
 | New password | `docker compose exec app node dist/set-password.js` (signs out all) |
 | Stop serving | `sudo tailscale serve reset`                                        |
 
+On Windows, run these in PowerShell from `$HOME\\workout-app` and leave out `sudo`. Windows PowerShell 5.1 has no `&&`, so run the update commands one at a time.
+
 Updating runs any new database migrations on start, and it backs up the database to `/data/backups/` first. When a new build ships, the open app shows "Update available" instead of reloading mid-workout. Tap Reload when you're done.
 
 ### Backups (manual, until nightly backups land)
@@ -95,11 +133,11 @@ Updating runs any new database migrations on start, and it backs up the database
 Nightly backups with retention are planned (SPEC §8) but don't exist yet. Until then, take a consistent copy while the app runs and copy it off the container:
 
 ```sh
-docker compose exec app node -e "require('fs').mkdirSync('/data/backups',{recursive:true}); require('better-sqlite3')('/data/app.db').exec(\"VACUUM INTO '/data/backups/manual-$(date +%Y%m%d-%H%M%S).db'\")"
-docker compose cp app:/data/backups ~/workout-backups
+docker compose exec app node -e "require('fs').mkdirSync('/data/backups',{recursive:true});const f='/data/backups/manual-'+Date.now()+'.db';require('better-sqlite3')('/data/app.db').exec('VACUUM INTO \''+f+'\'');console.log(f)"
+docker compose cp app:/data/backups $HOME/workout-backups
 ```
 
-Copy `~/workout-backups` to another disk or machine for it to count as a backup.
+Both lines work in bash and PowerShell. Copy the `workout-backups` folder in your home directory to another disk or machine for it to count as a backup.
 
 To restore, stop the app, put the backup in place as `/data/app.db` (removing the old WAL files, or SQLite replays them onto the restored file), and start it again:
 
@@ -109,6 +147,18 @@ docker compose run --rm --no-deps -v "$HOME/workout-backups:/restore:ro" app \
   sh -c 'cp /restore/<file>.db /data/app.db && rm -f /data/app.db-wal /data/app.db-shm'
 docker compose start
 ```
+
+### Moving to a new host
+
+The server's data is one SQLite file, and the phone's installed app is tied to its URL. To move without losing either:
+
+1. Sync the phone and laptop until nothing is pending.
+2. On the old host, take a backup (above) and copy the `workout-backups` folder to the new host.
+3. Set up the new host (steps 2–3, or [Windows host](#windows-host-interim) steps 1–3), then restore the backup there before using it. The password comes with the database.
+4. In the Tailscale admin console, remove the old machine, rename the new one to the old name (e.g. `workout`) and run `tailscale serve --bg 3000` on it. The URL stays the same, so the phone keeps its installed app and local data.
+5. Open the app on the phone and check that your history is there.
+
+With a different name instead, reinstall the app on the phone from the new URL. It downloads everything from the server, but anything the old install hadn't synced is lost.
 
 ### Troubleshooting
 
