@@ -2,6 +2,14 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-10-31: Docker Compose packaging (#18)
+
+- **One image, two stages, on `node:24.22.2-slim`.** The build stage installs pnpm with npm, runs `pnpm install --frozen-lockfile` and `pnpm build`, then `pnpm deploy --prod` copies the server with production deps only. The runtime stage holds that, the server `dist` and the web `dist`. No pnpm, TypeScript or dev deps ship (335 MB, most of it the Node base image). The Node tag matches `node@runtime` in the lockfile, so the container runs the same Node as dev and CI. Debian slim over Alpine: glibc gets the standard prebuilt binaries for native modules like better-sqlite3 (#20). (§2, §8)
+- **Bind `0.0.0.0` in the container, publish on `127.0.0.1` only.** Inside a container the server has to listen on all interfaces for Docker to forward to it; `compose.yaml` publishes `127.0.0.1:${PORT:-3000}:3000`, so the host stays localhost-only per §8. Host networking was the alternative, but it shares the host's whole network stack with the container and works differently on Docker Desktop. (§8)
+- **Runs as `node`, with `init: true` and a built-in healthcheck.** The image runs as the unprivileged `node` user. Compose's `init` adds tini so `docker compose down` stops the container straight away instead of waiting out the 10 s kill timeout. The `/healthz` healthcheck lives in the `Dockerfile` and uses Node's `fetch`, since the slim image has no curl. (§8)
+- **Data in a named volume at `/data`.** It is ready for the SQLite file (#20) and survives `docker compose down`. Backups (§8) will read from it. (§8)
+- **CI builds both architectures on native runners.** A `Docker image` job runs on `ubuntu-24.04` and `ubuntu-24.04-arm` (free for public repos) instead of emulating arm64 with QEMU, which would make native-module builds slow. Each run builds the image, starts it and checks `/healthz` and the web app. Nothing is pushed to a registry until a host exists (#23). It uses `docker/setup-buildx-action@v4` and `docker/build-push-action@v7`, with layers cached per architecture in the GitHub Actions cache. (§8, §10)
+
 ## 2026-10-30: CI on pull requests (#7)
 
 - **One GitHub Actions job on `ubuntu-latest`.** It runs on PRs to `main` and pushes to `main`: frozen-lockfile install, then `lint`, `format:check`, `typecheck`, `test`, `build`, the same commands as local dev. One job keeps a single required check (`Lint, test and build`) for the `protect-main` ruleset; the steps are cheap enough that splitting them into parallel jobs isn't worth the extra installs yet. No arm64 or macOS matrix until something platform-specific (better-sqlite3) lands. (§2, §10)
