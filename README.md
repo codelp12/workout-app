@@ -31,6 +31,21 @@ pnpm start            # http://127.0.0.1:3000
 
 Other commands: `pnpm test` (`test:watch`), `pnpm typecheck`, `pnpm lint` (`lint:fix`), `pnpm format` (`format:check`). CI runs lint, format check, typecheck, tests and build on every PR (`.github/workflows/ci.yml`).
 
+## Run with Docker Compose
+
+The deployable form is one container (SPEC §8): Node serves the API and the built PWA. Needs Docker with Compose v2; no Node or pnpm on the host.
+
+```sh
+docker compose up -d --build   # http://127.0.0.1:3000
+docker compose ps              # shows (healthy) once /healthz responds
+docker compose logs -f
+docker compose down            # keeps the data volume; add -v to delete it
+```
+
+- The port is published on `127.0.0.1` only, so nothing else on the network can reach it; Tailscale Serve will provide HTTPS and tailnet access (#23). Set `PORT` to use a different host port, e.g. `PORT=8080 docker compose up -d`.
+- App data lives in the `data` volume, mounted at `/data` in the container (the SQLite file goes there once #20 lands).
+- The image runs as the unprivileged `node` user and has a built-in healthcheck on `/healthz`. It builds for `linux/amd64` and `linux/arm64`; CI builds and smoke-tests both on every PR, but nothing is pushed to a registry yet.
+
 Server env vars: `HOST` (default `127.0.0.1`), `PORT` (default `3000`), `WEB_DIST` (default `../web/dist`, relative to `apps/server`).
 
 ## Layout

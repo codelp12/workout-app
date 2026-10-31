@@ -16,13 +16,14 @@ pnpm 12 (`packageManager` in `package.json`). Node 24 comes from `devEngines.run
 - `pnpm typecheck`: typecheck every package.
 - `pnpm test`: run every test once with Vitest. `pnpm test:watch` reruns on change.
 - `pnpm lint`: ESLint (typescript-eslint type-checked rules, plus React hooks/refresh rules in `apps/web`) over the whole repo. `pnpm lint:fix` applies autofixes.
+- `docker compose up -d --build`: build and run the production container on `127.0.0.1:3000` (`Dockerfile`, `compose.yaml`).
 - `pnpm format`: format everything with Prettier (default options). `pnpm format:check` checks without writing; run it before pushing.
 
 Tests are `*.test.ts(x)` files next to the code they cover. The root `vitest.config.js` runs each folder in `apps/*` and `packages/*` as its own Vitest project, using that package's `vite.config.ts` if it has one. The server keeps its routes in `src/app.ts` so tests can call `app.request()` without opening a port; `tsconfig.build.json` keeps test files out of `dist`.
 
 Lint config is `eslint.config.js` at the root; Prettier skips `.gitignore`d files and anything in `.prettierignore`. Formatting is Prettier's job, so don't add style rules to ESLint.
 
-CI (`.github/workflows/ci.yml`) runs on every PR to `main` and every push to `main`: `pnpm install --frozen-lockfile`, then `lint`, `format:check`, `typecheck`, `test` and `build`. Run the same commands locally before pushing; the `protect-main` ruleset requires the `Lint, test and build` check to pass. If you rename the job, the owner has to update the ruleset.
+CI (`.github/workflows/ci.yml`) runs on every PR to `main` and every push to `main`: `pnpm install --frozen-lockfile`, then `lint`, `format:check`, `typecheck`, `test` and `build`. A second job, `Docker image`, builds the image on native amd64 and arm64 runners and checks `/healthz` and the web app in the running container. If you touch the `Dockerfile`, run `docker build .` locally too. Keep `NODE_VERSION` in the `Dockerfile` equal to `node@runtime` in `pnpm-lock.yaml`, and its pnpm version equal to `packageManager`. Run the same commands locally before pushing; the `protect-main` ruleset requires the `Lint, test and build` check to pass. If you rename the job, the owner has to update the ruleset.
 
 Dependency build scripts are blocked unless listed under `allowBuilds` in `pnpm-workspace.yaml`; adding one there needs a reason.
 

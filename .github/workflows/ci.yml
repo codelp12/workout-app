@@ -33,3 +33,44 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+
+  docker:
+    name: Docker image (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      # Native runner per arch, no QEMU. Built and smoke-tested, not pushed.
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: workout-app:ci
+          cache-from: type=gha,scope=docker-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=docker-${{ matrix.arch }}
+
+      - name: Smoke test
+        run: |
+          docker run -d --name app -p 127.0.0.1:3000:3000 workout-app:ci
+          for i in $(seq 30); do
+            [ "$(docker inspect -f '{{.State.Health.Status}}' app)" = healthy ] && break
+            sleep 2
+          done
+          docker inspect -f '{{.State.Health.Status}}' app | grep -qx healthy
+          curl -fsS http://127.0.0.1:3000/healthz
+          curl -fsS http://127.0.0.1:3000/ | grep -q '<div id="root">'
+
+      - name: Container logs
+        if: always()
+        run: docker logs app || true

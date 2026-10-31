@@ -1,0 +1,14 @@
+services:
+  app:
+    build: .
+    image: workout-app
+    restart: unless-stopped
+    init: true
+    ports:
+      # Localhost only; Tailscale Serve provides HTTPS and tailnet access (SPEC §8).
+      - "127.0.0.1:${PORT:-3000}:3000"
+    volumes:
+      - data:/data
+
+volumes:
+  data:
