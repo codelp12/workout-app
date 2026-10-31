@@ -15,6 +15,7 @@ pnpm 12 (`packageManager` in `package.json`). Node 24 comes from `devEngines.run
 - `pnpm start`: run the built server, which also serves the built web app.
 - `pnpm typecheck`: typecheck every package.
 - `pnpm test`: run every test once with Vitest. `pnpm test:watch` reruns on change.
+- `pnpm test:e2e`: Playwright E2E (Chromium and WebKit at 390×844) in `e2e/`. Run `pnpm build` first; it starts the built server on :4173 with an in-memory database. Install the browsers once with `pnpm --filter @workout-app/e2e exec playwright install --with-deps chromium webkit`. Screenshots and failure traces go to `e2e/test-results/`.
 - `pnpm lint`: ESLint (typescript-eslint type-checked rules, plus React hooks/refresh rules in `apps/web`) over the whole repo. `pnpm lint:fix` applies autofixes.
 - `pnpm --filter @workout-app/server db:generate`: generate a migration in `apps/server/drizzle/` after editing `apps/server/src/schema.ts`. Commit it; never edit an applied migration.
 - `docker compose up -d --build`: build and run the production container on `127.0.0.1:3000` (`Dockerfile`, `compose.yaml`).
@@ -24,7 +25,7 @@ Tests are `*.test.ts(x)` files next to the code they cover. The root `vitest.con
 
 Lint config is `eslint.config.js` at the root; Prettier skips `.gitignore`d files and anything in `.prettierignore`. Formatting is Prettier's job, so don't add style rules to ESLint.
 
-CI (`.github/workflows/ci.yml`) runs on every PR to `main` and every push to `main`: `pnpm install --frozen-lockfile`, then `lint`, `format:check`, `typecheck`, `test` and `build`. A second job, `Docker image`, builds the image on native amd64 and arm64 runners and checks `/healthz` and the web app in the running container. If you touch the `Dockerfile`, run `docker build .` locally too. Keep `NODE_VERSION` in the `Dockerfile` equal to `node@runtime` in `pnpm-lock.yaml`, and its pnpm version equal to `packageManager`. Run the same commands locally before pushing; the `protect-main` ruleset requires the `Lint, test and build` check to pass. If you rename the job, the owner has to update the ruleset.
+CI (`.github/workflows/ci.yml`) runs on every PR to `main` and every push to `main`: `pnpm install --frozen-lockfile`, then `lint`, `format:check`, `typecheck`, `test`, `build` and `test:e2e` (uploaded as the `e2e-results` artifact). A second job, `Docker image`, builds the image on native amd64 and arm64 runners and checks `/healthz` and the web app in the running container. If you touch the `Dockerfile`, run `docker build .` locally too. Keep `NODE_VERSION` in the `Dockerfile` equal to `node@runtime` in `pnpm-lock.yaml`, and its pnpm version equal to `packageManager`. Run the same commands locally before pushing; the `protect-main` ruleset requires the `Lint, test and build` check to pass. If you rename the job, the owner has to update the ruleset.
 
 Dependency build scripts are blocked unless listed under `allowBuilds` in `pnpm-workspace.yaml`; adding one there needs a reason.
 

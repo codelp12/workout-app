@@ -31,7 +31,7 @@ pnpm start            # http://127.0.0.1:3000
 
 The built app is an installable PWA (manifest, service worker via vite-plugin-pwa). The service worker only runs from `pnpm build` output, not `pnpm dev`, and only on a secure origin: `localhost`/`127.0.0.1` on the laptop, HTTPS (Tailscale Serve, #23) on the phone. A new build shows an "Update available" bar instead of reloading on its own.
 
-Other commands: `pnpm test` (`test:watch`), `pnpm typecheck`, `pnpm lint` (`lint:fix`), `pnpm format` (`format:check`). CI runs lint, format check, typecheck, tests and build on every PR (`.github/workflows/ci.yml`).
+Other commands: `pnpm test` (`test:watch`), `pnpm test:e2e` (after `pnpm build`; see AGENTS.md for the browser install), `pnpm typecheck`, `pnpm lint` (`lint:fix`), `pnpm format` (`format:check`). CI runs lint, format check, typecheck, tests, build and E2E on every PR (`.github/workflows/ci.yml`).
 
 ## Run with Docker Compose
 
@@ -58,4 +58,5 @@ SQLite through better-sqlite3 and Drizzle. Pending migrations in `apps/server/dr
 
 - `apps/web`: React + TypeScript + Vite client.
 - `apps/server`: Node + Hono server (API, `/healthz`, serves the built client).
+- `e2e`: Playwright end-to-end tests against the built app.
 - `packages/*`: shared libraries (engine, shared types, exercise data), added as they're needed.
