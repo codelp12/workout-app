@@ -2,6 +2,14 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-10-31: Deploy runbook and iPhone checklist (#23, #24)
+
+- **Tailscale runs on the host, not as a sidecar container.** `tailscale serve --bg 3000` proxies HTTPS on :443 to the existing `127.0.0.1:3000` port, so `compose.yaml` doesn't change and the tailnet node outlives app rebuilds. The server's key expiry is disabled so it doesn't fall off the tailnet after 180 days. (§3.3, §8)
+- **No change needed for CSRF behind Serve.** Serve keeps the `Host` header but the app sees plain HTTP, so `Origin` (`https://…`) doesn't match the request URL. Hono's `csrf()` only checks form-type bodies and accepts a same-origin `Sec-Fetch-Site`, and the app posts JSON, so sign-in works; checked with curl using Serve's headers. (§8)
+- **Manual `VACUUM INTO` backups until the nightly job exists.** `docs/DEPLOY.md` gives a one-liner that runs in the running container, plus a restore that deletes the old `-wal`/`-shm` files. Both were tested against the Compose stack. (§8)
+- **The iPhone checklist lives in `docs/IPHONE-CHECKLIST.md`**, with a results template for the issue, so later phases can add their per-release items from §10.
+- **Host choice is still open (§12 Q1).** It gets its own entry when the owner picks the box.
+
 ## 2026-10-31: Single-user sign-in (#29)
 
 - **Password only, one account.** A single `account` row (id 1) holds the password hash. Passkeys (also allowed by §8) can come later; a password is enough behind Tailscale and needs no extra dependency. (§8)
