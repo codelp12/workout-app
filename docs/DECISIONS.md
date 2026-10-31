@@ -2,6 +2,13 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-10-31: Windows PC as the interim host (#23)
+
+- **The owner's Windows PC hosts the app until an always-on Linux box exists**, with Docker Desktop and Tailscale for Windows (`docs/DEPLOY.md`, "Windows host"). This answers §12 Q1 for now; the MacBook was only for the iPhone check. (§8, §12 Q1)
+- **Accepted cost: downtime after forced restarts.** Docker Desktop starts only after a Windows sign-in, so a Windows Update restart takes the app down until the owner signs in. No data is lost: the phone keeps logging offline, SQLite (WAL) keeps every acknowledged write, and unacknowledged ones are still in the outbox. Checked by `docker kill`-ing the container after a write: the row was there after restart. (§3.1, §8)
+- **Name the Tailscale machine after the app, not the hardware** (e.g. `workout`). A move to new hardware is then a database restore plus giving the new machine the same name, so the URL, and with it the phone's installed app and local data, survives.
+- **One backup one-liner for bash and PowerShell.** It builds the file name in JavaScript and avoids shell-specific quoting.
+
 ## 2026-10-31: iPhone check passed (#24)
 
 - **The offline design works on a real iPhone.** The owner ran every step in `docs/IPHONE-CHECKLIST.md`: install from Safari over HTTPS, launch and write a note in airplane mode, relaunch, reconnect, and see the note on the laptop exactly once. All passed, so SPEC §3.3 and §3.4 hold and Phase 1 can build on the Dexie outbox and service worker. Results are on #24. (§3.3, §3.4, §9)
