@@ -124,7 +124,7 @@ The same app, run with Docker Desktop on a Windows 10 or 11 PC that stays on. Ru
 | New password | `docker compose exec app node dist/set-password.js` (signs out all) |
 | Stop serving | `sudo tailscale serve reset`                                        |
 
-On Windows, run these in PowerShell from `$HOME\\workout-app` and leave out `sudo`. Windows PowerShell 5.1 has no `&&`, so run the update commands one at a time.
+On Windows, run these in PowerShell from `$HOME\workout-app` and leave out `sudo`. Windows PowerShell 5.1 has no `&&`, so run the update commands one at a time.
 
 Updating runs any new database migrations on start, and it backs up the database to `/data/backups/` first. When a new build ships, the open app shows "Update available" instead of reloading mid-workout. Tap Reload when you're done.
 
@@ -137,14 +137,13 @@ docker compose exec app node -e "require('fs').mkdirSync('/data/backups',{recurs
 docker compose cp app:/data/backups $HOME/workout-backups
 ```
 
-Both lines work in bash and PowerShell. Copy the `workout-backups` folder in your home directory to another disk or machine for it to count as a backup.
+These commands, and the restore below, work in bash and PowerShell. Copy the `workout-backups` folder in your home directory to another disk or machine for it to count as a backup.
 
 To restore, stop the app, put the backup in place as `/data/app.db` (removing the old WAL files, or SQLite replays them onto the restored file), and start it again:
 
 ```sh
 docker compose stop
-docker compose run --rm --no-deps -v "$HOME/workout-backups:/restore:ro" app \
-  sh -c 'cp /restore/<file>.db /data/app.db && rm -f /data/app.db-wal /data/app.db-shm'
+docker compose run --rm --no-deps -v "$HOME/workout-backups:/restore:ro" app sh -c 'cp /restore/<file>.db /data/app.db && rm -f /data/app.db-wal /data/app.db-shm'
 docker compose start
 ```
 
