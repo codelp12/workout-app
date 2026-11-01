@@ -23,15 +23,11 @@ test("a fresh install gets the library on its first sync", async ({ page }) => {
   await page.getByLabel("Password").fill(E2E_PASSWORD);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.getByTestId("sync-chip")).toHaveText("Synced");
-  await expect(
-    page.getByText(/^\d+ exercises are on this device/),
-  ).toBeVisible();
-  const count = Number(
-    (await page.getByText(/exercises are on this device/).textContent())!.split(
-      " ",
-    )[0],
-  );
-  expect(count).toBeGreaterThan(800);
+  // The pull arrives in pages, so the count climbs before it settles.
+  const count = page.getByText(/exercises are on this device/);
+  await expect
+    .poll(async () => parseInt((await count.textContent()) ?? "0"))
+    .toBeGreaterThan(800);
 });
 
 test("core images load in airplane mode", async ({ page, context }) => {
