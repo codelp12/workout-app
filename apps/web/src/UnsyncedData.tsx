@@ -9,6 +9,7 @@ import {
   type UnsyncedSummary,
 } from "./sync/unsynced";
 import { useLiveQuery } from "./use-live-query";
+import { button, card } from "./ui";
 
 const summaryQuery = () => unsyncedSummary(localDb);
 const none: UnsyncedSummary = { sessions: 0, pending: 0, rejected: 0 };
@@ -51,15 +52,23 @@ export function UnsyncedWarning() {
     rejected > 0 && `${plural(rejected, "change")} the server couldn't accept`,
   ].filter(Boolean);
   return (
-    <section role="status" aria-label="Unsynced data">
+    <section
+      role="status"
+      aria-label="Unsynced data"
+      className={`${card} border border-warning`}
+    >
       <p>
-        <strong>{parts.join(" · ")}</strong>
+        <strong className="text-warning">{parts.join(" · ")}</strong>
       </p>
-      <p>
+      <p className="mt-1 text-sm text-fg-muted">
         This is only on this device until it syncs. If sync keeps failing,
         export it to a file so it isn't lost.
       </p>
-      <button type="button" onClick={() => void exportToFile()}>
+      <button
+        type="button"
+        className={`${button} mt-3`}
+        onClick={() => void exportToFile()}
+      >
         Export unsynced data
       </button>
     </section>
@@ -100,16 +109,21 @@ export function ImportUnsynced() {
   }
 
   return (
-    <section>
-      <label>
+    <section className={card}>
+      <label className="flex flex-col gap-2 text-sm">
         Import unsynced data{" "}
         <input
           type="file"
+          className="text-fg-muted file:mr-3 file:min-h-tap file:rounded-lg file:border-0 file:bg-surface-raised file:px-4 file:font-medium file:text-fg"
           accept="application/json,.json"
           onChange={(e) => void onChange(e)}
         />
       </label>
-      {message && <p role="status">{message}</p>}
+      {message && (
+        <p role="status" className="mt-2 text-sm">
+          {message}
+        </p>
+      )}
     </section>
   );
 }
