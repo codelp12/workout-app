@@ -1,5 +1,9 @@
 import react from "@vitejs/plugin-react";
-import { defaultClientConditions, defineConfig } from "vite";
+import {
+  defaultClientConditions,
+  defaultServerConditions,
+  defineConfig,
+} from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 
 const serverUrl = process.env.SERVER_URL ?? "http://127.0.0.1:3000";
@@ -8,6 +12,12 @@ export default defineConfig({
   resolve: {
     // Use workspace packages' TypeScript source instead of their dist.
     conditions: ["@workout-app/source", ...defaultClientConditions],
+  },
+  // Vitest runs tests in Node through the SSR resolver.
+  ssr: {
+    resolve: {
+      conditions: ["@workout-app/source", ...defaultServerConditions],
+    },
   },
   plugins: [
     react(),
