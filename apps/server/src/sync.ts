@@ -21,7 +21,7 @@ import { opReceipt, syncCounter } from "./schema.js";
 /** Single-user app (SPEC §1): every row belongs to the one account. */
 export const OWNER_USER_ID = 1;
 
-type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+export type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 // One table type stands in for all of them: every op touches only the shared sync columns or a row its schema has validated.
 type EntityTable = typeof entityTables.exercise;
 
@@ -43,7 +43,8 @@ const pullQuery = z.object({
     .default(DEFAULT_PULL_LIMIT),
 });
 
-function nextSeq(tx: Tx): number {
+/** Claims the next global `serverSeq`. */
+export function nextSeq(tx: Tx): number {
   return tx
     .insert(syncCounter)
     .values({ id: 1, lastSeq: 1 })

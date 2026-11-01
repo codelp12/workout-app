@@ -2,6 +2,13 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-11-01: Seeding the library and caching it offline (#38)
+
+- **The server seeds the library at startup.** `seedExercises()` (`apps/server/src/seed.ts`) runs after migrations and inserts every free-exercise-db exercise the database doesn't have yet, each with a new `serverSeq`, so devices get them through the normal pull and a fresh install has the library after its first sync. It never updates or undeletes an existing row, so edits and deletions survive restarts. A future dataset bump only adds new exercises; changing existing ones would need its own migration. (§3.1, §7)
+- **Library ids are UUIDv5 of `free-exercise-db:<sourceId>`** (`libraryExerciseId()` in `packages/shared`), so they're the same on every server and device, and templates (#46) can refer to an exercise before any sync. The namespace is fixed in code; changing it would re-key every exercise. (§4)
+- **The server serves exercise images at `/media/exercises/<media path>`** straight from `packages/exercise-data/media/`, without a session (they're Unlicense dataset photos, like the app shell), with a one-day `Cache-Control`. Missing files are a 404, never the app shell. The server stays offline-capable: it never fetches images itself. (§7)
+- **The service worker pre-caches all 304 core images** (3.5 MB) through `additionalManifestEntries` in `apps/web/vite.config.ts`, revisioned by content hash, so they're there in airplane mode from the first visit. Any other `/media/` image is cached the first time it loads (`CacheFirst`, at most 1000 entries). Non-core exercises have no image files yet. (§7)
+
 ## 2026-11-01: Core exercise set and images (#37)
 
 - **The core set is a hand-picked list of 152 free-exercise-db ids** in `packages/exercise-data/src/core.ts`: the default templates' exercises, then dumbbell, band, bodyweight and kettlebell substitutes for each pattern (a few barbell, EZ-bar and cable ones for gym days), core work, and 24 mobility entries for warm-ups and cool-downs. 120 of the 152 are tagged dumbbell, band, bodyweight or kettlebell (most stretches have no equipment tag). Tests check every id exists and the count stays near 150. Climbing-specific exercises (hangboard, etc.) aren't in free-exercise-db and come with the climbing epics. (§5.1, §7)
