@@ -2,6 +2,21 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-11-01: free-exercise-db import (#36)
+
+- **The dataset is vendored, pinned and hash-checked.** `packages/exercise-data/data/free-exercise-db/` holds upstream's `dist/exercises.json` and `LICENSE.md` from commit `f00c92c` (2026-09-27), exactly as published; `source.json` records the commit and each file's SHA-256. `pnpm --filter @workout-app/exercise-data dataset` re-downloads that commit and fails if a byte differs, and a test checks the vendored files against the hashes. The script only runs at dev time; the app never fetches from GitHub. Prettier skips the folder so the bytes stay upstream's. (§7)
+- **Mapping happens in code, not in a generated file.** `loadFreeExerciseDb()` validates the vendored JSON against upstream's schema (zod) and maps each entry with `mapExercise()`, so a mapping change is a reviewable code diff and there is no second 1 MB file to keep in sync. The package is Node-only (it reads the file with `fs`); clients get exercises through sync (#38). (§4, §7)
+- **Cardio entries (14: treadmill, bikes, rowers, stair machines) aren't imported.** Runs are `run_log`s with their own workout content (§7), and cardio machines aren't in the plan. Everything else, 862 exercises, is imported; curating the ~150 core ones is #37. (§4, §7)
+- **Derived fields use simple, tested rules.** Upstream has no aliases, movement patterns, stress tags or substitution groups:
+  - `movementPattern`: one of `MOVEMENT_PATTERNS` (squat, lunge, hinge, horizontal/vertical push and pull, carry, olympic, jump, curl, triceps_extension, raise, fly, leg_extension, leg_curl, calf_raise, shrug, core, stretch), from name keywords, category and primary muscle, first match wins. About 10% of lifts (odd strongman and rotation moves) get none.
+  - `stressTags`: the pattern's regions plus each primary muscle's region (quads → knee, forearms → wrist, …), in `STRESS_TAGS` order.
+  - `substitutionGroup`: `<pattern>:<first primary muscle>`, e.g. `horizontal_push:chest`, falling back to the mechanic (`compound:quadriceps`).
+  - `progressionModel`: `e1rm_rir` for compound main patterns with free weights (barbell, dumbbell, kettlebell, EZ bar), else `double_progression` with an 8–12 rep range; none for stretches. `increment` stays null, meaning the equipment's default step (§5.1).
+  - `aliases`: abbreviations people type (DB, BB, KB, RDL, OHP). `unilateral` from names like one-arm, single-leg, lunge and split squat. `cues` and `commonMistakes` start empty.
+    (§4, §5.1, §5.5)
+- **Vocabulary is snake_case:** muscles as upstream names them (`lower back` → `lower_back`) and equipment as `EQUIPMENT` (`body only` → `bodyweight`, `e-z curl bar` → `ez_bar`). (§4)
+- **Every exercise and every image carries `source: free-exercise-db@<commit>` and `license: Unlicense`**, plus `sourceId` (upstream's id). Image `path`s are upstream's (`3_4_Sit-Up/0.jpg`) until the image pipeline (#37) converts them to WebP. (§7)
+
 ## 2026-11-01: Navigation shell (#34)
 
 - **React Router in declarative ("library") mode** (`react-router`, owner-approved on the roadmap): `BrowserRouter` in `main.tsx` and `<Routes>` in `src/Navigation.tsx`. Data mode's loaders and actions aren't needed, since screens read Dexie through live queries and never wait on the network. (§2, §6)
