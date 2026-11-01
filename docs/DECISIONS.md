@@ -2,6 +2,15 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-11-01: Tailwind and dark theme (#32)
+
+- **Tailwind CSS v4 through `@tailwindcss/vite`** (dev dependencies `tailwindcss` and `@tailwindcss/vite`, SPEC §2). v4 is configured in CSS, so there is no `tailwind.config.js` or PostCSS setup; its native engine ships as prebuilt platform packages and needs no `allowBuilds` entry. (§2)
+- **All theme tokens live in the `@theme` block of `apps/web/src/index.css`:** surfaces (`bg`, `surface`, `surface-raised`, `border`), text (`fg`, `fg-muted`), `accent`, `danger`, `warning`, one color per modality and `--spacing-tap`. Components use only these tokens (`bg-surface`, `text-climb`, `min-h-tap`), not Tailwind's palette. `bg` (`#111827`) is also the `theme-color` in `index.html` and the manifest colors; `theme.test.ts` keeps them equal. (§6)
+- **Modality colors:** lifting orange (`#fb923c`), running sky blue (`#38bdf8`), climbing green (`#4ade80`), mobility violet (`#c084fc`). `src/modality.ts` maps each modality to its label and class names, so screens pick a modality's color from one place and a new modality fails typecheck until it has one. (§6)
+- **Dark only for now.** `color-scheme: dark` and no light theme or toggle; the spec says dark by default and nothing needs light yet. (§6)
+- **Tap targets are at least 48 px** (`--spacing-tap: 3rem`), above Apple's 44 pt minimum, for use mid-set with chalky or sweaty hands. The base layer applies it to every button and form control. (§6)
+- **Tabular numerals app-wide** (`font-variant-numeric: tabular-nums` on `body`), with the system font stack, so nothing is downloaded and weights and paces line up. (§6)
+
 ## 2026-11-01: Unsynced-data safety net (#30)
 
 - **"N unsynced sessions" counts distinct training sessions** with a queued or rejected write: a `session_log` op, or a `set_log`, `run_log` or `ascent` op whose `sessionLogId` points at it. Until the logging screens exist, other queued writes (like Projects) show as "N unsynced changes", and rejected ops get their own count. The warning is hidden while a sync is running, so an ordinary online write doesn't flash it. (§3.4)

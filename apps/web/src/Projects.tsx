@@ -1,7 +1,11 @@
 import { newId, type Project } from "@workout-app/shared";
 import { useState, type FormEvent } from "react";
+import { modalityStyles } from "./modality";
 import { localDb, pendingRowIds, remove, save } from "./sync";
+import { button, buttonBase, card, input } from "./ui";
 import { useLiveQuery } from "./use-live-query";
+
+const climb = modalityStyles.climb;
 
 const activeProjects = () =>
   localDb
@@ -36,26 +40,55 @@ export function Projects() {
   }
 
   return (
-    <section>
-      <h2>Projects</h2>
-      <form onSubmit={(e) => void onSubmit(e)}>
-        <label>
-          Name <input value={name} onChange={(e) => setName(e.target.value)} />
+    <section className={card}>
+      <h2 className={`text-lg font-semibold ${climb.text}`}>Projects</h2>
+      <form
+        className="mt-3 grid grid-cols-[1fr_6rem] gap-3"
+        onSubmit={(e) => void onSubmit(e)}
+      >
+        <label className="flex flex-col gap-1 text-sm">
+          Name{" "}
+          <input
+            className={input}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
         </label>{" "}
-        <label>
+        <label className="flex flex-col gap-1 text-sm">
           Grade{" "}
-          <input value={grade} onChange={(e) => setGrade(e.target.value)} />
+          <input
+            className={input}
+            value={grade}
+            onChange={(e) => setGrade(e.target.value)}
+          />
         </label>{" "}
-        <button type="submit">Add project</button>
+        <button
+          type="submit"
+          className={`${buttonBase} col-span-2 ${climb.fill}`}
+        >
+          Add project
+        </button>
       </form>
-      <ul aria-label="Projects">
+      <ul aria-label="Projects" className="mt-3 flex flex-col gap-2">
         {projects.map((p) => (
-          <li key={p.id}>
-            {p.name}
-            {p.grade && ` ${p.grade}`}
-            {pending.has(p.id) && " (pending)"}{" "}
+          <li
+            key={p.id}
+            className={`flex items-center gap-2 rounded-lg bg-bg py-1 pr-1 pl-3 ${climb.accent}`}
+          >
+            <span className="flex-1">
+              {p.name}
+              {p.grade && (
+                <span className={`font-semibold ${climb.text}`}>
+                  {` ${p.grade}`}
+                </span>
+              )}
+              {pending.has(p.id) && (
+                <span className="text-sm text-fg-muted"> (pending)</span>
+              )}
+            </span>{" "}
             <button
               type="button"
+              className={button}
               aria-label={`Delete ${p.name}`}
               onClick={() => void remove("project", p.id)}
             >

@@ -10,7 +10,7 @@ export function SyncChip() {
   return (
     <button
       type="button"
-      className="sync-chip"
+      className="min-h-tap rounded-full bg-surface px-4 text-sm text-fg-muted active:bg-surface-raised"
       data-testid="sync-chip"
       title="Sync now"
       onClick={() => void syncEngine.sync()}

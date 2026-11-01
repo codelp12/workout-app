@@ -2,6 +2,7 @@ import Dexie from "dexie";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
+import "./index.css";
 import { requestPersistentStorage } from "./storage";
 import { UpdatePrompt } from "./UpdatePrompt";
 

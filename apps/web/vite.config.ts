@@ -1,3 +1,4 @@
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import {
   defaultClientConditions,
@@ -21,6 +22,7 @@ export default defineConfig({
   },
   plugins: [
     react(),
+    tailwindcss(),
     VitePWA({
       // Never reload on our own: a new build waits for the user to accept
       // the update prompt (SPEC §8).
@@ -33,6 +35,7 @@ export default defineConfig({
         start_url: "/",
         scope: "/",
         display: "standalone",
+        // Keep equal to --color-bg in src/index.css.
         background_color: "#111827",
         theme_color: "#111827",
         icons: [
