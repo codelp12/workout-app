@@ -1,1 +1,4 @@
 pnpm-lock.yaml
+
+# Vendored datasets, kept byte-for-byte (checked by SHA-256)
+packages/exercise-data/data/

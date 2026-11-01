@@ -18,6 +18,7 @@ pnpm 12 (`packageManager` in `package.json`). Node 24 comes from `devEngines.run
 - `pnpm test:e2e`: Playwright E2E (Chromium and WebKit at 390×844) in `e2e/`. Run `pnpm build` first; it starts the built server on :4173 with an in-memory database. Install the browsers once with `pnpm --filter @workout-app/e2e exec playwright install --with-deps chromium webkit`. Screenshots and failure traces go to `e2e/test-results/`.
 - `pnpm lint`: ESLint (typescript-eslint type-checked rules, plus React hooks/refresh rules in `apps/web`) over the whole repo. `pnpm lint:fix` applies autofixes.
 - `pnpm --filter @workout-app/server db:generate`: generate a migration in `apps/server/drizzle/` after editing `apps/server/src/schema.ts`. Commit it; never edit an applied migration.
+- `pnpm --filter @workout-app/exercise-data dataset [<commit>]`: re-download free-exercise-db at the pinned commit into `packages/exercise-data/data/free-exercise-db/` and check it against the SHA-256s in `source.json`; with a commit SHA, move the pin. Never edit the vendored files by hand.
 - `docker compose up -d --build`: build and run the production container on `127.0.0.1:3000` (`Dockerfile`, `compose.yaml`).
 - `pnpm format`: format everything with Prettier (default options). `pnpm format:check` checks without writing; run it before pushing.
 

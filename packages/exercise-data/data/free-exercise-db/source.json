@@ -1,0 +1,15 @@
+{
+  "repo": "yuhonas/free-exercise-db",
+  "commit": "f00c92c7dcf1216a928a52c3706c7ce8e2f71ed5",
+  "license": "Unlicense",
+  "files": {
+    "exercises.json": {
+      "path": "dist/exercises.json",
+      "sha256": "5bb747e3fc658f095a60dcbf6d53c96627acdcc6ffb6fffde86f7e26995d40bf"
+    },
+    "LICENSE.md": {
+      "path": "LICENSE.md",
+      "sha256": "6b0382b16279f26ff69014300541967a356a666eb0b91b422f6862f6b7dad17e"
+    }
+  }
+}

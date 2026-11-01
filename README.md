@@ -71,4 +71,4 @@ SQLite through better-sqlite3 and Drizzle. Pending migrations in `apps/server/dr
 - `apps/web`: React + TypeScript + Vite client.
 - `apps/server`: Node + Hono server (API, `/healthz`, serves the built client).
 - `e2e`: Playwright end-to-end tests against the built app.
-- `packages/*`: shared libraries (engine, shared types, exercise data), added as they're needed.
+- `packages/*`: shared libraries, added as they're needed: `shared` (row schemas and sync types), `exercise-data` (the pinned free-exercise-db import).
