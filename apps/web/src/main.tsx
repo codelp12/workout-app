@@ -1,3 +1,4 @@
+import Dexie from "dexie";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
@@ -8,6 +9,8 @@ const root = document.getElementById("root");
 if (!root) throw new Error("Missing #root element");
 
 void requestPersistentStorage();
+// The Phase 0 spike store; its notes were test data.
+void Dexie.delete("workout-app-spike");
 
 createRoot(root).render(
   <StrictMode>

@@ -346,15 +346,6 @@ describe("core schema migration", () => {
     db.insert(schema.authSession)
       .values({ id: "h", createdAt: now, expiresAt: now + 1 })
       .run();
-    db.insert(schema.spikeNotes)
-      .values({
-        id: newId(),
-        opId: newId(),
-        body: "kept",
-        createdAt: now,
-        receivedAt: now,
-      })
-      .run();
     db.$client.close();
 
     db = openDb(file);
@@ -363,9 +354,10 @@ describe("core schema migration", () => {
     expect(backup).not.toBeNull();
     expect(db.select().from(schema.account).all()).toHaveLength(1);
     expect(db.select().from(schema.authSession).all()).toHaveLength(1);
-    expect(
-      db.select({ body: schema.spikeNotes.body }).from(schema.spikeNotes).all(),
-    ).toEqual([{ body: "kept" }]);
+    const spike = db.$client
+      .prepare("SELECT name FROM sqlite_master WHERE name = 'spike_note'")
+      .get();
+    expect(spike).toBeUndefined();
     insertFixtures(db);
     expect(db.select().from(schema.setLog).all()).toEqual([fixtures.set_log]);
     db.$client.close();

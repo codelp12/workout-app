@@ -2,6 +2,17 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-10-31: Client sync engine (#28)
+
+- **One Dexie database, `workout-app`, mirrors every synced table** under its entity name, plus `outbox`, `rejected` and `meta` (the pull cursor). A write puts the row and its outbox op in one transaction and returns; sync runs in the background afterwards, so logging never waits on the network. A new row has `serverSeq: 0` until it comes back from a pull. (§3.1)
+- **A sync pushes the whole outbox, oldest first, then pulls from the stored cursor until `hasMore` is false.** An op leaves the outbox only once the server answers `applied` or `duplicate`. Offline, a 401 or a server error stops the run and leaves the outbox untouched. Overlapping triggers share one run, plus one follow-up. (§3.2)
+- **Rejected ops move to a `rejected` table** instead of being dropped or retried forever. Retrying can't succeed and would show "pending" indefinitely; keeping them means #30 can export them.
+- **A pull doesn't overwrite a row that still has a queued op.** The queued write reaches the server later, wins there, and comes back in a later pull.
+- **Triggers:** app open, returning to the foreground, the `online` event, after every local write, after sign-in, and tapping the status chip. `syncSoon()` is the hook for workout completion (#55). (§3.2)
+- **Status chip:** `Synced`, `N pending`, `Offline`, `Sign in to sync` and `Sync failed`, with the pending count added when offline or signed out. A sync 401 also shows the sign-in form. (§3.2)
+- **The spike is gone.** `/api/spike`, the `spike_note` table (migration `0004`) and the `workout-app-spike` IndexedDB store are deleted; their notes were test data. A placeholder climbing **Projects** list exercises sync in the UI and the E2E until the real screens land (#58).
+- **`fake-indexeddb` (dev only)** runs Dexie in the web package's Vitest tests.
+
 ## 2026-10-31: Windows PC as the interim host (#23)
 
 - **The owner's Windows PC hosts the app until an always-on Linux box exists**, with Docker Desktop and Tailscale for Windows (`docs/DEPLOY.md`, "Windows host"). This answers §12 Q1 for now; the MacBook was only for the iPhone check. (§8, §12 Q1)

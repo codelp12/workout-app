@@ -37,16 +37,6 @@ import {
   text,
 } from "drizzle-orm/sqlite-core";
 
-// Throwaway Phase 0 spike (#21). Kept until the iPhone check (#24) has run;
-// the client sync engine (#28) replaces it.
-export const spikeNotes = sqliteTable("spike_note", {
-  id: text("id").primaryKey(),
-  opId: text("op_id").notNull().unique(),
-  body: text("body").notNull(),
-  createdAt: integer("created_at").notNull(),
-  receivedAt: integer("received_at").notNull(),
-});
-
 // Single-user sign-in (#29). One row, id 1.
 export const account = sqliteTable("account", {
   id: integer("id").primaryKey(),

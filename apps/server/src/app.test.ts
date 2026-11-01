@@ -65,8 +65,8 @@ describe("auth", () => {
     for (const [method, path] of [
       ["GET", "/api/hello"],
       ["GET", "/api/nope"],
-      ["GET", "/api/spike"],
-      ["POST", "/api/spike"],
+      ["POST", "/api/sync/push"],
+      ["GET", "/api/sync/pull"],
       ["GET", "/api/auth/session"],
       ["POST", "/api/auth/logout"],
     ] as const) {
@@ -159,55 +159,5 @@ describe("auth", () => {
       body: "password=x",
     });
     expect(res.status).toBe(403);
-  });
-});
-
-describe("/api/spike", () => {
-  const note = {
-    opId: "0199f0a0-0000-7000-8000-000000000001",
-    id: "0199f0a0-0000-7000-8000-0000000000aa",
-    body: "Written offline",
-    createdAt: 1_793_450_000_000,
-  };
-  let cookie: string;
-  beforeEach(async () => {
-    cookie = await signIn();
-  });
-  const push = (body: unknown) =>
-    app.request("/api/spike", {
-      method: "POST",
-      headers: { ...json, cookie },
-      body: JSON.stringify(body),
-    });
-  const list = async () =>
-    (await (await get("/api/spike", cookie)).json()) as unknown[];
-
-  it("stores a pushed note and lists it", async () => {
-    expect(await (await push(note)).json()).toEqual({
-      ok: true,
-      duplicate: false,
-    });
-    expect(await list()).toEqual([
-      { id: note.id, body: note.body, createdAt: note.createdAt },
-    ]);
-  });
-
-  it("ignores a retried push with the same op id", async () => {
-    await push(note);
-    const retry = await push(note);
-    expect(retry.status).toBe(200);
-    expect(await retry.json()).toEqual({ ok: true, duplicate: true });
-    expect(await list()).toHaveLength(1);
-  });
-
-  it("rejects invalid notes", async () => {
-    expect((await push({ ...note, body: "  " })).status).toBe(400);
-    expect((await push({ ...note, opId: "nope" })).status).toBe(400);
-    const res = await app.request("/api/spike", {
-      method: "POST",
-      headers: { ...json, cookie },
-      body: "{",
-    });
-    expect(res.status).toBe(400);
   });
 });

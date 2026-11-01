@@ -1,16 +1,37 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { checkSession, signOut, type AuthState } from "./auth";
+import { Projects } from "./Projects";
 import { SignIn } from "./SignIn";
-import { SpikeNotes } from "./SpikeNotes";
+import { syncEngine, syncSoon } from "./sync";
+import { SyncChip } from "./SyncChip";
 
 export function App() {
   const [auth, setAuth] = useState<AuthState>("checking");
+  const syncState = useSyncExternalStore(
+    syncEngine.subscribe,
+    syncEngine.getState,
+  );
+  // A 401 from sync means the session expired since the last check.
+  const shownAuth =
+    auth === "signed-in" && syncState === "signed-out" ? "signed-out" : auth;
 
   useEffect(() => {
     const check = () => void checkSession().then(setAuth);
     check();
-    window.addEventListener("online", check);
-    return () => window.removeEventListener("online", check);
+    syncSoon();
+    const onOnline = () => {
+      check();
+      syncSoon();
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") syncSoon();
+    };
+    window.addEventListener("online", onOnline);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, []);
 
   async function onSignOut() {
@@ -18,13 +39,19 @@ export function App() {
     setAuth("signed-out");
   }
 
-  // Signing in never blocks local writes: notes queue until there's a session.
+  // Signing in never blocks local writes: they queue until there's a session.
   return (
     <main>
       <h1>Hello, world</h1>
-      {auth === "signed-out" ? (
-        <SignIn onSignedIn={() => setAuth("signed-in")} />
-      ) : auth === "signed-in" ? (
+      <SyncChip />
+      {shownAuth === "signed-out" ? (
+        <SignIn
+          onSignedIn={() => {
+            setAuth("signed-in");
+            syncSoon();
+          }}
+        />
+      ) : shownAuth === "signed-in" ? (
         <p>
           Signed in{" "}
           <button type="button" onClick={() => void onSignOut()}>
@@ -32,10 +59,9 @@ export function App() {
           </button>
         </p>
       ) : (
-        <p>{auth === "offline" ? "Offline" : "Checking…"}</p>
+        <p>{shownAuth === "offline" ? "Offline" : "Checking…"}</p>
       )}
-      {/* Remounting on auth changes syncs right after signing in. */}
-      <SpikeNotes key={auth} />
+      <Projects />
     </main>
   );
 }
