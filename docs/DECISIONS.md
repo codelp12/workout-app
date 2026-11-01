@@ -2,6 +2,14 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-11-01: Accessible base components (#33)
+
+- **Radix primitives, one package each:** `@radix-ui/react-dialog` (bottom sheet), `@radix-ui/react-toggle-group` (chip group) and `@radix-ui/react-toast` (toast), rather than the `radix-ui` bundle of every primitive. They bring focus trapping, roving focus, live-region announcements and Escape handling that we'd otherwise hand-roll. Styled with the #32 theme tokens; no shadcn copy-in or class-merging library. (§2, §6)
+- **The stepper and skeleton are our own.** Radix has no number-field or skeleton primitive. The stepper's number is an ARIA `spinbutton` (arrow keys step, Home/End jump to the limits, a typed value commits on Enter or blur and is clamped, not snapped to the step); its − and + buttons are named after the label ("Increase Weight"). A skeleton is `aria-hidden`; `Loading` wraps a screen's skeletons and announces one label. (§6)
+- **Single-select chips can't be cleared by tapping again.** Radix clears a single toggle group when the selected item is pressed; for pickers like RIR or grade that's an accidental tap, so it's ignored. Selected chips use the accent color, or the modality's color (`selected` in `src/modality.ts`). (§6)
+- **Toasts sit at the top** of the screen, clear of the thumb, the bottom tabs (#34) and sheets, and are swiped up to dismiss. They last 5 s by default and take at most one action (e.g. Undo), with `altText` for screen readers. `ToastProvider` wraps the app in `main.tsx`; screens call `useToast()`.
+- **Component tests run in jsdom with Testing Library** (dev dependencies `jsdom`, `@testing-library/react`, `@testing-library/dom`, `@testing-library/user-event`). Only files with a `// @vitest-environment jsdom` docblock use it; the rest stay in Node. Tests query by role and name, so they check what a screen reader gets.
+
 ## 2026-11-01: Tailwind and dark theme (#32)
 
 - **Tailwind CSS v4 through `@tailwindcss/vite`** (dev dependencies `tailwindcss` and `@tailwindcss/vite`, SPEC §2). v4 is configured in CSS, so there is no `tailwind.config.js` or PostCSS setup; its native engine ships as prebuilt platform packages and needs no `allowBuilds` entry. (§2)
