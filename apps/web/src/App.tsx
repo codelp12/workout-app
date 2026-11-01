@@ -4,6 +4,7 @@ import { Projects } from "./Projects";
 import { SignIn } from "./SignIn";
 import { syncEngine, syncSoon } from "./sync";
 import { SyncChip } from "./SyncChip";
+import { ImportUnsynced, UnsyncedWarning } from "./UnsyncedData";
 
 export function App() {
   const [auth, setAuth] = useState<AuthState>("checking");
@@ -44,6 +45,7 @@ export function App() {
     <main>
       <h1>Hello, world</h1>
       <SyncChip />
+      <UnsyncedWarning />
       {shownAuth === "signed-out" ? (
         <SignIn
           onSignedIn={() => {
@@ -62,6 +64,7 @@ export function App() {
         <p>{shownAuth === "offline" ? "Offline" : "Checking…"}</p>
       )}
       <Projects />
+      <ImportUnsynced />
     </main>
   );
 }

@@ -86,3 +86,37 @@ export type PullResponse = {
   /** More rows are waiting: pull again with the new cursor. */
   hasMore: boolean;
 };
+
+export const UNSYNCED_EXPORT_FORMAT = "workout-app/unsynced";
+
+/** An op the server refused, kept so its data isn't lost. */
+export type RejectedOp = { op: SyncOp; error: string; rejectedAt: number };
+
+/**
+ * The "export unsynced data" file (SPEC §3.4). `ops` are the queued writes,
+ * oldest first, exactly as `/api/sync/push` takes them, so importing replays
+ * them and the server's `opId` dedupe makes a second import harmless.
+ * `rejected` ops are kept for reference; sending them again won't succeed.
+ */
+export type UnsyncedExport = {
+  format: typeof UNSYNCED_EXPORT_FORMAT;
+  version: 1;
+  exportedAt: number;
+  ops: SyncOp[];
+  rejected: RejectedOp[];
+};
+
+/** Checks the envelope; each op's `data` is checked when it's pushed. */
+export const unsyncedExportSchema = z.object({
+  format: z.literal(UNSYNCED_EXPORT_FORMAT),
+  version: z.literal(1),
+  exportedAt: z.int().nonnegative(),
+  ops: z.array(syncOpSchema.extend({ data: z.looseObject({ id: z.uuid() }) })),
+  rejected: z.array(
+    z.object({
+      op: syncOpSchema,
+      error: z.string(),
+      rejectedAt: z.int().nonnegative(),
+    }),
+  ),
+});
