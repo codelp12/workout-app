@@ -2,6 +2,7 @@ import Dexie from "dexie";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
+import { ToastProvider } from "./components/Toast";
 import "./index.css";
 import { requestPersistentStorage } from "./storage";
 import { UpdatePrompt } from "./UpdatePrompt";
@@ -15,7 +16,9 @@ void Dexie.delete("workout-app-spike");
 
 createRoot(root).render(
   <StrictMode>
-    <App />
-    <UpdatePrompt />
+    <ToastProvider>
+      <App />
+      <UpdatePrompt />
+    </ToastProvider>
   </StrictMode>,
 );
