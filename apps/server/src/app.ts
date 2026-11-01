@@ -3,7 +3,6 @@ import { Hono } from "hono";
 import { csrf } from "hono/csrf";
 import { createAuth, type AuthOptions } from "./auth.js";
 import type { Db } from "./db.js";
-import { spikeRoutes } from "./spike.js";
 import { syncRoutes } from "./sync.js";
 
 const webDist = process.env.WEB_DIST ?? "../web/dist";
@@ -19,7 +18,6 @@ export function createApp(db: Db, options: AuthOptions = {}) {
   app.use("/api/*", auth.requireSession);
   app.route("/api/auth", auth.routes);
   app.get("/api/hello", (c) => c.json({ message: "Hello, world" }));
-  app.route("/api/spike", spikeRoutes(db));
   app.route("/api/sync", syncRoutes(db, options.now));
   app.all("/api/*", (c) => c.json({ error: "Not found" }, 404));
 

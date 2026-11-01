@@ -4,6 +4,8 @@ Playwright's WebKit is close to Safari but isn't iOS (SPEC §3.4), so each relea
 
 ## Phase 0: offline write spike (#24)
 
+This ran against the spike screen, which #28 replaced. Use the sync engine check below for later releases.
+
 **Before you start:** the app is deployed and reachable at `https://<host>.<tailnet>.ts.net` ([DEPLOY.md](DEPLOY.md)), Tailscale is connected on the iPhone and the laptop, and you're signed in on the laptop.
 
 1. **Open in Safari.** On the iPhone, open `https://<host>.<tailnet>.ts.net` in Safari. You should see "Hello, world" with no certificate warning.
@@ -36,3 +38,29 @@ Copy this, fill it in and paste it as a comment:
 ```
 
 Later phases add items to this list per SPEC §10: logging a set offline, killing the app mid-workout and resuming, the rest timer after a screen lock, and wake lock.
+
+## Sync engine (#28)
+
+**Before you start:** same as above, with the new build deployed (`git pull`, then `docker compose up -d --build` on the host).
+
+1. **Open the installed app.** Sign in if asked. The chip at the top should say **Synced**.
+2. **Go offline.** Airplane Mode on, Wi-Fi off.
+3. **Kill and relaunch offline.** It should load and the chip should say **Offline**.
+4. **Add a project.** Name `iphone sync 1`, grade `V3`, tap **Add project**. It shows as `iphone sync 1 V3 (pending)` and the chip says **Offline · 1 pending**.
+5. **Kill and relaunch again, still offline.** The project should still be there and still pending.
+6. **Reconnect** and bring the app to the foreground. Within a few seconds the chip should say **Synced** and "(pending)" should disappear. If it doesn't, tap the chip and write down that you had to.
+7. **Check the laptop.** Open the app on the laptop and tap the chip. `iphone sync 1 V3` should be listed exactly once.
+8. **Delete on the laptop.** Tap **Delete** next to it, then bring the phone app to the foreground. It should disappear from the phone too.
+
+### Results to post on #28
+
+```md
+- iPhone model / iOS version:
+- 3 Relaunch offline shows Offline: pass / fail
+- 4 Add project offline (1 pending): pass / fail
+- 5 Survives relaunch: pass / fail
+- 6 Syncs on reconnect without tapping the chip: yes / needed a tap / fail
+- 7 On laptop exactly once: pass / fail
+- 8 Delete reaches the phone: pass / fail
+- Anything odd:
+```

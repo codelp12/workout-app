@@ -1,0 +1,1 @@
+DROP TABLE `spike_note`;

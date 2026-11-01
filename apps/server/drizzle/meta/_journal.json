@@ -29,6 +29,13 @@
       "when": 1793471901347,
       "tag": "0003_sync_counter",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1793547139530,
+      "tag": "0004_drop_spike_note",
+      "breakpoints": true
     }
   ]
 }
