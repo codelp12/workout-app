@@ -1,3 +1,6 @@
+import { createHash } from "node:crypto";
+import { readdirSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import {
@@ -8,6 +11,22 @@ import {
 import { VitePWA } from "vite-plugin-pwa";
 
 const serverUrl = process.env.SERVER_URL ?? "http://127.0.0.1:3000";
+
+// The core exercise images, which the server serves at /media/exercises/.
+// They're pre-cached so the library has photos offline (SPEC §7).
+const exerciseMedia = fileURLToPath(
+  new URL("../../packages/exercise-data/media/", import.meta.url),
+);
+const coreImages = readdirSync(exerciseMedia, { recursive: true })
+  .map(String)
+  .filter((path) => path.endsWith(".webp"))
+  .sort()
+  .map((path) => ({
+    url: `/media/exercises/${path.split("\\").join("/")}`,
+    revision: createHash("md5")
+      .update(readFileSync(`${exerciseMedia}/${path}`))
+      .digest("hex"),
+  }));
 
 export default defineConfig({
   resolve: {
@@ -53,7 +72,19 @@ export default defineConfig({
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,png,webmanifest}"],
         navigateFallback: "/index.html",
-        navigateFallbackDenylist: [/^\/api\//, /^\/healthz$/],
+        navigateFallbackDenylist: [/^\/api\//, /^\/media\//, /^\/healthz$/],
+        additionalManifestEntries: coreImages,
+        // Any other exercise image is kept once it has been viewed.
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.startsWith("/media/"),
+            handler: "CacheFirst",
+            options: {
+              cacheName: "exercise-media",
+              expiration: { maxEntries: 1000 },
+            },
+          },
+        ],
         cleanupOutdatedCaches: true,
       },
     }),
@@ -62,6 +93,7 @@ export default defineConfig({
     proxy: {
       "/api": serverUrl,
       "/healthz": serverUrl,
+      "/media": serverUrl,
     },
   },
 });
