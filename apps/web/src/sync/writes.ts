@@ -7,7 +7,7 @@ import {
 import type { LocalDb, OutboxEntry } from "./local-db";
 
 /** Single-user app: matches the server's owner id. */
-const OWNER_USER_ID = 1;
+export const OWNER_USER_ID = 1;
 
 /** Writes a row locally and queues it for the server in one transaction. Never touches the network. */
 export async function saveRow<E extends EntityName>(

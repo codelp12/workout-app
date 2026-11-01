@@ -64,3 +64,25 @@ Later phases add items to this list per SPEC §10: logging a set offline, killin
 - 8 Delete reaches the phone: pass / fail
 - Anything odd:
 ```
+
+## Unsynced-data export (#30)
+
+**Before you start:** same as above, with the new build deployed.
+
+1. **Go offline** in the installed app (Airplane Mode on, Wi-Fi off) and add a project named `iphone export 1`. Under the chip you should see **1 unsynced change** and an **Export unsynced data** button.
+2. **Export.** Tap **Export unsynced data**. Write down what iOS does: a download prompt, a preview with a Share button, or nothing. Save the file to Files if it lets you.
+3. **Check the file.** In the Files app, open the `workout-app-unsynced-….json` file. It should mention `iphone export 1`.
+4. **Import on the laptop.** Get the file to the laptop (AirDrop or iCloud Drive), open the app there, choose it under **Import unsynced data**. Expect "Imported 1 change." and `iphone export 1` in the list.
+5. **Reconnect the phone.** The warning should go away, and the laptop should list `iphone export 1` exactly once after tapping the chip.
+
+### Results to post on #30
+
+```md
+- iPhone model / iOS version:
+- 1 Warning shows offline: pass / fail
+- 2 What Export did (prompt / preview + Share / nothing):
+- 3 File saved to Files and readable: pass / fail
+- 4 Import on laptop: pass / fail
+- 5 Exactly once after reconnect: pass / fail
+- Anything odd:
+```

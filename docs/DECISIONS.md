@@ -2,6 +2,13 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-11-01: Unsynced-data safety net (#30)
+
+- **"N unsynced sessions" counts distinct training sessions** with a queued or rejected write: a `session_log` op, or a `set_log`, `run_log` or `ascent` op whose `sessionLogId` points at it. Until the logging screens exist, other queued writes (like Projects) show as "N unsynced changes", and rejected ops get their own count. The warning is hidden while a sync is running, so an ordinary online write doesn't flash it. (§3.4)
+- **The export file is the push format.** `{ format: "workout-app/unsynced", version: 1, exportedAt, ops, rejected }`, where `ops` are the outbox's ops, oldest first, with their original `opId`s; the envelope's schema is `unsyncedExportSchema` in `packages/shared`. Since the server dedupes on `opId`, importing a file whose ops already synced (from this or another device) changes nothing. Rejected ops are in the file for reference only, since sending them again would fail the same way. (§3.2, §3.4)
+- **Import is in the web app, not a server endpoint.** "Import unsynced data" queues the file's ops in that device's outbox and syncs, so it works offline, uses the normal session and batching, and needs no new route. It writes a row locally only when the device doesn't have it, since an existing row may be newer than the file. The control sits at the bottom of the page until the Settings screen (#42) gives it a home.
+- **The download is a plain `<a download>` of a JSON blob.** No Web Share API for now; whether iOS saves it to Files from the installed app is a step in `docs/IPHONE-CHECKLIST.md`.
+
 ## 2026-10-31: Client sync engine (#28)
 
 - **One Dexie database, `workout-app`, mirrors every synced table** under its entity name, plus `outbox`, `rejected` and `meta` (the pull cursor). A write puts the row and its outbox op in one transaction and returns; sync runs in the background afterwards, so logging never waits on the network. A new row has `serverSeq: 0` until it comes back from a pull. (§3.1)
