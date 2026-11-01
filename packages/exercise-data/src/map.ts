@@ -274,6 +274,14 @@ export function aliases(name: string): string[] {
   return short === name ? [] : [short];
 }
 
+/**
+ * Where an upstream image (`3_4_Sit-Up/0.jpg`) lives once converted, relative
+ * to the media root (`3_4_Sit-Up/0.webp`). See `scripts/images.ts`.
+ */
+export function webpPath(upstreamPath: string): string {
+  return upstreamPath.replace(/\.(jpe?g|png)$/i, ".webp");
+}
+
 export interface Provenance {
   /** e.g. `free-exercise-db@<commit>`. */
   source: string;
@@ -315,7 +323,11 @@ export function mapExercise(
     instructions: raw.instructions,
     cues: [],
     commonMistakes: [],
-    media: raw.images.map((path) => ({ kind: "image", path, ...provenance })),
+    media: raw.images.map((path) => ({
+      kind: "image",
+      path: webpPath(path),
+      ...provenance,
+    })),
     ...provenance,
     sourceId: raw.id,
   };

@@ -2,6 +2,14 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-11-01: Core exercise set and images (#37)
+
+- **The core set is a hand-picked list of 152 free-exercise-db ids** in `packages/exercise-data/src/core.ts`: the default templates' exercises, then dumbbell, band, bodyweight and kettlebell substitutes for each pattern (a few barbell, EZ-bar and cable ones for gym days), core work, and 24 mobility entries for warm-ups and cool-downs. 120 of the 152 are tagged dumbbell, band, bodyweight or kettlebell (most stretches have no equipment tag). Tests check every id exists and the count stays near 150. Climbing-specific exercises (hangboard, etc.) aren't in free-exercise-db and come with the climbing epics. (§5.1, §7)
+- **The default templates' exercises are chosen here** (`DEFAULT_TEMPLATE_EXERCISES`), so "covers every default template exercise" is testable before #46 adds sets, reps, RIR and rest. Push/Pull/Legs A and B, six exercises each, all dumbbell or bodyweight apart from a band pull-apart and the goblet squat (tagged kettlebell upstream, done with a dumbbell). #46 builds the templates from this list. (§5.1)
+- **Images are 480 px wide WebP at quality 75, committed under `packages/exercise-data/media/`.** `pnpm --filter @workout-app/exercise-data images` (sharp, owner-approved dev dependency) downloads each core image from the pinned commit, converts it and deletes images no longer in the set. Committing the output means builds, CI and Docker never need the network or sharp. Upstream JPEGs average 55 KB at 850 px. (§7)
+- **Size budget: 40 KB per image and 5 MB for the whole core set** (`CORE_IMAGE_BUDGET`), enforced by tests. The set is pre-cached on the phone (#38), so it has to stay well under iOS's storage eviction risk. Today it's 304 images, 3.5 MB in total, 12 KB on average and 34 KB at most. (§7)
+- **Every exercise's media path now points at the WebP** (`Dumbbell_Bench_Press/0.webp`, relative to the media root), including non-core ones, which have no file yet. How the server serves those on demand is #38's call. (§7)
+
 ## 2026-11-01: free-exercise-db import (#36)
 
 - **The dataset is vendored, pinned and hash-checked.** `packages/exercise-data/data/free-exercise-db/` holds upstream's `dist/exercises.json` and `LICENSE.md` from commit `f00c92c` (2026-09-27), exactly as published; `source.json` records the commit and each file's SHA-256. `pnpm --filter @workout-app/exercise-data dataset` re-downloads that commit and fails if a byte differs, and a test checks the vendored files against the hashes. The script only runs at dev time; the app never fetches from GitHub. Prettier skips the folder so the bytes stay upstream's. (§7)

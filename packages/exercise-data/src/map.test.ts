@@ -60,8 +60,8 @@ describe("mapExercise", () => {
       cues: [],
       commonMistakes: [],
       media: [
-        { kind: "image", path: "Test_Exercise/0.jpg", ...provenance },
-        { kind: "image", path: "Test_Exercise/1.jpg", ...provenance },
+        { kind: "image", path: "Test_Exercise/0.webp", ...provenance },
+        { kind: "image", path: "Test_Exercise/1.webp", ...provenance },
       ],
       source: provenance.source,
       license: provenance.license,

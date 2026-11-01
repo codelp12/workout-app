@@ -11,18 +11,22 @@
   },
   "files": [
     "dist",
-    "data"
+    "data",
+    "media"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
-    "dataset": "node scripts/import.js"
+    "dataset": "node scripts/import.js",
+    "images": "tsx --conditions=@workout-app/source scripts/images.ts"
   },
   "dependencies": {
     "@workout-app/shared": "workspace:*",
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@types/node": "^24.19.2"
+    "@types/node": "^24.19.2",
+    "sharp": "~0.35.5",
+    "tsx": "^4.23.15"
   }
 }

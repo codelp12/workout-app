@@ -19,6 +19,7 @@ pnpm 12 (`packageManager` in `package.json`). Node 24 comes from `devEngines.run
 - `pnpm lint`: ESLint (typescript-eslint type-checked rules, plus React hooks/refresh rules in `apps/web`) over the whole repo. `pnpm lint:fix` applies autofixes.
 - `pnpm --filter @workout-app/server db:generate`: generate a migration in `apps/server/drizzle/` after editing `apps/server/src/schema.ts`. Commit it; never edit an applied migration.
 - `pnpm --filter @workout-app/exercise-data dataset [<commit>]`: re-download free-exercise-db at the pinned commit into `packages/exercise-data/data/free-exercise-db/` and check it against the SHA-256s in `source.json`; with a commit SHA, move the pin. Never edit the vendored files by hand.
+- `pnpm --filter @workout-app/exercise-data images`: convert the core set's images (`packages/exercise-data/src/core.ts`) from free-exercise-db at the pinned commit to WebP in `packages/exercise-data/media/`, and delete images no longer in the set. Rerun it after editing the core set or the pin, and commit the result; tests check every core image exists and fits `CORE_IMAGE_BUDGET`.
 - `docker compose up -d --build`: build and run the production container on `127.0.0.1:3000` (`Dockerfile`, `compose.yaml`).
 - `pnpm format`: format everything with Prettier (default options). `pnpm format:check` checks without writing; run it before pushing.
 
