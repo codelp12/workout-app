@@ -2,6 +2,13 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-11-01: Navigation shell (#34)
+
+- **React Router in declarative ("library") mode** (`react-router`, owner-approved on the roadmap): `BrowserRouter` in `main.tsx` and `<Routes>` in `src/Navigation.tsx`. Data mode's loaders and actions aren't needed, since screens read Dexie through live queries and never wait on the network. (§2, §6)
+- **Five tabs with real URLs:** Today `/`, Week `/week`, Log `/log`, Library `/library`, Settings `/settings`. Any other path redirects to Today. Deep links work offline because the service worker already answers every navigation with `index.html` (`navigateFallback`), and online the server's SPA fallback does the same. (§6, §8)
+- **The tab bar is fixed to the bottom**, inside a `Tabs` navigation landmark and outside `main`, sized to `min-h-tap` and padded for the home indicator, with each tab shown as an icon plus a label. The icons are inline SVG, so no icon library. The current tab is marked with `aria-current="page"` and the accent color, each screen has its own `h1` and document title, and switching tabs scrolls to the top. (§6)
+- **The app header (sync chip, unsynced warning, sign-in) appears on every tab.** A sync 401 has to be able to ask for the password anywhere. The Projects placeholder stays on Today, and "Import unsynced data" moves to Settings until #42 builds that screen. (§3.2, §3.4)
+
 ## 2026-11-01: Accessible base components (#33)
 
 - **Radix primitives, one package each:** `@radix-ui/react-dialog` (bottom sheet), `@radix-ui/react-toggle-group` (chip group) and `@radix-ui/react-toast` (toast), rather than the `radix-ui` bundle of every primitive. They bring focus trapping, roving focus, live-region announcements and Escape handling that we'd otherwise hand-roll. Styled with the #32 theme tokens; no shadcn copy-in or class-merging library. (§2, §6)

@@ -69,8 +69,10 @@ test("unsynced data exports to a file that another device and the server can imp
   const laptop = await laptopContext.newPage();
   await laptop.goto("/");
   await signIn(laptop);
+  await laptop.getByRole("link", { name: "Settings" }).click();
   await laptop.getByLabel("Import unsynced data").setInputFiles(path);
   await expect(laptop.getByText("Imported 1 change.")).toBeVisible();
+  await laptop.getByRole("link", { name: "Today" }).click();
   await expect(projects(laptop)).toContainText(`${name} V2`);
   await expect(laptop.getByTestId("sync-chip")).toHaveText("Synced");
   expect(await serverRows(laptop, name)).toHaveLength(1);
