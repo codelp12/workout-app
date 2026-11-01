@@ -16,7 +16,6 @@ import {
   type EntityRow,
 } from "@workout-app/shared";
 import { getTableColumns, getTableName } from "drizzle-orm";
-import type { SQLiteTable } from "drizzle-orm/sqlite-core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   defaultMigrationsFolder,
@@ -24,23 +23,10 @@ import {
   runMigrations,
   type Db,
 } from "./db.js";
+import { entityTables } from "./entity-tables.js";
 import * as schema from "./schema.js";
 
-const tables = {
-  settings: schema.settings,
-  exercise: schema.exercise,
-  template: schema.template,
-  block: schema.block,
-  week: schema.week,
-  planned_session: schema.plannedSession,
-  planned_item: schema.plannedItem,
-  plan_override: schema.planOverride,
-  session_log: schema.sessionLog,
-  set_log: schema.setLog,
-  run_log: schema.runLog,
-  project: schema.project,
-  ascent: schema.ascent,
-} satisfies Record<EntityName, SQLiteTable>;
+const tables = entityTables;
 
 // Compile-time check that each table's row type is exactly its zod type.
 type Equal<A, B> =

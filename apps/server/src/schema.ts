@@ -325,3 +325,9 @@ export const opReceipt = sqliteTable("op_receipt", {
   userId: integer("user_id").notNull(),
   receivedAt: integer("received_at").notNull(),
 });
+
+/** One row, id 1: the last `server_seq` handed out. Every synced write takes the next one. Server-only. */
+export const syncCounter = sqliteTable("sync_counter", {
+  id: integer("id").primaryKey(),
+  lastSeq: integer("last_seq").notNull(),
+});
