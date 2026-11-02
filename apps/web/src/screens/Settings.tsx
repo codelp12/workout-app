@@ -202,7 +202,10 @@ function Barbells({ settings }: { settings: SettingsData }) {
                   }))
                 }
               >
-                {weight} {unit} <span aria-hidden="true">×</span>
+                {weight} {unit}{" "}
+                <span aria-hidden="true" className="ml-1">
+                  ×
+                </span>
               </button>
             </li>
           ))}
