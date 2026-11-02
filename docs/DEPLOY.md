@@ -126,7 +126,7 @@ The same app, run with Docker Desktop on a Windows 10 or 11 PC that stays on. Ru
 
 On Windows, run these in PowerShell from `$HOME\workout-app` and leave out `sudo`. Windows PowerShell 5.1 has no `&&`, so run the update commands one at a time.
 
-Updating runs any new database migrations on start, and it backs up the database to `/data/backups/` first. When a new build ships, the open app shows "Update available" instead of reloading mid-workout. Tap Reload when you're done.
+Updating runs any new database migrations on start, and it backs up the database to `/data/backups/` first. When a new build ships, the open app doesn't reload mid-workout: a dot appears on the Settings tab, and **Settings → App updates → Reload to update** installs it. **Check for updates** there asks the server right away.
 
 ### Backups (manual, until nightly backups land)
 

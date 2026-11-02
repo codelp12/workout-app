@@ -266,7 +266,7 @@ Mobile-first (390×844 baseline), one-handed, dark by default (gym lighting), la
 - Auth: single-user passkey or password (argon2id), HttpOnly Secure SameSite cookie, login rate limiting, no secrets in git, configurable base URL. Long sliding sessions (default 90 days), so an expired session never blocks offline logging (see 3.2). Tailscale identity headers are an optional extra layer, trusted only when the app listens on localhost.
 - Backups: nightly SQLite online backup (.backup or Litestream) to a second disk or NAS, 14+ days retention, a documented restore drill, and CSV/JSON export in Settings.
 - Migrations are forward-only (Drizzle) with an automatic pre-migration backup.
-- PWA updates show an “update available” prompt and never reload mid-workout.
+- PWA updates are offered in Settings (a dot on the Settings tab says one is ready) and never reload mid-workout.
 - Observability: structured logs, /healthz, the engine decision table.
 - Later, not v1: internet exposure via Cloudflare Tunnel or Tailscale Funnel behind WebAuthn, rate limits and CSP. Nothing in v1 should preclude it.
 
