@@ -6,3 +6,5 @@ export const button = `${buttonBase} bg-surface-raised text-fg`;
 export const input =
   "w-full rounded-lg border border-border bg-surface px-3 text-fg placeholder:text-fg-muted";
 export const card = "rounded-xl bg-surface p-4";
+/** A button that toggles on and off; style its state through `aria-pressed`. */
+export const toggle = `${buttonBase} min-h-tap bg-surface-raised text-fg aria-pressed:bg-accent aria-pressed:text-bg`;

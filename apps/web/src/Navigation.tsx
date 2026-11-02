@@ -10,6 +10,7 @@ import {
 import { ExerciseDetail } from "./screens/ExerciseDetail";
 import { Library } from "./screens/Library";
 import { Log } from "./screens/Log";
+import { Onboarding } from "./screens/Onboarding";
 import { Settings } from "./screens/Settings";
 import { Today } from "./screens/Today";
 import { Week } from "./screens/Week";
@@ -142,6 +143,7 @@ export function Navigation({ header }: { header?: ReactNode }) {
           <Route key={tab.path} path={tab.path} element={tab.screen} />
         ))}
         <Route path="/library/:id" element={<ExerciseDetail />} />
+        <Route path="/onboarding" element={<Onboarding />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

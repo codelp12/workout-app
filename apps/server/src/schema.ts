@@ -28,6 +28,7 @@ import type {
   WeekType,
   Weight,
   WeightUnit,
+  Onboarding,
 } from "@workout-app/shared";
 import {
   index,
@@ -80,6 +81,7 @@ export const settings = sqliteTable(
     liftFreeDay: integer("lift_free_day"),
     goals: json<Goals>("goals").notNull(),
     engineConfig: json<Record<string, unknown>>("engine_config").notNull(),
+    onboarding: json<Onboarding>("onboarding"),
   },
   (t) => [index("settings_server_seq_idx").on(t.serverSeq)],
 );
