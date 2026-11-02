@@ -2,6 +2,12 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-11-02: Loadable weights and the engine package (#41)
+
+- **`packages/engine` starts here**, pure TypeScript with no runtime dependencies beyond `@workout-app/shared` types. ESLint bans `Date`, `fetch`, timers, `Math.random`, `node:` and other I/O imports in its source, so "no I/O, no clock reads, no randomness" is checked on every lint, not just by review. fast-check (named in §5.6) is its dev dependency for property tests. (§2, §5.0, §5.6)
+- **`roundToLoadable(equipment, implement, target, rounding)`** rounds to a load the inventory can make on a dumbbell (per hand), fixed barbell, loadable bar (bar plus plate pairs) or stack; `availableLoads` lists them for the load picker and `isLoadable` checks one. `nearest` breaks ties toward the lighter load (slow to increase, §5.0); `down` and `up` never cross the target and return `null` when nothing is on that side, so the engine can tell "the next step doesn't exist" and progress reps instead (§5.1). Weights are compared in thousandths, so fractional plates and steps (2.5 lb, 1.25 kg) don't drift. Bands are levels, not weights: `roundBandLevel` rounds to a band index, lightest first. (§5.1)
+- **The default inventory is `DEFAULT_EQUIPMENT` in `packages/shared`**, so Settings (#42) and onboarding (#43) start from the same values the engine is tested against: dumbbells 5–120 lb in 5 lb steps, fixed barbells 20–110 lb in 10 lb steps, and four bands (Light, Medium, Heavy, Extra heavy). SPEC §2 gives the step but not the barbell range or band names, so those are guesses for the owner to correct in Settings. No loadable bar, plates or stack by default. (§2)
+
 ## 2026-11-01: Library screen (#39)
 
 - **Personal notes are a nullable `notes` field on the `exercise` row** (migration `0005_exercise_notes`), saved through the normal outbox and synced like any edit. Seeding never overwrites an existing row (#38), so notes survive restarts and dataset bumps. Personal cues, photos and clips (§7) come later and get their own fields. (§4, §6.8)
