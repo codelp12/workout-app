@@ -23,7 +23,7 @@ let cookie: string;
 beforeEach(async () => {
   const db = openDb(":memory:");
   runMigrations(db);
-  app = createApp(db, { now: () => T0 });
+  app = createApp(db, { now: () => T0, planWeeks: false });
   await setPassword(db, PASSWORD);
   const res = await app.request("/api/auth/login", {
     method: "POST",

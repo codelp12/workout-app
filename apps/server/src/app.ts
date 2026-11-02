@@ -12,7 +12,12 @@ const webDist = process.env.WEB_DIST ?? "../web/dist";
 /** Where exercise images are served; media paths are relative to it. */
 export const EXERCISE_MEDIA_PATH = "/media/exercises";
 
-export function createApp(db: Db, options: AuthOptions = {}) {
+export type AppOptions = AuthOptions & {
+  /** Off in tests of the sync protocol itself, so pulls hold only their rows. */
+  planWeeks?: boolean;
+};
+
+export function createApp(db: Db, options: AppOptions = {}) {
   const app = new Hono();
   const auth = createAuth(db, options);
 
@@ -23,7 +28,7 @@ export function createApp(db: Db, options: AuthOptions = {}) {
   app.use("/api/*", auth.requireSession);
   app.route("/api/auth", auth.routes);
   app.get("/api/hello", (c) => c.json({ message: "Hello, world" }));
-  app.route("/api/sync", syncRoutes(db, options.now));
+  app.route("/api/sync", syncRoutes(db, options.now, options.planWeeks));
   app.all("/api/*", (c) => c.json({ error: "Not found" }, 404));
 
   // Public like the app shell: the images are Unlicense dataset photos.

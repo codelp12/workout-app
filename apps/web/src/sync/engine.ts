@@ -5,6 +5,7 @@ import {
   type PushResponse,
   type SyncOp,
 } from "@workout-app/shared";
+import { dropReplacedProvisional } from "../plan/provisional";
 import type { LocalDb, OutboxEntry } from "./local-db";
 
 export type SyncState = "idle" | "syncing" | "offline" | "signed-out" | "error";
@@ -151,7 +152,10 @@ export class SyncEngine {
         }
         await this.db.meta.put({ key: "cursor", value: page.cursor });
       });
-      if (!page.hasMore) return;
+      if (!page.hasMore) {
+        await dropReplacedProvisional(this.db);
+        return;
+      }
     }
   }
 }

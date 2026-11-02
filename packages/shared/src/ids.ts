@@ -24,3 +24,25 @@ export function libraryExerciseId(dataset: string, sourceId: string): string {
 export function defaultTemplateId(key: string): string {
   return v5(`default-template:${key}`, LIBRARY_NAMESPACE);
 }
+
+// Plan rows get ids derived from their week, so the phone's provisional week
+// and the server's (SPEC §3.2) are the same rows and a pull replaces them.
+
+/** The id of the block that starts on `startDate`. */
+export function blockId(startDate: string): string {
+  return v5(`block:${startDate}`, LIBRARY_NAMESPACE);
+}
+
+/** The id of the week that starts on Monday `startDate`. */
+export function weekId(startDate: string): string {
+  return v5(`week:${startDate}`, LIBRARY_NAMESPACE);
+}
+
+/** The id of a week's generated session, e.g. ("2026-11-02", "push_a"). */
+export function plannedSessionId(weekStart: string, key: string): string {
+  return v5(`planned-session:${weekStart}:${key}`, LIBRARY_NAMESPACE);
+}
+
+export function plannedItemId(sessionId: string, position: number): string {
+  return v5(`planned-item:${sessionId}:${position}`, LIBRARY_NAMESPACE);
+}
