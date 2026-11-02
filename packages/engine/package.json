@@ -1,0 +1,25 @@
+{
+  "name": "@workout-app/engine",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "@workout-app/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@workout-app/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "fast-check": "~4.10.2"
+  }
+}
