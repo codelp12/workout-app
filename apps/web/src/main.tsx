@@ -6,7 +6,7 @@ import { App } from "./App";
 import { ToastProvider } from "./components/Toast";
 import "./index.css";
 import { requestPersistentStorage } from "./storage";
-import { UpdatePrompt } from "./UpdatePrompt";
+import { UpdateProvider } from "./update/UpdateProvider";
 
 const root = document.getElementById("root");
 if (!root) throw new Error("Missing #root element");
@@ -19,8 +19,9 @@ createRoot(root).render(
   <StrictMode>
     <BrowserRouter>
       <ToastProvider>
-        <App />
-        <UpdatePrompt />
+        <UpdateProvider>
+          <App />
+        </UpdateProvider>
       </ToastProvider>
     </BrowserRouter>
   </StrictMode>,

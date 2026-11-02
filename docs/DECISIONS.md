@@ -9,6 +9,10 @@ Newest first. Each entry gives the decision, why it was made, and the spec secti
 - **The wizard opens once per install, when the app starts on Today and the settings have no answers.** Finishing saves the answers (and they sync); "Skip for now" saves nothing. Either way a device-local flag (`localStorage`) stops it opening again on that device, so a second phone still gets the wizard until its first sync brings the answers. Deep links never redirect. Settings has "Start setup" / "Run setup again", which reopens it prefilled. (§5.0)
 - **Step 1 is the same equipment editor as Settings**, so equipment changes save immediately; the later steps save together on Finish. E2E tests start with the device flag set (`storageState` in `e2e/playwright.config.ts`) so only `onboarding.spec.ts` sees the wizard. (§6)
 
+## 2026-11-02: App updates move to Settings
+
+- **The floating "Update available" bar is gone; updates live in Settings → App updates** (owner's request: the bar sat behind the tab bar on an iPhone 16 Pro Max and got in the way). **Check for updates** calls the service worker registration's `update()`, and **Reload to update** is disabled until a new build has installed and is waiting. A small dot on the Settings tab (with "update available" for screen readers) says one is ready. `registerType: "prompt"` stays, so nothing reloads without a tap. (§8)
+
 ## 2026-11-02: Settings screen (#42)
 
 - **Settings are one row with a fixed id** (`SETTINGS_ID` in `packages/shared`), so every device edits the same row and last-write-wins keeps a single copy. Until something is changed the screen shows `defaultSettings()` (SPEC §2: lb and miles, the default inventory, every day AM and PM with gym access, the planner choosing the lift-free and long-run days, this device's time zone) and saves nothing. (§3.2, §4)
