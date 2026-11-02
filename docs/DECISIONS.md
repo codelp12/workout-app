@@ -2,6 +2,13 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-11-02: Onboarding wizard (#43)
+
+- **Onboarding answers are stored on the settings row as `onboarding`** (migration `0006_settings_onboarding`, nullable JSON), kept as entered: per main lift a recent working set (load per dumbbell, reps, RIR), one recent hard run (distance, time, RPE) plus typical weekly distance, and climbing discipline with limit and volume grades. Any part can be left out. The engines (Phases 2–4) turn these into their starting `fitness_state`; storing them on settings needs no new synced table before those engines exist. (§4, §5.0, §12 Q3–Q5)
+- **The main lifts are `MAIN_LIFTS` in `packages/shared`**: dumbbell squat, bench press, RDL (stiff-legged dumbbell deadlift), seated overhead press and one-arm row, the §5.1 `e1rm_rir` compounds from the default templates (a test checks each is in one). Entered weights snap to the nearest dumbbell on the rack with `roundToLoadable`. (§5.1)
+- **The wizard opens once per install, when the app starts on Today and the settings have no answers.** Finishing saves the answers (and they sync); "Skip for now" saves nothing. Either way a device-local flag (`localStorage`) stops it opening again on that device, so a second phone still gets the wizard until its first sync brings the answers. Deep links never redirect. Settings has "Start setup" / "Run setup again", which reopens it prefilled. (§5.0)
+- **Step 1 is the same equipment editor as Settings**, so equipment changes save immediately; the later steps save together on Finish. E2E tests start with the device flag set (`storageState` in `e2e/playwright.config.ts`) so only `onboarding.spec.ts` sees the wizard. (§6)
+
 ## 2026-11-02: Settings screen (#42)
 
 - **Settings are one row with a fixed id** (`SETTINGS_ID` in `packages/shared`), so every device edits the same row and last-write-wins keeps a single copy. Until something is changed the screen shows `defaultSettings()` (SPEC §2: lb and miles, the default inventory, every day AM and PM with gym access, the planner choosing the lift-free and long-run days, this device's time zone) and saves nothing. (§3.2, §4)
