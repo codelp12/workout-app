@@ -16,3 +16,11 @@ const LIBRARY_NAMESPACE = "6f1d6a3e-3c55-4a8e-9a43-2f5f0c7e5b21";
 export function libraryExerciseId(dataset: string, sourceId: string): string {
   return v5(`${dataset}:${sourceId}`, LIBRARY_NAMESPACE);
 }
+
+/**
+ * The id of a default template, e.g. `push_a`: a UUIDv5, so every server
+ * seeds the same row and reseeding finds it.
+ */
+export function defaultTemplateId(key: string): string {
+  return v5(`default-template:${key}`, LIBRARY_NAMESPACE);
+}

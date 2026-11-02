@@ -1,7 +1,11 @@
 import { readdirSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
-import { MAIN_LIFTS } from "@workout-app/shared";
+import {
+  MAIN_LIFTS,
+  libraryExerciseId,
+  templateSlotSchema,
+} from "@workout-app/shared";
 import { describe, expect, it } from "vitest";
 import {
   CORE_EXERCISES,
@@ -13,6 +17,7 @@ import {
   otherMediaFile,
 } from "./core.js";
 import { loadFreeExerciseDb } from "./load.js";
+import { defaultTemplates } from "./templates.js";
 
 const exercises = new Map(loadFreeExerciseDb().map((e) => [e.sourceId, e]));
 const core = CORE_EXERCISES.map((id) => exercises.get(id));
@@ -116,5 +121,43 @@ describe("other images", () => {
       expect(meta.format, path).toBe("webp");
       expect(meta.width, path).toBeLessThanOrEqual(CORE_IMAGE_BUDGET.width);
     }
+  });
+});
+
+describe("default templates", () => {
+  const templates = defaultTemplates();
+
+  it("are Push/Pull/Legs A and B with valid slots", () => {
+    expect(templates.map((t) => t.name)).toEqual(
+      Object.keys(DEFAULT_TEMPLATE_EXERCISES),
+    );
+    expect(new Set(templates.map((t) => t.id)).size).toBe(6);
+    for (const t of templates) {
+      expect(t.modality).toBe("lift");
+      t.slots.forEach((slot, i) => {
+        templateSlotSchema.parse(slot);
+        expect(slot.repMin).toBeLessThanOrEqual(slot.repMax);
+        expect(slot.ramp).toBe(i < 2);
+      });
+    }
+  });
+
+  it("point at library exercises", () => {
+    const ids = new Set(
+      [...exercises.values()].map((e) =>
+        libraryExerciseId("free-exercise-db", e.sourceId!),
+      ),
+    );
+    for (const t of templates)
+      for (const slot of t.slots) expect(ids).toContain(slot.exerciseId);
+  });
+
+  it("make heavy legs the only key lifting day", () => {
+    expect(
+      templates.filter((t) => t.intent === "key").map((t) => t.name),
+    ).toEqual(["Legs A"]);
+    expect(
+      templates.filter((t) => t.intensityClass === "heavy").map((t) => t.name),
+    ).toEqual(["Push A", "Pull A", "Legs A"]);
   });
 });
