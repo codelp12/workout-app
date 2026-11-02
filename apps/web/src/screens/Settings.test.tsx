@@ -168,7 +168,8 @@ describe("Settings", () => {
     await waitFor(async () =>
       expect((await saved())?.equipment.dumbbells).toBeNull(),
     );
-    expect(screen.queryByText(/weights:/)).toBeNull();
+    // The saved row reaches the screen on the live query's next render.
+    await waitFor(() => expect(screen.queryByText(/weights:/)).toBeNull());
     await user.click(owned);
     expect(await screen.findByText(/^24 weights:/)).toBeTruthy();
   });
