@@ -12,10 +12,16 @@ import {
 } from "@workout-app/shared";
 import type { RawExercise, RawMuscle } from "./raw.js";
 
-/** An exercise row without the sync columns, which seeding assigns. */
+/** An exercise row without the sync columns and owner notes, which seeding assigns. */
 export type ExerciseData = Omit<
   Exercise,
-  "id" | "userId" | "createdAt" | "updatedAt" | "deletedAt" | "serverSeq"
+  | "id"
+  | "userId"
+  | "createdAt"
+  | "updatedAt"
+  | "deletedAt"
+  | "serverSeq"
+  | "notes"
 >;
 
 export const MOVEMENT_PATTERNS = [

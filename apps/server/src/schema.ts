@@ -110,6 +110,7 @@ export const exercise = sqliteTable(
     source: text("source").notNull(),
     license: text("license").notNull(),
     sourceId: text("source_id"),
+    notes: text("notes"),
   },
   (t) => [
     index("exercise_server_seq_idx").on(t.serverSeq),

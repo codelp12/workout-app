@@ -7,6 +7,7 @@ import {
   Routes,
   useLocation,
 } from "react-router";
+import { ExerciseDetail } from "./screens/ExerciseDetail";
 import { Library } from "./screens/Library";
 import { Log } from "./screens/Log";
 import { Settings } from "./screens/Settings";
@@ -84,7 +85,8 @@ function TabBar() {
           <li key={tab.path}>
             <NavLink
               to={tab.path}
-              end
+              // Library stays highlighted on an exercise's page.
+              end={tab.path === "/"}
               className={({ isActive }) =>
                 `flex min-h-tap flex-col items-center justify-center gap-0.5 py-2 text-xs font-medium ${
                   isActive ? "text-accent" : "text-fg-muted"
@@ -139,6 +141,7 @@ export function Navigation({ header }: { header?: ReactNode }) {
         {tabs.map((tab) => (
           <Route key={tab.path} path={tab.path} element={tab.screen} />
         ))}
+        <Route path="/library/:id" element={<ExerciseDetail />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

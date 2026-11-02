@@ -36,6 +36,7 @@ export function seedExercises(db: Db, now = Date.now()): number {
           updatedAt: now,
           deletedAt: null,
           serverSeq: nextSeq(tx),
+          notes: null,
         })
         .run();
       added++;
