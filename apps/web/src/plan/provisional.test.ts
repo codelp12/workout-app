@@ -63,7 +63,7 @@ describe("provisional week", () => {
     const serverPlan = planWeek({
       weekStart: MONDAY,
       now: 2,
-      blocks: [{ ...older.block!, userId: 1, serverSeq: 1 }],
+      blocks: [older.block!],
       settings: {
         weightUnit: "lb",
         distanceUnit: "mi",
