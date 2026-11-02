@@ -13,6 +13,7 @@ import { Log } from "./screens/Log";
 import { Settings } from "./screens/Settings";
 import { Today } from "./screens/Today";
 import { Week } from "./screens/Week";
+import { useAppUpdate } from "./update/update-context";
 
 type Tab = { path: string; label: string; icon: ReactNode; screen: ReactNode };
 
@@ -75,6 +76,7 @@ const tabs: Tab[] = [
 ];
 
 function TabBar() {
+  const updateAvailable = useAppUpdate().status === "available";
   return (
     <nav
       aria-label="Tabs"
@@ -95,19 +97,30 @@ function TabBar() {
                 }`
               }
             >
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 24 24"
-                className="size-7"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                {tab.icon}
-              </svg>
+              <span className="relative">
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  className="size-7"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  {tab.icon}
+                </svg>
+                {tab.path === "/settings" && updateAvailable && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute -top-0.5 -right-1 size-2.5 rounded-full bg-warning"
+                  />
+                )}
+              </span>
               {tab.label}
+              {tab.path === "/settings" && updateAvailable && (
+                <span className="sr-only">, update available</span>
+              )}
             </NavLink>
           </li>
         ))}

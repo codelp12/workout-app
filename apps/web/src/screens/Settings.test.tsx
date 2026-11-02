@@ -10,10 +10,19 @@ import {
 import userEvent from "@testing-library/user-event";
 import { SETTINGS_ID } from "@workout-app/shared";
 import { MemoryRouter } from "react-router";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { ToastProvider } from "../components/Toast";
 import { Navigation } from "../Navigation";
 import { localDb } from "../sync";
+import { UpdateContext, type AppUpdate } from "../update/update-context";
 
 beforeAll(() => {
   window.scrollTo = () => {};
@@ -31,13 +40,20 @@ beforeEach(async () => {
 });
 afterEach(cleanup);
 
-function renderSettings() {
-  render(
+function renderSettings(update?: AppUpdate) {
+  const page = (
     <ToastProvider>
       <MemoryRouter initialEntries={["/settings"]}>
         <Navigation />
       </MemoryRouter>
-    </ToastProvider>,
+    </ToastProvider>
+  );
+  render(
+    update ? (
+      <UpdateContext.Provider value={update}>{page}</UpdateContext.Provider>
+    ) : (
+      page
+    ),
   );
 }
 
@@ -152,8 +168,70 @@ describe("Settings", () => {
     await waitFor(async () =>
       expect((await saved())?.equipment.dumbbells).toBeNull(),
     );
-    expect(screen.queryByText(/weights:/)).toBeNull();
+    // The saved row reaches the screen on the live query's next render.
+    await waitFor(() => expect(screen.queryByText(/weights:/)).toBeNull());
     await user.click(owned);
     expect(await screen.findByText(/^24 weights:/)).toBeTruthy();
+  });
+});
+
+describe("App updates", () => {
+  const updates = () =>
+    within(screen.getByRole("region", { name: "App updates" }));
+
+  it("can't reload until an update is waiting", () => {
+    const check = vi.fn();
+    renderSettings({ status: "current", check, install: vi.fn() });
+    expect(updates().getByText("You're on the latest version.")).toBeTruthy();
+    expect(
+      updates().getByRole<HTMLButtonElement>("button", {
+        name: "Reload to update",
+      }).disabled,
+    ).toBe(true);
+    expect(screen.getByRole("link", { name: "Settings" }).textContent).toBe(
+      "Settings",
+    );
+  });
+
+  it("checks for updates on tap", async () => {
+    const check = vi.fn();
+    renderSettings({ status: "idle", check, install: vi.fn() });
+    await userEvent
+      .setup()
+      .click(updates().getByRole("button", { name: "Check for updates" }));
+    expect(check).toHaveBeenCalledOnce();
+  });
+
+  it("disables checking while a check runs", () => {
+    renderSettings({ status: "checking", check: vi.fn(), install: vi.fn() });
+    expect(
+      updates().getByRole<HTMLButtonElement>("button", {
+        name: "Check for updates",
+      }).disabled,
+    ).toBe(true);
+  });
+
+  it("installs a waiting update and marks the Settings tab", async () => {
+    const install = vi.fn();
+    renderSettings({ status: "available", check: vi.fn(), install });
+    expect(
+      screen.getByRole("link", { name: "Settings, update available" }),
+    ).toBeTruthy();
+    await userEvent
+      .setup()
+      .click(updates().getByRole("button", { name: "Reload to update" }));
+    expect(install).toHaveBeenCalledOnce();
+  });
+
+  it("explains when there's no service worker", () => {
+    renderSettings();
+    expect(
+      updates().getByText("Updates aren't available in this browser."),
+    ).toBeTruthy();
+    expect(
+      updates().getByRole<HTMLButtonElement>("button", {
+        name: "Check for updates",
+      }).disabled,
+    ).toBe(true);
   });
 });

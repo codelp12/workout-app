@@ -14,6 +14,7 @@ import {
   type SettingsData,
 } from "../settings/settings";
 import { ImportUnsynced } from "../UnsyncedData";
+import { useAppUpdate, type UpdateStatus } from "../update/update-context";
 import { button, buttonBase, card, input } from "../ui";
 import { useLiveQuery } from "../use-live-query";
 import { Screen } from "./Screen";
@@ -440,6 +441,44 @@ function SettingsForm({ settings }: { settings: SettingsData }) {
   );
 }
 
+const updateMessages: Record<UpdateStatus, string> = {
+  unsupported: "Updates aren't available in this browser.",
+  idle: "Updates download in the background.",
+  checking: "Checking for updates…",
+  current: "You're on the latest version.",
+  available: "An update is ready. Reloading won't lose anything you've saved.",
+  failed: "Couldn't check for updates. Try again when you're online.",
+};
+
+function AppUpdates() {
+  const { status, check, install } = useAppUpdate();
+  return (
+    <Section title="App updates">
+      <p role="status" className="text-sm text-fg-muted">
+        {updateMessages[status]}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          className={`${button} min-h-tap`}
+          disabled={status === "unsupported" || status === "checking"}
+          onClick={check}
+        >
+          Check for updates
+        </button>
+        <button
+          type="button"
+          className={`${buttonBase} min-h-tap bg-accent text-bg`}
+          disabled={status !== "available"}
+          onClick={install}
+        >
+          Reload to update
+        </button>
+      </div>
+    </Section>
+  );
+}
+
 export function Settings() {
   const settings = useLiveQuery(readSettings, null);
   return (
@@ -449,6 +488,7 @@ export function Settings() {
       ) : (
         <Skeleton className="h-96" />
       )}
+      <AppUpdates />
       <ImportUnsynced />
     </Screen>
   );
