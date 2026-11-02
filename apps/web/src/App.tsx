@@ -1,13 +1,36 @@
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useLocation, useNavigate } from "react-router";
 import { checkSession, signOut, type AuthState } from "./auth";
 import { Navigation } from "./Navigation";
+import { onboardingOffered } from "./settings/onboarding-flag";
+import { readSettings } from "./settings/settings";
 import { SignIn } from "./SignIn";
 import { syncEngine, syncSoon } from "./sync";
 import { SyncChip } from "./SyncChip";
 import { UnsyncedWarning } from "./UnsyncedData";
 import { button } from "./ui";
+import { useLiveQuery } from "./use-live-query";
+
+/**
+ * Opens the first-run wizard when a fresh install starts on Today. Checked
+ * once per launch, after the local settings load; deep links aren't redirected.
+ */
+function useFirstRunWizard() {
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const settings = useLiveQuery(readSettings, null);
+  const checked = useRef(false);
+  useEffect(() => {
+    if (checked.current || !settings) return;
+    checked.current = true;
+    if (pathname === "/" && !settings.onboarding && !onboardingOffered()) {
+      void navigate("/onboarding");
+    }
+  }, [settings, pathname, navigate]);
+}
 
 export function App() {
+  useFirstRunWizard();
   const [auth, setAuth] = useState<AuthState>("checking");
   const syncState = useSyncExternalStore(
     syncEngine.subscribe,

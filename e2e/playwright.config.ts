@@ -4,6 +4,7 @@ import { defineConfig, devices } from "@playwright/test";
 import { E2E_PASSWORD } from "./credentials";
 
 const port = 4173;
+const baseURL = `http://127.0.0.1:${port}`;
 const viewport = { width: 390, height: 844 };
 const dbPath = join(tmpdir(), "workout-app-e2e.db");
 
@@ -16,8 +17,20 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [["github"], ["list"]] : "list",
   use: {
-    baseURL: `http://127.0.0.1:${port}`,
+    baseURL,
     trace: "retain-on-failure",
+    // Most tests start past the first-run wizard; onboarding.spec.ts opts out.
+    storageState: {
+      cookies: [],
+      origins: [
+        {
+          origin: baseURL,
+          localStorage: [
+            { name: "workout-app:onboarding-offered", value: "1" },
+          ],
+        },
+      ],
+    },
   },
   projects: [
     {

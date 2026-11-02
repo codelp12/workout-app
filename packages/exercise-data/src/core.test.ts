@@ -1,6 +1,7 @@
 import { readdirSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
+import { MAIN_LIFTS } from "@workout-app/shared";
 import { describe, expect, it } from "vitest";
 import {
   CORE_EXERCISES,
@@ -23,6 +24,13 @@ describe("core set", () => {
     expect(CORE_EXERCISES.length).toBeGreaterThanOrEqual(140);
     expect(CORE_EXERCISES.length).toBeLessThanOrEqual(160);
     expect(CORE_EXERCISES.filter((id) => !exercises.has(id))).toEqual([]);
+  });
+
+  it("has every onboarding main lift in a default template", () => {
+    const templated = new Set<string>(
+      Object.values(DEFAULT_TEMPLATE_EXERCISES).flat(),
+    );
+    for (const lift of MAIN_LIFTS) expect(templated).toContain(lift.sourceId);
   });
 
   it("covers every default template exercise", () => {

@@ -59,5 +59,6 @@ export function defaultSettings(
     liftFreeDay: null,
     goals: { ...DEFAULT_GOALS, targetLifts: [] },
     engineConfig: {},
+    onboarding: null,
   };
 }

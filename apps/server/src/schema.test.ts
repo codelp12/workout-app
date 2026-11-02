@@ -87,6 +87,18 @@ const fixtures: { [E in EntityName]: EntityRow<E> } = {
       targetLifts: [{ exerciseId, load: { value: 80, unit: "lb" }, reps: 8 }],
     },
     engineConfig: { deloadEvery: 4 },
+    onboarding: {
+      completedAt: now,
+      lifts: [{ exerciseId, load: { value: 60, unit: "lb" }, reps: 8, rir: 2 }],
+      run: {
+        distanceValue: 3.1,
+        distanceUnit: "mi",
+        durationSec: 1500,
+        rpe: 8,
+        weeklyDistance: 12,
+      },
+      climb: { discipline: "boulder", limitGrade: "V5", volumeGrade: "V3" },
+    },
   },
   exercise: {
     ...base(),

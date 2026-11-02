@@ -47,6 +47,7 @@ export const OVERRIDE_KINDS = [
 export const ASCENT_STYLES = ["flash", "onsight", "send", "attempt"] as const;
 export const PROJECT_STATUSES = ["active", "sent", "dropped"] as const;
 export const MEDIA_KINDS = ["image", "video"] as const;
+export const CLIMB_DISCIPLINES = ["boulder", "route"] as const;
 
 export type WeightUnit = (typeof WEIGHT_UNITS)[number];
 export type DistanceUnit = (typeof DISTANCE_UNITS)[number];
@@ -64,6 +65,7 @@ export type PlannedItemKind = (typeof PLANNED_ITEM_KINDS)[number];
 export type OverrideKind = (typeof OVERRIDE_KINDS)[number];
 export type AscentStyle = (typeof ASCENT_STYLES)[number];
 export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
+export type ClimbDiscipline = (typeof CLIMB_DISCIPLINES)[number];
 
 /** Milliseconds since the epoch, UTC. */
 const timestamp = z.int().nonnegative();
@@ -142,6 +144,42 @@ export const goalsSchema = z.object({
 });
 export type Goals = z.infer<typeof goalsSchema>;
 
+/**
+ * First-run answers for the engines' cold start (SPEC §5.0, §12 Q3–Q5). The
+ * engines turn them into their starting state; they're kept as entered.
+ */
+export const onboardingSchema = z.object({
+  completedAt: timestamp,
+  /** Recent working sets for the main lifts; loads are per dumbbell. */
+  lifts: z.array(
+    z.object({
+      exerciseId: z.uuid(),
+      load: weightSchema,
+      reps: z.int().positive(),
+      rir,
+    }),
+  ),
+  /** A recent hard run, plus typical weekly volume. */
+  run: z
+    .object({
+      distanceValue: z.number().positive(),
+      distanceUnit: z.enum(DISTANCE_UNITS),
+      durationSec: z.int().positive(),
+      rpe,
+      weeklyDistance: z.number().nonnegative(),
+    })
+    .nullable(),
+  /** Grades like `V4` (boulder) or `5.11a` (route). */
+  climb: z
+    .object({
+      discipline: z.enum(CLIMB_DISCIPLINES),
+      limitGrade: z.string().min(1),
+      volumeGrade: z.string().min(1),
+    })
+    .nullable(),
+});
+export type Onboarding = z.infer<typeof onboardingSchema>;
+
 export const settingsSchema = z.object({
   ...syncFields,
   weightUnit: z.enum(WEIGHT_UNITS),
@@ -155,6 +193,8 @@ export const settingsSchema = z.object({
   goals: goalsSchema,
   /** Overrides of engine config keys; the engine validates its own keys. */
   engineConfig: z.record(z.string(), z.unknown()),
+  /** `null` until the onboarding wizard is finished. */
+  onboarding: onboardingSchema.nullable(),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 
