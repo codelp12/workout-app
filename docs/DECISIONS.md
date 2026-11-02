@@ -2,6 +2,13 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-11-02: Engine interface and static stubs (#45)
+
+- **`ModalityEngine<State, Intent, Prescription, Log>`** in `packages/engine/src/types.ts` has `initState(onboarding)`, `prescribe(state, intent, ctx)`, `update(state, log)` and `reviewWeek(state, logs, ctx)`, plus `modality` and `version` (`stub-1`, for `generatedBy: engine@<version>`). `EngineContext` carries everything outside the engine's state: the session's local date (the engine never reads the clock), week type, readiness (green until Phase 5), units, equipment and config. Each modality has its own intent, prescription and log types; logs are the shared row types trimmed with `Pick`, so the engine doesn't depend on Dexie or the server. (§5.0)
+- **Reasons are `{ code, text }`**: a stable code (`from_setup`, `repeat_last`, `rounded`, `no_history` …) and one plain-English line. Every prescription and every lift item has at least one (property-tested). (§5.0)
+- **The stubs prefill but never progress.** Lift: the template's sets, reps and RIR as written, with the load from the top working set of the last session, or else the onboarding answer, converted to the current unit and rounded to the rack; group-only slots pick the dumbbell, then band, then bodyweight option. Run: last time's distance for the same workout type, or else a share of the onboarding weekly distance (long 40%, easy and quality 30%), with a target RPE and no paces until VDOT lands. Climb: limit sessions at limit−1 to limit+1 with a 12-attempt cap, volume sessions at volume−2 to volume−1, from the onboarding grades. (§5.1–5.3)
+- **Thresholds live in `ENGINE_CONFIG`** (`config.ts`) and reach the engines through the context, so per-user overrides from `settings.engineConfig` can be merged in later without touching the engines. Grade scales moved to `GRADE_SCALES` in the engine, and onboarding uses them. (§5.0, §5.3)
+
 ## 2026-11-02: Onboarding wizard (#43)
 
 - **Onboarding answers are stored on the settings row as `onboarding`** (migration `0006_settings_onboarding`, nullable JSON), kept as entered: per main lift a recent working set (load per dumbbell, reps, RIR), one recent hard run (distance, time, RPE) plus typical weekly distance, and climbing discipline with limit and volume grades. Any part can be left out. The engines (Phases 2–4) turn these into their starting `fitness_state`; storing them on settings needs no new synced table before those engines exist. (§4, §5.0, §12 Q3–Q5)

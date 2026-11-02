@@ -1,4 +1,4 @@
-import { roundToLoadable } from "@workout-app/engine";
+import { GRADE_SCALES, roundToLoadable } from "@workout-app/engine";
 import {
   MAIN_LIFTS,
   type ClimbDiscipline,
@@ -33,18 +33,6 @@ type Climb = { discipline: ClimbDiscipline; limit: string; volume: string };
 
 const STEPS = ["Equipment", "Lifts", "Running", "Climbing"] as const;
 
-const GRADES: Record<ClimbDiscipline, string[]> = {
-  boulder: Array.from({ length: 13 }, (_, i) => `V${i}`),
-  route: [
-    "5.6",
-    "5.7",
-    "5.8",
-    "5.9",
-    ...[10, 11, 12, 13].flatMap((n) =>
-      ["a", "b", "c", "d"].map((l) => `5.${n}${l}`),
-    ),
-  ],
-};
 const DEFAULT_GRADES: Record<ClimbDiscipline, [string, string]> = {
   boulder: ["V4", "V2"],
   route: ["5.11a", "5.10a"],
@@ -282,7 +270,7 @@ function ClimbStep({
               <ChipGroup
                 type="single"
                 label="Limit grade"
-                options={options(GRADES[climb.discipline])}
+                options={options(GRADE_SCALES[climb.discipline])}
                 modality="climb"
                 value={climb.limit}
                 onValueChange={(limit) => setClimb({ ...climb, limit })}
@@ -292,7 +280,7 @@ function ClimbStep({
               <ChipGroup
                 type="single"
                 label="Volume grade"
-                options={options(GRADES[climb.discipline])}
+                options={options(GRADE_SCALES[climb.discipline])}
                 modality="climb"
                 value={climb.volume}
                 onValueChange={(volume) => setClimb({ ...climb, volume })}
