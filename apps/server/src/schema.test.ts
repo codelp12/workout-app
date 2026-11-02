@@ -120,6 +120,7 @@ const fixtures: { [E in EntityName]: EntityRow<E> } = {
     source: "free-exercise-db@abc123",
     license: "Unlicense",
     sourceId: "Dumbbell_Bench_Press",
+    notes: "Use the flat bench by the window.",
   },
   template: {
     ...base(),

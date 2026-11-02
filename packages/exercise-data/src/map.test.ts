@@ -226,6 +226,7 @@ describe("vendored free-exercise-db", () => {
     updatedAt: true,
     deletedAt: true,
     serverSeq: true,
+    notes: true,
   });
 
   it("imports everything except cardio", () => {

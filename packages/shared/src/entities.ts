@@ -194,6 +194,8 @@ export const exerciseSchema = z.object({
   license: z.string(),
   /** The entry's id in its source dataset, if any. */
   sourceId: z.string().nullable(),
+  /** The owner's own notes (§6.8). Datasets never set or overwrite them. */
+  notes: z.string().nullable(),
 });
 export type Exercise = z.infer<typeof exerciseSchema>;
 

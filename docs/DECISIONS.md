@@ -2,6 +2,13 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-11-01: Library screen (#39)
+
+- **Personal notes are a nullable `notes` field on the `exercise` row** (migration `0005_exercise_notes`), saved through the normal outbox and synced like any edit. Seeding never overwrites an existing row (#38), so notes survive restarts and dataset bumps. Personal cues, photos and clips (§7) come later and get their own fields. (§4, §6.8)
+- **Search and filters run on the device over the IndexedDB copy**, so they work offline. Search matches every typed word as a word prefix of the name or an alias (`db press` finds "Dumbbell Bench Press"). Filters are muscle (primary muscles only, so "Chest" means chest exercises), equipment and movement pattern; within a filter any chosen value matches, across filters all must. Filter options come from the exercises on the device, not a fixed list. (§6.8)
+- **The search and filters live in the URL** (`/library?q=press&muscle=chest`), so Back from an exercise restores them. An exercise's page is `/library/<id>`, and the Library tab stays highlighted there. (§6)
+- **Cues and common mistakes only show when an exercise has some**; the dataset has none yet. Exercise history on the detail page waits for logging (Phase 1 lift player). (§6.8)
+
 ## 2026-11-01: Images for every exercise (#38 follow-up)
 
 - **Every imported exercise's images are converted and committed, not just the core set's** (owner's choice over fetching them from GitHub on demand or leaving them out). `pnpm --filter @workout-app/exercise-data images` now writes core images to `packages/exercise-data/media/core/` and the other 1414 to `media/other/`, same 480 px WebP at quality 75. The other set is 18 MB (13 KB average, 39 KB max), which grows the repo and Docker image by that much but keeps the server off the network. (§7)
