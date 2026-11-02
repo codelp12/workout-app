@@ -12,6 +12,7 @@ import { Library } from "./screens/Library";
 import { Log } from "./screens/Log";
 import { Onboarding } from "./screens/Onboarding";
 import { Settings } from "./screens/Settings";
+import { TemplateEditor } from "./screens/TemplateEditor";
 import { Today } from "./screens/Today";
 import { Week } from "./screens/Week";
 import { useAppUpdate } from "./update/update-context";
@@ -90,7 +91,7 @@ function TabBar() {
           <li key={tab.path}>
             <NavLink
               to={tab.path}
-              // Library stays highlighted on an exercise's page.
+              // Library and Settings stay highlighted on their detail pages.
               end={tab.path === "/"}
               className={({ isActive }) =>
                 `flex min-h-tab-bar flex-col items-center justify-center gap-1 pt-2 text-sm font-medium ${
@@ -159,6 +160,7 @@ export function Navigation({ header }: { header?: ReactNode }) {
         ))}
         <Route path="/library/:id" element={<ExerciseDetail />} />
         <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="/settings/templates/:id" element={<TemplateEditor />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

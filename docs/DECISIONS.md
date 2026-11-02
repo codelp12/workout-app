@@ -2,6 +2,12 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-11-02: Default templates and the template editor (#46)
+
+- **The server seeds the six default templates at startup** (`seedTemplates()` after `seedExercises()`), so they reach every device through the normal pull, like the library. Ids are UUIDv5 of `default-template:<key>` (`defaultTemplateId()`), so every server seeds the same rows. Like the library, it never updates or undeletes an existing row, so edits and deletions survive restarts. (§3.1, §4)
+- **The templates are a table in `packages/exercise-data/src/templates.ts`** (`DEFAULT_TEMPLATES`), and `DEFAULT_TEMPLATE_EXERCISES` is now derived from it. Main lifts get 3 × 6–10 (A days) or 3 × 8–12 (B days) with 150–180 s rest; accessories 2–3 × 10–20 with 60–90 s. Target RIR is 2 (1 for small isolation moves). The first two slots are `ramp` (§5.1 default). A days are heavy and B days moderate; Legs A is the only key lifting session ("heavy legs", §5.4), and the rest are support. Plank holds use the rep range as seconds (30–60) until sets can be timed. (§4, §5.1, §5.4)
+- **The editor lives under Settings** (Settings → Lifting templates → `/settings/templates/<id>`), since there's no Plan tab yet (§6.9); the Settings tab stays highlighted there. It edits name, intensity, intent and each slot's sets, rep range, RIR (0–4), rest, ramp and order; exercises are added from a search of the lifting library. Every change saves at once through the outbox, like Settings. (§6)
+
 ## 2026-11-02: Engine interface and static stubs (#45)
 
 - **`ModalityEngine<State, Intent, Prescription, Log>`** in `packages/engine/src/types.ts` has `initState(onboarding)`, `prescribe(state, intent, ctx)`, `update(state, log)` and `reviewWeek(state, logs, ctx)`, plus `modality` and `version` (`stub-1`, for `generatedBy: engine@<version>`). `EngineContext` carries everything outside the engine's state: the session's local date (the engine never reads the clock), week type, readiness (green until Phase 5), units, equipment and config. Each modality has its own intent, prescription and log types; logs are the shared row types trimmed with `Pick`, so the engine doesn't depend on Dexie or the server. (§5.0)

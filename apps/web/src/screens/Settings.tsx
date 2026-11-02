@@ -9,6 +9,7 @@ import {
   updateSettings,
   type SettingsData,
 } from "../settings/settings";
+import { liftTemplates } from "../templates/templates";
 import { ImportUnsynced } from "../UnsyncedData";
 import { useAppUpdate, type UpdateStatus } from "../update/update-context";
 import { button, buttonBase, toggle } from "../ui";
@@ -157,6 +158,38 @@ function DayPreference({
   );
 }
 
+function Templates() {
+  const templates = useLiveQuery(liftTemplates, null);
+  return (
+    <Section title="Lifting templates">
+      {templates === null ? (
+        <Skeleton className="h-24" />
+      ) : templates.length === 0 ? (
+        <p className="text-sm text-fg-muted">
+          The default templates arrive with your first sync.
+        </p>
+      ) : (
+        <ul aria-label="Lifting templates" className="flex flex-col gap-2">
+          {templates.map((t) => (
+            <li key={t.id}>
+              <Link
+                to={`/settings/templates/${t.id}`}
+                className={`${button} min-h-tap w-full justify-between`}
+              >
+                <span>{t.name}</span>
+                <span className="text-sm text-fg-muted">
+                  {t.slots.length}{" "}
+                  {t.slots.length === 1 ? "exercise" : "exercises"}
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Section>
+  );
+}
+
 function SettingsForm({ settings }: { settings: SettingsData }) {
   return (
     <>
@@ -182,6 +215,7 @@ function SettingsForm({ settings }: { settings: SettingsData }) {
         />
         <p className="text-sm text-fg-muted">Time zone: {settings.timezone}</p>
       </Section>
+      <Templates />
       <Section title="Setup">
         <p className="text-sm text-fg-muted">
           {settings.onboarding

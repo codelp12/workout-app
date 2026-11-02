@@ -4,60 +4,17 @@
 // under `media/`, so they can be pre-cached for offline use; the rest of the
 // library loads on demand. Ids are free-exercise-db ids (`sourceId`).
 
+import { DEFAULT_TEMPLATES } from "./templates.js";
+
 /**
  * Exercises for the default Push/Pull/Legs A and B templates (SPEC §5.1),
- * dumbbell-first, in session order. #46 builds the templates from these.
+ * dumbbell-first, in session order, keyed by template name.
  */
-export const DEFAULT_TEMPLATE_EXERCISES = {
-  "Push A": [
-    "Dumbbell_Bench_Press",
-    "Seated_Dumbbell_Press",
-    "Incline_Dumbbell_Flyes",
-    "Side_Lateral_Raise",
-    "Lying_Dumbbell_Tricep_Extension",
-    "Tricep_Dumbbell_Kickback",
-  ],
-  "Push B": [
-    "Incline_Dumbbell_Press",
-    "Standing_Dumbbell_Press",
-    "Dumbbell_Flyes",
-    "Seated_Side_Lateral_Raise",
-    "Standing_Dumbbell_Triceps_Extension",
-    "Dips_-_Triceps_Version",
-  ],
-  "Pull A": [
-    "One-Arm_Dumbbell_Row",
-    "Pullups",
-    "Seated_Bent-Over_Rear_Delt_Raise",
-    "Dumbbell_Shrug",
-    "Hammer_Curls",
-    "Incline_Dumbbell_Curl",
-  ],
-  "Pull B": [
-    "Dumbbell_Incline_Row",
-    "Chin-Up",
-    "Band_Pull_Apart",
-    "Reverse_Flyes",
-    "Dumbbell_Bicep_Curl",
-    "Zottman_Curl",
-  ],
-  "Legs A": [
-    "Dumbbell_Squat",
-    "Stiff-Legged_Dumbbell_Deadlift",
-    "Split_Squat_with_Dumbbells",
-    "Single_Leg_Glute_Bridge",
-    "Standing_Dumbbell_Calf_Raise",
-    "Plank",
-  ],
-  "Legs B": [
-    "Goblet_Squat",
-    "Dumbbell_Rear_Lunge",
-    "Dumbbell_Step_Ups",
-    "Natural_Glute_Ham_Raise",
-    "Calf_Raise_On_A_Dumbbell",
-    "Hanging_Leg_Raise",
-  ],
-} as const satisfies Record<string, readonly string[]>;
+export const DEFAULT_TEMPLATE_EXERCISES: Readonly<
+  Record<string, readonly string[]>
+> = Object.fromEntries(
+  DEFAULT_TEMPLATES.map((t) => [t.name, t.slots.map(([sourceId]) => sourceId)]),
+);
 
 const substitutes = {
   push: [
