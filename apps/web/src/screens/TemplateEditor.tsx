@@ -12,7 +12,7 @@ import { ChipGroup } from "../components/ChipGroup";
 import { Loading, Skeleton } from "../components/Skeleton";
 import { Stepper } from "../components/Stepper";
 import { searchLibrary, vocabLabel } from "../library/filter";
-import { Section } from "../settings/Sections";
+import { Section, Subsection } from "../settings/Sections";
 import { localDb } from "../sync";
 import {
   readTemplate,
@@ -302,24 +302,28 @@ function Editor({
     <>
       <Section title="Template">
         <NameField template={template} />
-        <ChipGroup
-          type="single"
-          label="Intensity"
-          options={INTENSITIES}
-          value={template.intensityClass}
-          onValueChange={(intensityClass) =>
-            void updateTemplate(template.id, () => ({ intensityClass }))
-          }
-        />
-        <ChipGroup
-          type="single"
-          label="Intent"
-          options={INTENTS}
-          value={template.intent}
-          onValueChange={(intent) =>
-            void updateTemplate(template.id, () => ({ intent }))
-          }
-        />
+        <Subsection title="Intensity">
+          <ChipGroup
+            type="single"
+            label="Intensity"
+            options={INTENSITIES}
+            value={template.intensityClass}
+            onValueChange={(intensityClass) =>
+              void updateTemplate(template.id, () => ({ intensityClass }))
+            }
+          />
+        </Subsection>
+        <Subsection title="Intent">
+          <ChipGroup
+            type="single"
+            label="Intent"
+            options={INTENTS}
+            value={template.intent}
+            onValueChange={(intent) =>
+              void updateTemplate(template.id, () => ({ intent }))
+            }
+          />
+        </Subsection>
         <p className="text-sm text-fg-muted">
           The planner uses intensity and intent to space hard days apart.
         </p>
