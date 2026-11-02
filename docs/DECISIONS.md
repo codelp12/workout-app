@@ -2,6 +2,15 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-11-02: Global calendar and weekly rollover (#47)
+
+- **The server runs the rollover at the start of every pull** (`planCurrentWeek()`): if the week that's current in the owner's zone has no row, it plans it from every log it has. Pushes then pulls, so the first sync after Sunday midnight gets the new week. It uses the settings' `timezone`, or the server's own zone until settings first sync. (§3.2)
+- **Plan rows have ids derived from the week** (`weekId(start)`, `blockId(start)`, `plannedSessionId(weekStart, key)`, `plannedItemId(session, position)`). Repeated or concurrent syncs can't make a second copy, and the phone's provisional week is the same rows as the server's, so a pull overwrites them. After a pull the phone drops any provisional rows the server's week didn't replace (`dropReplacedProvisional()`). (§3.2)
+- **The phone plans a provisional week** (`planProvisionalWeek()`) on launch and when it comes back to the foreground, if it has no row for the current week. The rows have `serverSeq` 0 and never enter the outbox, since plan rows are server-owned. (§3.1, §3.2)
+- **One pure planner for both** (`planWeek()` in `packages/engine`), from the stubs. Blocks default to 4 weeks, the last a deload (`config.calendar.blockWeeks`); a week outside every live block starts a new one. Week-type effects on targets arrive with the engines. (§5.1, §5.4)
+- **A fixed default week until the Phase 5 scheduler** (`DEFAULT_WEEK`): Mon Legs A (PM); Tue Push A (AM) and volume climb (PM); Wed quality run (AM) and Pull A (PM); Thu easy run (AM) and Legs B (PM); Fri Push B (AM) and limit climb (PM); Sat long run (AM), lift-free; Sun Pull B (AM). It meets the hard constraints and avoids every high soft penalty. The quality run alternates threshold and intervals by week. A session whose slot is unavailable moves to the day's other slot if that one is free; `longRunDay` and `liftFreeDay` wait for the scheduler. Lift sessions whose default template was deleted are planned without exercises. (§5.4)
+- **Planned item targets are the stub's prescription** minus its reasons, which become the item's `reasons` text. (§4, §5.0)
+
 ## 2026-11-02: Default templates and the template editor (#46)
 
 - **The server seeds the six default templates at startup** (`seedTemplates()` after `seedExercises()`), so they reach every device through the normal pull, like the library. Ids are UUIDv5 of `default-template:<key>` (`defaultTemplateId()`), so every server seeds the same rows. Like the library, it never updates or undeletes an existing row, so edits and deletions survive restarts. (§3.1, §4)

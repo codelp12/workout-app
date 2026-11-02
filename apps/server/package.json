@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.1.5",
+    "@workout-app/engine": "workspace:*",
     "@workout-app/exercise-data": "workspace:*",
     "@workout-app/shared": "workspace:*",
     "better-sqlite3": "^13.0.3",
