@@ -20,6 +20,12 @@ describe("GET /media/exercises/*", () => {
     expect(new TextDecoder().decode(bytes.slice(8, 12))).toBe("WEBP");
   });
 
+  it("serves non-core images from the same path", async () => {
+    const res = await app.request("/media/exercises/Ab_Roller/0.webp");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/webp");
+  });
+
   it("returns 404, not the app shell, for missing media", async () => {
     for (const path of [
       "/media/exercises/Not_An_Exercise/0.webp",

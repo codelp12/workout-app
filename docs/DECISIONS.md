@@ -2,6 +2,11 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-11-01: Images for every exercise (#38 follow-up)
+
+- **Every imported exercise's images are converted and committed, not just the core set's** (owner's choice over fetching them from GitHub on demand or leaving them out). `pnpm --filter @workout-app/exercise-data images` now writes core images to `packages/exercise-data/media/core/` and the other 1414 to `media/other/`, same 480 px WebP at quality 75. The other set is 18 MB (13 KB average, 39 KB max), which grows the repo and Docker image by that much but keeps the server off the network. (§7)
+- **The split keeps the pre-cache to the core set.** The service worker pre-caches only `media/core/` (still under the 5 MB budget); other images are cached when first viewed (#38's `CacheFirst` rule). The server serves both folders at the same `/media/exercises/<media path>`, so media paths don't say which set an image is in. Tests check each folder holds exactly its set's images and that every image is a WebP within the 40 KB per-image limit. (§7)
+
 ## 2026-11-01: Seeding the library and caching it offline (#38)
 
 - **The server seeds the library at startup.** `seedExercises()` (`apps/server/src/seed.ts`) runs after migrations and inserts every free-exercise-db exercise the database doesn't have yet, each with a new `serverSeq`, so devices get them through the normal pull and a fresh install has the library after its first sync. It never updates or undeletes an existing row, so edits and deletions survive restarts. A future dataset bump only adds new exercises; changing existing ones would need its own migration. (§3.1, §7)

@@ -6,8 +6,10 @@ import {
   CORE_EXERCISES,
   CORE_IMAGE_BUDGET,
   DEFAULT_TEMPLATE_EXERCISES,
+  MEDIA_DIRS,
   coreMediaFile,
   isCore,
+  otherMediaFile,
 } from "./core.js";
 import { loadFreeExerciseDb } from "./load.js";
 
@@ -59,13 +61,17 @@ describe("core set", () => {
   });
 });
 
+const filesIn = (url: URL) => {
+  const dir = fileURLToPath(url);
+  return readdirSync(dir, { recursive: true, encoding: "utf8" })
+    .filter((f) => statSync(dir + f).isFile())
+    .map((f) => f.replaceAll("\\", "/"))
+    .sort();
+};
+
 describe("core images", () => {
   it("are committed for every core media path, and nothing else is", () => {
-    const dir = fileURLToPath(coreMediaFile(""));
-    const files = readdirSync(dir, { recursive: true, encoding: "utf8" })
-      .filter((f) => statSync(dir + f).isFile())
-      .map((f) => f.replaceAll("\\", "/"));
-    expect(files.sort()).toEqual([...corePaths].sort());
+    expect(filesIn(MEDIA_DIRS.core)).toEqual([...corePaths].sort());
   });
 
   it("are WebP at the target width within the size budget", async () => {
@@ -80,5 +86,27 @@ describe("core images", () => {
       expect(meta.width, path).toBe(CORE_IMAGE_BUDGET.width);
     }
     expect(total).toBeLessThanOrEqual(CORE_IMAGE_BUDGET.maxTotalBytes);
+  });
+});
+
+describe("other images", () => {
+  const otherPaths = loadFreeExerciseDb()
+    .filter((e) => !isCore(e.sourceId!))
+    .flatMap((e) => e.media.map((m) => m.path));
+
+  it("are committed for every non-core media path, and nothing else is", () => {
+    expect(filesIn(MEDIA_DIRS.other)).toEqual([...otherPaths].sort());
+  });
+
+  it("are WebP no wider than the target", async () => {
+    for (const path of otherPaths) {
+      const file = fileURLToPath(otherMediaFile(path));
+      expect(statSync(file).size, path).toBeLessThanOrEqual(
+        CORE_IMAGE_BUDGET.maxImageBytes,
+      );
+      const meta = await sharp(file).metadata();
+      expect(meta.format, path).toBe("webp");
+      expect(meta.width, path).toBeLessThanOrEqual(CORE_IMAGE_BUDGET.width);
+    }
   });
 });

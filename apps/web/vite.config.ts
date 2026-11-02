@@ -15,7 +15,7 @@ const serverUrl = process.env.SERVER_URL ?? "http://127.0.0.1:3000";
 // The core exercise images, which the server serves at /media/exercises/.
 // They're pre-cached so the library has photos offline (SPEC §7).
 const exerciseMedia = fileURLToPath(
-  new URL("../../packages/exercise-data/media/", import.meta.url),
+  new URL("../../packages/exercise-data/media/core/", import.meta.url),
 );
 const coreImages = readdirSync(exerciseMedia, { recursive: true })
   .map(String)

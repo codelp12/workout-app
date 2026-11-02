@@ -211,9 +211,22 @@ export const CORE_IMAGE_BUDGET = {
   maxTotalBytes: 5 * 1024 * 1024,
 } as const;
 
-const mediaDir = new URL("../media/", import.meta.url);
+/**
+ * Where converted images live. Both folders use the same media paths
+ * (`Pushups/0.webp`); core ones are pre-cached on the phone, the rest are
+ * fetched when first viewed.
+ */
+export const MEDIA_DIRS = {
+  core: new URL("../media/core/", import.meta.url),
+  other: new URL("../media/other/", import.meta.url),
+} as const;
 
 /** Path of a converted core image, e.g. `Pushups/0.webp`. */
 export function coreMediaFile(path: string): URL {
-  return new URL(path, mediaDir);
+  return new URL(path, MEDIA_DIRS.core);
+}
+
+/** Path of a converted non-core image. */
+export function otherMediaFile(path: string): URL {
+  return new URL(path, MEDIA_DIRS.other);
 }
