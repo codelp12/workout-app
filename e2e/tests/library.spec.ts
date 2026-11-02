@@ -125,7 +125,7 @@ test("personal notes saved offline sync after reconnecting", async ({
   await exerciseLink(page, name).click();
   await page.getByLabel("Personal notes").fill(notes);
   await page.getByRole("button", { name: "Save notes" }).click();
-  await expect(page.getByText("Notes saved")).toBeVisible();
+  await expect(page.getByText("Notes saved", { exact: true })).toBeVisible();
   await expect(page.getByTestId("sync-chip")).toHaveText("Offline · 1 pending");
 
   await page.reload();
