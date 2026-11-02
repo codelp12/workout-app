@@ -33,4 +33,10 @@ describe("theme", () => {
     expect(viteConfig).toContain(`background_color: "${bg}"`);
     expect(viteConfig).toContain(`theme_color: "${bg}"`);
   });
+
+  it("lets the safe-area insets reach the page so the tab bar clears the iPhone home indicator", () => {
+    expect(indexHtml).toMatch(
+      /<meta\s+name="viewport"\s+content="[^"]*viewport-fit=cover[^"]*"/,
+    );
+  });
 });

@@ -14,7 +14,7 @@ export function UpdatePrompt() {
   return (
     <div
       role="status"
-      className={`${card} fixed inset-x-4 bottom-4 mx-auto flex max-w-md items-center gap-2 shadow-lg`}
+      className={`${card} fixed inset-x-4 bottom-[calc(var(--spacing-tab-bar)+max(0.75rem,calc(env(safe-area-inset-bottom)+0.25rem))+1rem)] z-50 mx-auto flex max-w-md items-center gap-2 shadow-lg`}
     >
       <span className="flex-1">Update available.</span>{" "}
       <button

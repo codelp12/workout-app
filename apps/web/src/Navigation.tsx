@@ -78,9 +78,11 @@ function TabBar() {
   return (
     <nav
       aria-label="Tabs"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)]"
+      // viewport-fit=cover (index.html) makes the safe-area insets non-zero on
+      // iPhone, so the tabs clear the home indicator and the rounded corners.
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface pr-[env(safe-area-inset-right)] pb-[max(0.75rem,calc(env(safe-area-inset-bottom)+0.25rem))] pl-[env(safe-area-inset-left)]"
     >
-      <ul className="mx-auto grid max-w-md grid-cols-5">
+      <ul className="mx-auto grid max-w-md grid-cols-5 px-2">
         {tabs.map((tab) => (
           <li key={tab.path}>
             <NavLink
@@ -88,7 +90,7 @@ function TabBar() {
               // Library stays highlighted on an exercise's page.
               end={tab.path === "/"}
               className={({ isActive }) =>
-                `flex min-h-tap flex-col items-center justify-center gap-0.5 py-2 text-xs font-medium ${
+                `flex min-h-tab-bar flex-col items-center justify-center gap-1 pt-2 text-sm font-medium ${
                   isActive ? "text-accent" : "text-fg-muted"
                 }`
               }
@@ -96,7 +98,7 @@ function TabBar() {
               <svg
                 aria-hidden="true"
                 viewBox="0 0 24 24"
-                className="size-6"
+                className="size-7"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="2"
@@ -121,7 +123,7 @@ function TabLayout({ header }: { header: ReactNode }) {
   }, [pathname]);
   return (
     <>
-      <main className="mx-auto flex max-w-md flex-col gap-4 p-4 pb-24">
+      <main className="mx-auto flex max-w-md flex-col gap-4 p-4 pt-[max(1rem,env(safe-area-inset-top))] pr-[max(1rem,env(safe-area-inset-right))] pb-[calc(var(--spacing-tab-bar)+env(safe-area-inset-bottom)+2rem)] pl-[max(1rem,env(safe-area-inset-left))]">
         {header}
         <Outlet />
       </main>
