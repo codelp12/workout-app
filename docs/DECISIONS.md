@@ -2,6 +2,13 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-11-02: Settings screen (#42)
+
+- **Settings are one row with a fixed id** (`SETTINGS_ID` in `packages/shared`), so every device edits the same row and last-write-wins keeps a single copy. Until something is changed the screen shows `defaultSettings()` (SPEC §2: lb and miles, the default inventory, every day AM and PM with gym access, the planner choosing the lift-free and long-run days, this device's time zone) and saves nothing. (§3.2, §4)
+- **Every change saves at once** through the outbox, with no Save button, so settings work offline like any other write. Updates run one at a time against the latest saved row, so quick taps don't overwrite each other. A device that changes settings before its first sync overwrites the server's copy; with one owner that's acceptable. (§3.2)
+- **Switching the weight unit doesn't convert the equipment**; the screen says so. The inventory is entered in the owner's unit, and converting a 5 lb rack to kg would give weights no rack has. (§2, §4)
+- **The screen edits dumbbells (on/off, lightest, heaviest, step), fixed barbells, bands (lightest first, reorderable), weekly availability (AM, PM and gym per weekday), and the lift-free and long-run days.** The optional loadable bar, plates and machine stack stay in the data model with no editor yet; they come when a gym-day template needs them. Export, backup status and the engine config viewer are later epics. (§4, §6.10)
+
 ## 2026-11-02: Loadable weights and the engine package (#41)
 
 - **`packages/engine` starts here**, pure TypeScript with no runtime dependencies beyond `@workout-app/shared` types. ESLint bans `Date`, `fetch`, timers, `Math.random`, `node:` and other I/O imports in its source, so "no I/O, no clock reads, no randomness" is checked on every lint, not just by review. fast-check (named in §5.6) is its dev dependency for property tests. (§2, §5.0, §5.6)
