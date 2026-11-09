@@ -67,7 +67,9 @@ beforeEach(async () => {
 afterEach(cleanup);
 
 const saved = () => localDb.rows("template").get(pushA.id);
-const card = (name: RegExp) => within(screen.getByRole("region", { name }));
+// The list re-renders from IndexedDB after a save, so wait for it.
+const card = async (name: RegExp) =>
+  within(await screen.findByRole("region", { name }));
 
 describe("template editor", () => {
   it("is listed in Settings and edits save through the outbox", async () => {
@@ -129,7 +131,7 @@ describe("template editor", () => {
       ]),
     );
     expect(
-      card(/^1\. Seated Dumbbell Press/).getByRole<HTMLButtonElement>(
+      (await card(/^1\. Seated Dumbbell Press/)).getByRole<HTMLButtonElement>(
         "button",
         { name: /up$/ },
       ).disabled,
