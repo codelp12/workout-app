@@ -2,10 +2,11 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { checkSession, signOut, type AuthState } from "./auth";
 import { Navigation } from "./Navigation";
+import { planProvisionalWeek } from "./plan/provisional";
 import { onboardingOffered } from "./settings/onboarding-flag";
 import { readSettings } from "./settings/settings";
 import { SignIn } from "./SignIn";
-import { syncEngine, syncSoon } from "./sync";
+import { localDb, syncEngine, syncSoon } from "./sync";
 import { SyncChip } from "./SyncChip";
 import { UnsyncedWarning } from "./UnsyncedData";
 import { button } from "./ui";
@@ -42,14 +43,22 @@ export function App() {
 
   useEffect(() => {
     const check = () => void checkSession().then(setAuth);
+    // Covers a Sunday-night rollover while offline (SPEC §3.2).
+    const plan = () =>
+      void planProvisionalWeek(localDb).catch((error: unknown) =>
+        console.error("Planning the provisional week failed", error),
+      );
     check();
+    plan();
     syncSoon();
     const onOnline = () => {
       check();
       syncSoon();
     };
     const onVisible = () => {
-      if (document.visibilityState === "visible") syncSoon();
+      if (document.visibilityState !== "visible") return;
+      plan();
+      syncSoon();
     };
     window.addEventListener("online", onOnline);
     document.addEventListener("visibilitychange", onVisible);

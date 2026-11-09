@@ -16,6 +16,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { Db } from "./db.js";
 import { entityTables } from "./entity-tables.js";
+import { planCurrentWeek } from "./plan.js";
 import { opReceipt, syncCounter } from "./schema.js";
 
 /** Single-user app (SPEC §1): every row belongs to the one account. */
@@ -127,8 +128,15 @@ function applyOp(tx: Tx, raw: { opId: string }, now: number): PushResult {
   return { opId, status: "applied", serverSeq };
 }
 
-/** Sync v1 (SPEC §3.2): push ops, pull changed rows and tombstones by cursor. */
-export function syncRoutes(db: Db, now: () => number = Date.now) {
+/**
+ * Sync v1 (SPEC §3.2): push ops, pull changed rows and tombstones by cursor.
+ * With `planWeeks`, a pull first runs the weekly rollover.
+ */
+export function syncRoutes(
+  db: Db,
+  now: () => number = Date.now,
+  planWeeks = true,
+) {
   const routes = new Hono();
 
   routes.post("/push", async (c) => {
@@ -146,6 +154,7 @@ export function syncRoutes(db: Db, now: () => number = Date.now) {
     const query = pullQuery.safeParse(c.req.query());
     if (!query.success) return c.json({ error: "Invalid cursor" }, 400);
     const { since, limit } = query.data;
+    if (planWeeks) planCurrentWeek(db, now());
     // Take up to limit + 1 from each table: if the merged list is longer than limit, there's another page.
     const changes = ENTITY_NAMES.flatMap((entity) => {
       const table = entityTables[entity] as EntityTable;
