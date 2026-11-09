@@ -2,6 +2,13 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-11-09: Today view (#48)
+
+- **Today reads the plan straight from IndexedDB** (`dayPlan()` in `apps/web/src/plan/sessions.ts`), so it works offline and shows the provisional week until the server's arrives. "Today" is the date in the settings' time zone, rechecked every minute and when the app returns to the foreground. Sessions are grouped AM and PM; ones marked `moved` are left out, and done or skipped ones show their status instead of Start. A deload week is labelled. (§3.2, §6.1)
+- **Each card shows a one-line target summary from the planned items**: exercises and sets for lifts, distance and RPE for runs, grades and problem count for climbs. Lift titles come from the template, others from the workout type ("Easy run", "Limit climb"). (§6.1)
+- **Start opens `/session/<plannedSessionId>`, which picks the player by modality** (`apps/web/src/players/`). Until #51, #57 and #58 land, each player lists the planned targets and writes nothing; starting a session log is the players' job. (§6.3–6.5)
+- **The coach note is a placeholder card** until the engines write one (Phases 2–4), and the sync chip stays in the shared header shown on every tab. The readiness check-in waits for Phase 5. (§5.5, §6.1)
+
 ## 2026-11-02: Global calendar and weekly rollover (#47)
 
 - **The server runs the rollover at the start of every pull** (`planCurrentWeek()`): if the week that's current in the owner's zone has no row, it plans it from every log it has. Pushes then pulls, so the first sync after Sunday midnight gets the new week. It uses the settings' `timezone`, or the server's own zone until settings first sync. (§3.2)
