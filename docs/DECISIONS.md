@@ -2,6 +2,14 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-11-10: Lift player core (#51)
+
+- **One `session_log` per planned session** (`sessionLogId(plannedSessionId)`, a UUIDv5), created when the first set is logged, so just opening a session writes nothing. Logging the same session on two devices fills one log instead of making two. `endedAt` stays null until finishing lands (#55). (§3.2, §4)
+- **Every set is its own `set_log` write through the outbox** the moment it's logged (`logSet()` in `apps/web/src/players/lift-log.ts`), so a kill loses nothing logged. The card on screen and any unlogged stepper values are kept in `localStorage` per session (device-local, like the onboarding flag), so the player reopens exactly where it was. (§3.1)
+- **A killed PWA reopens on Today, so launching on Today opens the lift session this device was logging** if its log is still open from today, after the first-run wizard check. It's device-local (`localStorage`), so a workout on the phone never takes over the laptop, and deep links aren't redirected. (§3.1, §3.4)
+- **Two taps per set: pick RIR, then Log set.** Weight and reps are prefilled, from the target for the first set (the top of the rep range) and from the previous set after that. RIR starts unpicked whenever the slot has a target RIR, so every logged working set has an honest RIR for the engine. Slots without one (e.g. planks) log in one tap. Logging the last planned set moves to the next exercise. (§1, §5.1, §6.3)
+- **Cards swipe with a plain pointer gesture** (60 px) as well as Previous/Next buttons, with no carousel library. The weight stepper steps by the rack's dumbbell step (or the stack step), until the load picker (#52) offers only available weights. Bodyweight and band slots log no load. "Last time" lists the working sets from the latest earlier log of the exercise. "How to" links to the exercise's Library page for now. (§2, §6.3)
+
 ## 2026-11-10: Week view (#49)
 
 - **A move is a `plan_override` row of kind `move`, one per session** (`moveOverrideId(sessionId)`, a UUIDv5), with `data: { date, slot }`. Moving a session again updates the same row, so last-write-wins settles two devices moving it at once; moving it back to where the plan put it deletes the override. The row records the outbox op that wrote it (`opId`). Plan rows stay server-owned and untouched. (§3.1, §3.2, §4)

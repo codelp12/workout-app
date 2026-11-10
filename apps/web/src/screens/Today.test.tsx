@@ -148,7 +148,7 @@ describe("Today", () => {
       await screen.findByRole("heading", { level: 1, name: "Push A" }),
     ).toBeTruthy();
     const lift = within(screen.getByRole("region", { name: "Lift player" }));
-    expect(lift.getByText("Dumbbell Bench Press")).toBeTruthy();
+    expect(await lift.findByText("Dumbbell Bench Press")).toBeTruthy();
     expect(lift.getByText("3 × 6–10 · 50 lb · RIR 2 · rest 3:00")).toBeTruthy();
 
     await user.click(screen.getByRole("button", { name: "Back" }));
