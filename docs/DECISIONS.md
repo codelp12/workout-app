@@ -2,6 +2,12 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-11-10: Finish a lifting session (#55)
+
+- **"Finish workout" sits under the card once a set is logged** and opens a sheet with session RPE (1–10, required) and notes (optional). Finishing sets the `session_log`'s `endedAt`, `rpe` and `notes`, which go through the outbox like any other write, then syncs straight away. (§3.2, §4)
+- **The client doesn't write `planned_session.status`.** The server owns plan rows (§3.1), so Today and Week show a planned session as done when its `session_log` has an `endedAt`. Week's done count already used finished logs. The server can write `done` itself later, and the client still shows it.
+- **A finished session shows a summary in the player** (working sets, minutes, RPE, notes) instead of the cards, and isn't editable. Finishing clears the player's saved position and this device's active-workout pointer, so Today stops reopening it. History (#60) lists finished logs.
+
 ## 2026-11-10: Swap, skip, add set and warm-ups (#54)
 
 - **Swaps and skips are `plan_override` rows, one per planned item** (`swapOverrideId(itemId)`, `skipOverrideId(itemId)`, UUIDv5s, in `apps/web/src/plan/item-overrides.ts`), so they go through the outbox and sync like moves, and the latest write wins on every device. A swap is kind `swap` with `{itemId, exerciseId}`; swapping back to the planned exercise deletes it. A skip uses the existing `trim` kind with `{itemId}`, rather than adding a new kind to `OVERRIDE_KINDS`; undoing it deletes the row. (§3.1, §4)

@@ -72,7 +72,14 @@ test("a set logs in two taps and the player resumes after a kill", async ({
 
 type PullPage = {
   changes: {
-    row: { kind?: string; plannedSessionId?: string; opId?: string };
+    row: {
+      kind?: string;
+      plannedSessionId?: string;
+      opId?: string;
+      endedAt?: number | null;
+      rpe?: number | null;
+      notes?: string | null;
+    };
   }[];
   cursor: number;
   hasMore: boolean;
@@ -137,4 +144,64 @@ test("swaps and skips sync to the server", async ({ page }, testInfo) => {
       return kinds.sort();
     })
     .toEqual(["swap", "trim"]);
+});
+
+test("a finished session shows as done and syncs", async ({
+  page,
+}, testInfo) => {
+  const title = sessions[testInfo.project.name] ?? "Legs A";
+  await page.goto("/week?show=lift");
+  await page.getByLabel("Password").fill(E2E_PASSWORD);
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page.getByTestId("sync-chip")).toHaveText("Synced");
+  await expect(page.getByText("No exercises yet")).toHaveCount(0);
+  await page.getByRole("button", { name: new RegExp(`^${title}, `) }).click();
+  await page
+    .getByRole("dialog", { name: title })
+    .getByRole("button", { name: "Open session" })
+    .click();
+  await expect(page).toHaveURL(/\/session\//);
+  const sessionId = new URL(page.url()).pathname.split("/").pop()!;
+  const player = page.getByRole("region", { name: "Lift player" });
+  const card = player.getByRole("article");
+  await card.getByRole("radio", { name: "2" }).click();
+  await card.getByRole("button", { name: "Log set" }).click();
+
+  await player.getByRole("button", { name: "Finish workout" }).click();
+  const sheet = page.getByRole("dialog", { name: "Finish workout" });
+  await sheet.getByRole("radio", { name: "8" }).click();
+  await sheet.getByLabel("Notes").fill("Heavy but good");
+  await sheet.getByRole("button", { name: "Finish", exact: true }).click();
+  const done = player.getByRole("region", { name: "Workout finished" });
+  await expect(done).toBeVisible();
+  await expect(done).toContainText("RPE 8");
+  await page.screenshot({
+    path: testInfo.outputPath("lift-finished-390x844.png"),
+  });
+
+  await expect
+    .poll(async () => {
+      for (let since = 0, more = true; more;) {
+        const res = await page.request.get(`/api/sync/pull?since=${since}`);
+        const body = (await res.json()) as PullPage;
+        for (const { row } of body.changes) {
+          if (row.plannedSessionId === sessionId && "endedAt" in row) {
+            return {
+              finished: row.endedAt != null,
+              rpe: row.rpe,
+              notes: row.notes,
+            };
+          }
+        }
+        since = body.cursor;
+        more = body.hasMore;
+      }
+      return null;
+    })
+    .toEqual({ finished: true, rpe: 8, notes: "Heavy but good" });
+
+  await page.goto("/week?show=lift");
+  await expect(
+    page.getByRole("button", { name: new RegExp(`^${title}, .*Done`) }),
+  ).toBeVisible();
 });

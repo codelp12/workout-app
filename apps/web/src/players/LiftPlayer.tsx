@@ -16,10 +16,11 @@ import { skipItem, swapExercise } from "../plan/item-overrides";
 import { liftDetail, type SessionView } from "../plan/sessions";
 import { readSettings, type SettingsData } from "../settings/settings";
 import { localDb, syncSoon } from "../sync";
-import { button, buttonBase, card as cardClass } from "../ui";
+import { button, buttonBase, card as cardClass, input } from "../ui";
 import { useLiveQuery } from "../use-live-query";
 import {
   bandChoices,
+  finishSession,
   implementOf,
   isWeighted,
   loadChoices,
@@ -72,6 +73,95 @@ function describeSet(
 function lastTimeLine(sets: SetLog[]): string {
   if (sets.length === 0) return "First time";
   return sets.map(describeSet).join(", ");
+}
+
+const RPE_OPTIONS = Array.from({ length: 10 }, (_, i) => ({
+  value: String(i + 1),
+  label: String(i + 1),
+}));
+
+function FinishSheet({ view }: { view: SessionView }) {
+  const notesId = useId();
+  const [open, setOpen] = useState(false);
+  const [rpe, setRpe] = useState<number | null>(null);
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+  async function finish() {
+    if (rpe === null) return;
+    setSaving(true);
+    try {
+      await finishSession(localDb, view, { rpe, notes });
+      syncSoon();
+      setOpen(false);
+    } finally {
+      setSaving(false);
+    }
+  }
+  return (
+    <BottomSheet
+      title="Finish workout"
+      open={open}
+      onOpenChange={setOpen}
+      trigger={
+        <button type="button" className={`${button} min-h-tap w-full`}>
+          Finish workout
+        </button>
+      }
+    >
+      <ChipGroup
+        type="single"
+        label="Session RPE"
+        modality="lift"
+        options={RPE_OPTIONS}
+        value={rpe === null ? undefined : String(rpe)}
+        onValueChange={(value) => setRpe(Number(value))}
+      />
+      <label htmlFor={notesId} className="font-medium">
+        Notes
+      </label>
+      <textarea
+        id={notesId}
+        rows={3}
+        className={`${input} py-2`}
+        placeholder="How it went, anything to remember…"
+        value={notes}
+        onChange={(event) => setNotes(event.target.value)}
+      />
+      <button
+        type="button"
+        className={`${buttonBase} min-h-tap bg-lift text-bg`}
+        disabled={saving || rpe === null}
+        onClick={() => void finish()}
+      >
+        Finish
+      </button>
+    </BottomSheet>
+  );
+}
+
+function Finished({ data }: { data: LiftSession }) {
+  const log = data.log!;
+  const sets = data.cards.reduce((sum, c) => sum + c.sets.length, 0);
+  const minutes = Math.max(
+    1,
+    Math.round((log.endedAt! - log.startedAt) / 60_000),
+  );
+  return (
+    <section
+      aria-label="Workout finished"
+      className={`${cardClass} flex flex-col gap-2`}
+    >
+      <h2 className="text-xl font-semibold text-lift">Workout finished</h2>
+      <p className="tabular-nums">
+        {sets} working set{sets === 1 ? "" : "s"} · {minutes} min
+        {log.rpe === null ? "" : ` · RPE ${log.rpe}`}
+      </p>
+      {log.notes && <p className="whitespace-pre-wrap">{log.notes}</p>}
+      <Link to="/" className={`${button} min-h-tap self-start`}>
+        Back to Today
+      </Link>
+    </section>
+  );
 }
 
 function SwapSheet({
@@ -472,6 +562,13 @@ export function LiftPlayer({ view }: { view: SessionView }) {
   useWakeLock(data !== undefined && data.log?.endedAt == null);
 
   if (!data || !settings) return <section aria-label="Lift player" />;
+  if (data.log?.endedAt != null) {
+    return (
+      <section aria-label="Lift player">
+        <Finished data={data} />
+      </section>
+    );
+  }
   const { cards } = data;
   if (cards.length === 0) {
     return (
@@ -575,6 +672,7 @@ export function LiftPlayer({ view }: { view: SessionView }) {
         }}
         onSwapped={() => setPosition((p) => ({ ...p, drafts: dropDraft(p) }))}
       />
+      {data.log && <FinishSheet view={view} />}
     </section>
   );
 }
