@@ -2,6 +2,11 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-11-10: CI runs in the Playwright image
+
+- **The `Lint, test and build` job runs inside `mcr.microsoft.com/playwright:v1.64.1-noble`** instead of running `playwright install --with-deps` on the bare runner. The apt step pulled 139 MB of browser libraries from the runner's Ubuntu mirror. On a slow mirror (161 kB/s) that took 10–18 minutes and once hit the 20-minute timeout, while the same step sometimes took 38 seconds. The image ships Chromium, WebKit and their libraries, so E2E has nothing to install. It runs as the runner's user (`--user 1001`) so checkout and caches can write to the workspace, with `--ipc=host` as Playwright recommends for Chromium. The image's tag has to equal `@playwright/test` in `pnpm-lock.yaml`. If they drift, E2E fails with Playwright's "Executable doesn't exist" error, so bump both together. (§10)
+- **Job timeout lowered from 20 to 10 minutes.** The job takes a couple of minutes now, so a hang fails sooner. (§10)
+
 ## 2026-11-10: Load picker (#52)
 
 - **The weight is a picker, not a typed number** (`LoadPicker` in `apps/web/src/components/`). − and + step to the next lighter or heavier load the equipment can make, and tapping the weight opens a sheet listing them all. There's no text field, so an unloadable weight can't be shown or logged. (§5.1, §6.3)
