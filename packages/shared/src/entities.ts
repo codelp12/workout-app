@@ -48,10 +48,12 @@ export const ASCENT_STYLES = ["flash", "onsight", "send", "attempt"] as const;
 export const PROJECT_STATUSES = ["active", "sent", "dropped"] as const;
 export const MEDIA_KINDS = ["image", "video"] as const;
 export const CLIMB_DISCIPLINES = ["boulder", "route"] as const;
+export const PROBLEM_REPORT_STATUSES = ["new", "filed"] as const;
 
 export type WeightUnit = (typeof WEIGHT_UNITS)[number];
 export type DistanceUnit = (typeof DISTANCE_UNITS)[number];
 export type ElevationUnit = (typeof ELEVATION_UNITS)[number];
+export type ProblemReportStatus = (typeof PROBLEM_REPORT_STATUSES)[number];
 export type Modality = (typeof MODALITIES)[number];
 export type StressTag = (typeof STRESS_TAGS)[number];
 export type ProgressionModel = (typeof PROGRESSION_MODELS)[number];
@@ -425,6 +427,25 @@ export const ascentSchema = z.object({
 });
 export type Ascent = z.infer<typeof ascentSchema>;
 
+export const PROBLEM_REPORT_MAX_LENGTH = 4000;
+
+/** A beta "Report a problem" note. The server's `reports.js` command lists new ones and marks them filed. */
+export const problemReportSchema = z.object({
+  ...syncFields,
+  text: z.string().min(1).max(PROBLEM_REPORT_MAX_LENGTH),
+  /** When the web app was built, so a report maps to a version. */
+  appBuild: z.string(),
+  /** The last screen opened before Settings, e.g. `/session/<id>`. */
+  screen: z.string().nullable(),
+  userAgent: z.string(),
+  /** The sync chip's text when the report was written. */
+  syncStatus: z.string(),
+  status: z.enum(PROBLEM_REPORT_STATUSES),
+  /** The GitHub issue it was filed as. */
+  githubIssue: z.int().positive().nullable(),
+});
+export type ProblemReport = z.infer<typeof problemReportSchema>;
+
 /** Every synced entity, keyed by the name sync ops use (§3.2). */
 export const entitySchemas = {
   settings: settingsSchema,
@@ -440,6 +461,7 @@ export const entitySchemas = {
   run_log: runLogSchema,
   project: projectSchema,
   ascent: ascentSchema,
+  problem_report: problemReportSchema,
 } as const;
 export type EntityName = keyof typeof entitySchemas;
 export const ENTITY_NAMES = Object.keys(entitySchemas) as EntityName[];

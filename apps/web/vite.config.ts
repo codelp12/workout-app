@@ -29,6 +29,12 @@ const coreImages = readdirSync(exerciseMedia, { recursive: true })
   }));
 
 export default defineConfig({
+  define: {
+    // Shown in problem reports, so each maps to a build.
+    __APP_BUILD__: JSON.stringify(
+      process.env.APP_BUILD ?? `${new Date().toISOString().slice(0, 16)}Z`,
+    ),
+  },
   resolve: {
     // Use workspace packages' TypeScript source instead of their dist.
     conditions: ["@workout-app/source", ...defaultClientConditions],

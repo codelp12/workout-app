@@ -29,6 +29,7 @@ import type {
   Weight,
   WeightUnit,
   Onboarding,
+  ProblemReportStatus,
 } from "@workout-app/shared";
 import {
   index,
@@ -309,6 +310,24 @@ export const ascent = sqliteTable(
     index("ascent_server_seq_idx").on(t.serverSeq),
     index("ascent_session_log_id_idx").on(t.sessionLogId),
     index("ascent_project_id_idx").on(t.projectId),
+  ],
+);
+
+export const problemReport = sqliteTable(
+  "problem_report",
+  {
+    ...syncColumns(),
+    text: text("text").notNull(),
+    appBuild: text("app_build").notNull(),
+    screen: text("screen"),
+    userAgent: text("user_agent").notNull(),
+    syncStatus: text("sync_status").notNull(),
+    status: text("status").$type<ProblemReportStatus>().notNull(),
+    githubIssue: integer("github_issue"),
+  },
+  (t) => [
+    index("problem_report_server_seq_idx").on(t.serverSeq),
+    index("problem_report_status_idx").on(t.status),
   ],
 );
 
