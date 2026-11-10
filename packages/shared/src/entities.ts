@@ -330,6 +330,13 @@ export const planOverrideSchema = z.object({
 });
 export type PlanOverride = z.infer<typeof planOverrideSchema>;
 
+/** `data` of a `move` override: where the owner put the session. */
+export const moveOverrideDataSchema = z.object({
+  date: localDate,
+  slot: z.enum(DAY_SLOTS),
+});
+export type MoveOverrideData = z.infer<typeof moveOverrideDataSchema>;
+
 // --- Logs -------------------------------------------------------------------
 
 export const sessionLogSchema = z.object({

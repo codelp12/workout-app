@@ -9,12 +9,16 @@ import type { LocalDb, OutboxEntry } from "./local-db";
 /** Single-user app: matches the server's owner id. */
 export const OWNER_USER_ID = 1;
 
-/** Writes a row locally and queues it for the server in one transaction. Never touches the network. */
+/**
+ * Writes a row locally and queues it for the server in one transaction. Never
+ * touches the network. Pass `opId` when the row records its own op.
+ */
 export async function saveRow<E extends EntityName>(
   db: LocalDb,
   entity: E,
   data: UpsertData<E>,
   now = Date.now(),
+  opId = newId(),
 ): Promise<void> {
   const table = db.rows(entity);
   await db.transaction("rw", table, db.outbox, async () => {
@@ -25,7 +29,7 @@ export async function saveRow<E extends EntityName>(
       serverSeq: existing?.serverSeq ?? 0,
     } as EntityRow<E>);
     await db.outbox.add({
-      opId: newId(),
+      opId,
       entity,
       action: "upsert",
       data,

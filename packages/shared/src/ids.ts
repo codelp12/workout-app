@@ -46,3 +46,11 @@ export function plannedSessionId(weekStart: string, key: string): string {
 export function plannedItemId(sessionId: string, position: number): string {
   return v5(`planned-item:${sessionId}:${position}`, LIBRARY_NAMESPACE);
 }
+
+/**
+ * The id of the `move` override for a planned session: one per session, so
+ * moving it again updates the same row and last-write-wins settles races.
+ */
+export function moveOverrideId(sessionId: string): string {
+  return v5(`move-override:${sessionId}`, LIBRARY_NAMESPACE);
+}
