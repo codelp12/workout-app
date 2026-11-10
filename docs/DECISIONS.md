@@ -11,6 +11,7 @@ Newest first. Each entry gives the decision, why it was made, and the spec secti
 - **The pyramid counts sends per grade, hardest first, with empty grades in between.** Attempts aren't sends. It's worked out from this session's `ascent` rows on every change, so it updates as you log.
 - **Projects are `project` rows. An ascent links to one through `projectId`, and a new project can be created from the sheet at the ascent's grade.** A project's attempts and session count are summed over all its ascents in every session. A project is `sent` from its first live send and goes back to `active` if that send is deleted or edited away. The tracker lists active projects plus any this session touched. There's no way yet to drop or rename a project. (§4)
 - Everything is written through the outbox, so a session logs offline and syncs later. Nothing on the server changed.
+
 ## 2026-11-10: Report a problem (#108)
 
 - **Settings has a "Report a problem" box for the beta.** The owner asked for it on #107. It's outside §6, so §6 item 10 now lists it. It's a plain text box; screenshots are left out. (§6)
