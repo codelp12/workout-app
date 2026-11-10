@@ -1,11 +1,18 @@
-import { formatAmount, type WeightImplement } from "@workout-app/engine";
+import {
+  formatAmount,
+  toWeightUnit,
+  type WeightImplement,
+} from "@workout-app/engine";
 import type { SetLog } from "@workout-app/shared";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Link } from "react-router";
+import { BottomSheet } from "../components/BottomSheet";
 import { ChipGroup } from "../components/ChipGroup";
 import { LoadPicker } from "../components/LoadPicker";
 import { Stepper } from "../components/Stepper";
+import { vocabLabel } from "../library/filter";
 import { ExerciseImage } from "../library/ExerciseImage";
+import { skipItem, swapExercise } from "../plan/item-overrides";
 import { liftDetail, type SessionView } from "../plan/sessions";
 import { readSettings, type SettingsData } from "../settings/settings";
 import { localDb, syncSoon } from "../sync";
@@ -24,6 +31,8 @@ import {
   savePosition,
   settle,
   unitOf,
+  warmupCards,
+  warmupPlan,
   weightStep,
   type LiftCard,
   type LiftSession,
@@ -65,26 +74,164 @@ function lastTimeLine(sets: SetLog[]): string {
   return sets.map(describeSet).join(", ");
 }
 
+function SwapSheet({
+  view,
+  card,
+  onSwapped,
+}: {
+  view: SessionView;
+  card: LiftCard;
+  onSwapped: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  async function swap(exerciseId: string) {
+    await swapExercise(localDb, card.item, view.session, exerciseId);
+    syncSoon();
+    setOpen(false);
+    onSwapped();
+  }
+  return (
+    <BottomSheet
+      title="Swap exercise"
+      description="Same movement, other equipment. Dumbbell and band variants first."
+      open={open}
+      onOpenChange={setOpen}
+      trigger={
+        <button type="button" className={`${button} min-h-tap`}>
+          Swap
+        </button>
+      }
+    >
+      <ul aria-label="Substitutes" className="flex flex-col gap-2">
+        {card.substitutes.map((e) => {
+          const current = e.id === card.exercise?.id;
+          return (
+            <li key={e.id}>
+              <button
+                type="button"
+                aria-pressed={current}
+                className={`${button} min-h-tap w-full flex-col items-start text-left ${current ? "ring-2 ring-lift" : ""}`}
+                onClick={() => void swap(e.id)}
+              >
+                <span className="font-medium">{e.name}</span>
+                <span className="text-sm text-fg-muted">
+                  {e.equipment.map(vocabLabel).join(", ") || "No equipment"}
+                  {e.id === card.item.exerciseId ? " · Planned" : ""}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </BottomSheet>
+  );
+}
+
+function Warmups({
+  view,
+  card,
+  settings,
+  plan,
+}: {
+  view: SessionView;
+  card: LiftCard;
+  settings: SettingsData;
+  plan: SetValues[];
+}) {
+  const [saving, setSaving] = useState(false);
+  const unit = unitOf(card, settings);
+  const logged = card.warmups.length;
+  async function log(values: SetValues) {
+    setSaving(true);
+    try {
+      await logSet(localDb, view, card, values, settings, Date.now(), true);
+      markActive(view.session.id);
+      syncSoon();
+    } finally {
+      setSaving(false);
+    }
+  }
+  return (
+    <details className="rounded-lg bg-surface-raised px-3 py-2">
+      <summary className="min-h-tap cursor-pointer content-center font-medium">
+        Warm-up · {Math.min(logged, plan.length)} of {plan.length}
+      </summary>
+      <ol
+        aria-label="Warm-up sets"
+        className="flex flex-col gap-1 tabular-nums"
+      >
+        {plan.map((values, i) => {
+          const set = card.warmups[i];
+          const what = describeSet(
+            set ?? {
+              loadValue: values.load,
+              loadUnit: unit,
+              band: values.band,
+              reps: values.reps,
+              rir: null,
+            },
+          );
+          return (
+            <li
+              key={i}
+              className="flex min-h-tap items-center justify-between gap-2"
+            >
+              <span>
+                <span className="text-fg-muted">Warm-up {i + 1}</span> {what}
+              </span>
+              {set ? (
+                <span className="text-lift">Done</span>
+              ) : (
+                <button
+                  type="button"
+                  className={`${button} min-h-tap`}
+                  aria-label={`Log warm-up ${i + 1}`}
+                  disabled={saving || i !== logged}
+                  onClick={() => void log(values)}
+                >
+                  Log
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </details>
+  );
+}
+
 function ExerciseCard({
   view,
   card,
   settings,
   values,
+  planned,
+  warmups,
   onValues,
   onLogged,
+  onAddSet,
+  onSkipped,
+  onSwapped,
 }: {
   view: SessionView;
   card: LiftCard;
   settings: SettingsData;
   values: SetValues;
+  /** The planned sets plus any added. */
+  planned: number;
+  /** Whether the card ramps up with warm-ups. */
+  warmups: boolean;
   onValues: (values: SetValues) => void;
   onLogged: (done: boolean) => void;
+  onAddSet: () => void;
+  onSkipped: (skipped: boolean) => void;
+  onSwapped: () => void;
 }) {
   const titleId = useId();
   const [saving, setSaving] = useState(false);
-  const { exercise, targets, sets } = card;
+  const { exercise, targets, sets, skipped } = card;
   const name = exercise?.name ?? "Pick an exercise";
-  const done = sets.length >= targets.sets;
+  const done = sets.length >= planned;
   const needsRir = targets.targetRir !== null;
   const unit = unitOf(card, settings);
   const weighted = isWeighted(card);
@@ -100,11 +247,33 @@ function ExerciseCard({
       await logSet(localDb, view, card, values, settings);
       markActive(view.session.id);
       syncSoon();
-      onLogged(sets.length + 1 >= targets.sets);
+      onLogged(sets.length + 1 >= planned);
     } finally {
       setSaving(false);
     }
   }
+
+  async function skip(next: boolean) {
+    await skipItem(localDb, card.item, view.session, next);
+    syncSoon();
+    onSkipped(next);
+  }
+
+  const first = sets[0];
+  const workingLoad =
+    first?.loadValue != null
+      ? toWeightUnit(
+          { value: first.loadValue, unit: first.loadUnit ?? unit },
+          unit,
+        )
+      : values.load;
+  const warmupSets =
+    warmups && !skipped ? warmupPlan(card, settings, workingLoad) : [];
+  const canSwap =
+    !skipped &&
+    sets.length === 0 &&
+    card.warmups.length === 0 &&
+    card.substitutes.length > 1;
 
   return (
     <article
@@ -149,6 +318,30 @@ function ExerciseCard({
         <dt className="text-fg-muted">Last time</dt>
         <dd>{lastTimeLine(card.lastTime)}</dd>
       </dl>
+      {(canSwap || (!skipped && !done)) && (
+        <div className="flex gap-2">
+          {canSwap && (
+            <SwapSheet view={view} card={card} onSwapped={onSwapped} />
+          )}
+          {!done && (
+            <button
+              type="button"
+              className={`${button} min-h-tap`}
+              onClick={() => void skip(true)}
+            >
+              Skip
+            </button>
+          )}
+        </div>
+      )}
+      {warmupSets.length > 0 && (
+        <Warmups
+          view={view}
+          card={card}
+          settings={settings}
+          plan={warmupSets}
+        />
+      )}
       <ol aria-label="Sets" className="flex flex-col gap-1 tabular-nums">
         {sets.map((set) => (
           <li key={set.id} className="flex justify-between">
@@ -157,15 +350,35 @@ function ExerciseCard({
           </li>
         ))}
       </ol>
-      {done ? (
-        <p className="font-medium text-lift">All {targets.sets} sets done.</p>
+      {skipped ? (
+        <div className="flex items-center justify-between gap-2">
+          <p className="font-medium text-fg-muted">Skipped.</p>
+          <button
+            type="button"
+            className={`${button} min-h-tap`}
+            onClick={() => void skip(false)}
+          >
+            Undo skip
+          </button>
+        </div>
+      ) : done ? (
+        <div className="flex items-center justify-between gap-2">
+          <p className="font-medium text-lift">All {planned} sets done.</p>
+          <button
+            type="button"
+            className={`${button} min-h-tap`}
+            onClick={onAddSet}
+          >
+            Add set
+          </button>
+        </div>
       ) : (
         <section
-          aria-label={`Set ${sets.length + 1} of ${targets.sets}`}
+          aria-label={`Set ${sets.length + 1} of ${planned}`}
           className="flex flex-col gap-3"
         >
           <h3 className="font-semibold">
-            Set {sets.length + 1} of {targets.sets}
+            Set {sets.length + 1} of {planned}
           </h3>
           {loads && values.load !== null && loads.length > 0 && (
             <LoadPicker
@@ -282,6 +495,13 @@ export function LiftPlayer({ view }: { view: SessionView }) {
   const values = draft
     ? settle(current, settings, draft)
     : prefill(current, settings);
+  const extra = position.extra?.[current.itemId] ?? 0;
+  const warmed = warmupCards(cards);
+  const dropDraft = (p: PlayerPosition) => {
+    const drafts = { ...p.drafts };
+    delete drafts[current.itemId];
+    return drafts;
+  };
 
   return (
     <section
@@ -330,6 +550,8 @@ export function LiftPlayer({ view }: { view: SessionView }) {
         card={current}
         settings={settings}
         values={values}
+        planned={current.targets.sets + extra}
+        warmups={warmed.has(current.itemId)}
         onValues={(next) =>
           setPosition((p) => ({
             ...p,
@@ -338,12 +560,20 @@ export function LiftPlayer({ view }: { view: SessionView }) {
         }
         onLogged={(done) =>
           setPosition((p) => {
-            const drafts = { ...p.drafts };
-            delete drafts[current.itemId];
             const card = done && index < cards.length - 1 ? index + 1 : p.card;
-            return { card, drafts };
+            return { ...p, card, drafts: dropDraft(p) };
           })
         }
+        onAddSet={() =>
+          setPosition((p) => ({
+            ...p,
+            extra: { ...p.extra, [current.itemId]: extra + 1 },
+          }))
+        }
+        onSkipped={(skipped) => {
+          if (skipped && index < cards.length - 1) go(index + 1);
+        }}
+        onSwapped={() => setPosition((p) => ({ ...p, drafts: dropDraft(p) }))}
       />
     </section>
   );

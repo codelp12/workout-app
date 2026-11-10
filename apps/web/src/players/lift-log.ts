@@ -1,5 +1,6 @@
 import {
   availableLoads,
+  equipmentRank,
   roundToLoadable,
   toWeightUnit,
   type WeightImplement,
@@ -9,11 +10,13 @@ import {
   newId,
   sessionLogId,
   type Exercise,
+  type PlannedItem,
   type SessionLog,
   type Settings,
   type SetLog,
   type WeightUnit,
 } from "@workout-app/shared";
+import { itemOverrides } from "../plan/item-overrides";
 import type { LiftTargets, SessionView } from "../plan/sessions";
 import type { LocalDb } from "../sync/local-db";
 import { saveRow } from "../sync/writes";
@@ -31,10 +34,17 @@ export type SetValues = {
 /** One exercise of the session, as the player shows it. */
 export type LiftCard = {
   itemId: string;
+  item: Pick<PlannedItem, "id" | "plannedSessionId" | "exerciseId">;
+  /** The exercise being done: the planned one, or what it was swapped for. */
   exercise: Exercise | null;
+  /** The exercises it can be swapped for, preferred first (SPEC §5.1). */
+  substitutes: Exercise[];
+  skipped: boolean;
   targets: LiftTargets;
-  /** This session's sets of the exercise, in order. */
+  /** This session's working sets of the exercise, in order. */
   sets: SetLog[];
+  /** This session's warm-up sets of the exercise, in order. */
+  warmups: SetLog[];
   /** The working sets of the latest earlier session with this exercise. */
   lastTime: SetLog[];
 };
@@ -52,8 +62,14 @@ export async function readLiftSession(
   view: SessionView,
 ): Promise<LiftSession> {
   const items = view.items.filter((i) => i.kind === "exercise");
+  const overrides = itemOverrides(await db.rows("plan_override").toArray());
+  const exerciseOf = (item: PlannedItem) =>
+    overrides.swaps.get(item.id) ?? item.exerciseId;
   const ids = new Set(
-    items.flatMap((i) => (i.exerciseId ? [i.exerciseId] : [])),
+    items.flatMap((i) => {
+      const id = exerciseOf(i);
+      return id ? [id] : [];
+    }),
   );
   const logId = sessionLogId(view.session.id);
   const log = (await db.rows("session_log").get(logId)) ?? null;
@@ -63,8 +79,23 @@ export async function readLiftSession(
   const logs = new Map(
     live(await db.rows("session_log").toArray()).map((l) => [l.id, l]),
   );
-  const exercises = await db.rows("exercise").bulkGet([...ids]);
-  const byId = new Map(exercises.flatMap((e) => (e ? [[e.id, e]] : [])));
+  const exercises = live(await db.rows("exercise").toArray()).filter(
+    (e) => e.modality === "lift",
+  );
+  const byId = new Map(exercises.map((e) => [e.id, e]));
+  const substitutes = (planned: Exercise | null, current: Exercise | null) => {
+    const group = (planned ?? current)?.substitutionGroup ?? null;
+    const options = exercises.filter(
+      (e) =>
+        e.id === planned?.id ||
+        e.id === current?.id ||
+        (group !== null && e.substitutionGroup === group),
+    );
+    return options.sort(
+      (a, b) =>
+        equipmentRank(a) - equipmentRank(b) || a.name.localeCompare(b.name),
+    );
+  };
 
   const lastTime = (exerciseId: string) => {
     const earlier = sets.filter(
@@ -89,17 +120,29 @@ export async function readLiftSession(
 
   return {
     log: log && log.deletedAt === null ? log : null,
-    cards: items.map((item) => ({
-      itemId: item.id,
-      exercise: (item.exerciseId && byId.get(item.exerciseId)) || null,
-      targets: item.targets as LiftTargets,
-      sets: sets
-        .filter(
-          (s) => s.sessionLogId === logId && s.exerciseId === item.exerciseId,
-        )
-        .sort((a, b) => a.index - b.index),
-      lastTime: item.exerciseId ? lastTime(item.exerciseId) : [],
-    })),
+    cards: items.map((item) => {
+      const planned = (item.exerciseId && byId.get(item.exerciseId)) || null;
+      const exerciseId = exerciseOf(item);
+      const exercise = (exerciseId && byId.get(exerciseId)) || null;
+      const mine = sets
+        .filter((s) => s.sessionLogId === logId && s.exerciseId === exerciseId)
+        .sort((a, b) => a.index - b.index);
+      return {
+        itemId: item.id,
+        item: {
+          id: item.id,
+          plannedSessionId: item.plannedSessionId,
+          exerciseId: item.exerciseId,
+        },
+        exercise,
+        substitutes: substitutes(planned, exercise),
+        skipped: overrides.skips.has(item.id),
+        targets: item.targets as LiftTargets,
+        sets: mine.filter((s) => !s.isWarmup),
+        warmups: mine.filter((s) => s.isWarmup),
+        lastTime: exerciseId ? lastTime(exerciseId) : [],
+      };
+    }),
   };
 }
 
@@ -274,9 +317,61 @@ export function prefill(card: LiftCard, settings: PlayerSettings): SetValues {
   return settle(card, settings, raw);
 }
 
+// Warm-up ramp (SPEC §5.1): share of the first working load, and reps.
+const RAMP = [
+  { share: 0.4, reps: 8 },
+  { share: 0.6, reps: 5 },
+  { share: 0.8, reps: 3 },
+];
+
+/**
+ * The warm-up sets for a card: about 40/60/80% of the first working load,
+ * rounded to weights the inventory has. Steps that round to nothing, to the
+ * working load or to the step before are dropped. Empty for unweighted cards.
+ */
+export function warmupPlan(
+  card: LiftCard,
+  settings: PlayerSettings,
+  workingLoad: number | null,
+): SetValues[] {
+  if (!isWeighted(card) || workingLoad === null || workingLoad <= 0) return [];
+  const inModel = implementOf(card.exercise) !== null;
+  const step = weightStep(settings);
+  const plan: SetValues[] = [];
+  for (const { share, reps } of RAMP) {
+    const raw = workingLoad * share;
+    const load = inModel
+      ? snapLoad(card, settings, raw)
+      : Math.round(raw / step) * step;
+    if (load === null || load <= 0 || load >= workingLoad) continue;
+    if (plan.some((p) => p.load === load)) continue;
+    plan.push({ load, band: null, reps, rir: null });
+  }
+  return plan;
+}
+
+/**
+ * The cards that get warm-ups: those marked `ramp`, minus later ones whose
+ * movement pattern an earlier card already warmed up (SPEC §5.1). Skipped
+ * cards don't count.
+ */
+export function warmupCards(cards: readonly LiftCard[]): Set<string> {
+  const warmed = new Set<string>();
+  const result = new Set<string>();
+  for (const card of cards) {
+    if (card.skipped || !card.exercise || card.targets.ramp === false) continue;
+    const pattern = card.exercise.movementPattern;
+    if (pattern !== null && warmed.has(pattern)) continue;
+    if (pattern !== null) warmed.add(pattern);
+    result.add(card.itemId);
+  }
+  return result;
+}
+
 /**
  * Saves a set, starting the session's log with the first one. Each set goes
  * through the outbox on its own, so a killed app loses nothing (SPEC §3.1).
+ * Warm-ups are numbered apart from working sets and kept out of their stats.
  */
 export async function logSet(
   db: LocalDb,
@@ -285,6 +380,7 @@ export async function logSet(
   values: SetValues,
   settings: PlayerSettings,
   now = Date.now(),
+  warmup = false,
 ): Promise<void> {
   const id = sessionLogId(view.session.id);
   const existing = await db.rows("session_log").get(id);
@@ -321,13 +417,13 @@ export async function logSet(
       deletedAt: null,
       sessionLogId: id,
       exerciseId,
-      index: card.sets.length,
+      index: warmup ? card.warmups.length : card.sets.length,
       loadValue: values.load,
       loadUnit: values.load === null ? null : unitOf(card, settings),
       band: values.band,
       reps: values.reps,
       rir: values.rir,
-      isWarmup: false,
+      isWarmup: warmup,
       completedAt: now,
     },
     now,
@@ -373,6 +469,8 @@ export async function openWorkout(
 export type PlayerPosition = {
   card: number;
   drafts: Record<string, SetValues>;
+  /** Sets added past the plan, by planned item. */
+  extra?: Record<string, number>;
 };
 
 // Device-local, like the onboarding flag: it only has to survive a kill.

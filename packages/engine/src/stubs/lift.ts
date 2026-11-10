@@ -50,6 +50,8 @@ export type LiftItem = {
   repMax: number;
   targetRir: number | null;
   restSec: number;
+  /** Whether the first exercise of a movement pattern ramps up with warm-ups. */
+  ramp?: boolean;
   reasons: Reason[];
 };
 
@@ -72,7 +74,9 @@ export type LiftSessionLog = {
 
 // Equipment-first selection (SPEC §5.1): dumbbell, band, then bodyweight.
 const PREFERENCE = ["dumbbell", "band", "bodyweight"];
-const rank = (exercise: LiftExercise) => {
+
+/** Lower is preferred: dumbbell, band, bodyweight, then anything else (SPEC §5.1). */
+export const equipmentRank = (exercise: Pick<LiftExercise, "equipment">) => {
   const best = Math.min(
     ...exercise.equipment.map((e) =>
       PREFERENCE.includes(e) ? PREFERENCE.indexOf(e) : PREFERENCE.length,
@@ -92,7 +96,8 @@ function resolve(
     (e) => e.substitutionGroup === slot.substitutionGroup,
   );
   return group.reduce<LiftExercise | null>(
-    (best, e) => (best === null || rank(e) < rank(best) ? e : best),
+    (best, e) =>
+      best === null || equipmentRank(e) < equipmentRank(best) ? e : best,
     null,
   );
 }
@@ -170,6 +175,7 @@ function prescribeSlot(
     repMax: slot.repMax,
     targetRir: slot.targetRir,
     restSec: slot.restSec,
+    ramp: slot.ramp,
     reasons,
   };
   if (exercise === null) {

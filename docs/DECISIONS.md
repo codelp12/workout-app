@@ -2,6 +2,15 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-11-10: Swap, skip, add set and warm-ups (#54)
+
+- **Swaps and skips are `plan_override` rows, one per planned item** (`swapOverrideId(itemId)`, `skipOverrideId(itemId)`, UUIDv5s, in `apps/web/src/plan/item-overrides.ts`), so they go through the outbox and sync like moves, and the latest write wins on every device. A swap is kind `swap` with `{itemId, exerciseId}`; swapping back to the planned exercise deletes it. A skip uses the existing `trim` kind with `{itemId}`, rather than adding a new kind to `OVERRIDE_KINDS`; undoing it deletes the row. (§3.1, §4)
+- **The swap list is the planned exercise's substitution group, dumbbell then band then bodyweight first, then by name**, using the engine's `equipmentRank` so the player and the engine agree on "equipment-first". Swap is offered only until the first set (warm-up or working) is logged, because logged sets belong to the exercise they were done on. (§5.1, §6.3)
+- **A skipped card shows "Skipped." with Undo** and the player moves to the next card. Its sets stay hidden until it's unskipped.
+- **Add set is device-local**: after the planned sets, "Add set" raises that card's target by one, kept with the player's position in `localStorage`. The extra set itself is an ordinary `set_log` that syncs; the plan isn't changed. (§3.1, §6.3)
+- **Warm-ups ramp through about 40/60/80% of the first working load for 8/5/3 reps**, rounded to weights the equipment can make (or to the stepper's step for kettlebells and the like), dropping steps that round to nothing, the working load or the step before. They go on the first card of each movement pattern whose slot is `ramp` (the engine now copies `ramp` into the planned item's targets; older items count as `ramp`), and not on skipped cards. The rep counts are a guess; the spec only gives the percentages. (§5.1)
+- **Warm-ups sit in a collapsed `<details>` and log with one tap each, as `set_log.isWarmup = true`.** They're numbered apart from working sets (`index` 0, 1, 2 within the warm-ups), don't start the rest timer, and stay out of "Set N of M", "Last time" and the engine's exposures, so working-set stats only see working sets. (§4, §5.1, §6.3)
+
 ## 2026-11-10: Rest timer and wake lock (#53)
 
 - **The rest timer counts from the latest set's `completedAt`**, with that exercise's `restSec` (`latestRest()` in `apps/web/src/players/rest.ts`). The time left is recomputed from the clock every 250 ms and whenever the app returns to the foreground, so a locked screen, a backgrounded app or a kill can't put it out, and there's no timer state to save. It sits above the card, so it stays up when the player moves to the next exercise. (§3.4, §6.3)
