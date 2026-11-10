@@ -1,4 +1,9 @@
-import { type WeightImplement } from "@workout-app/engine";
+import {
+  availableLoads,
+  roundToLoadable,
+  toWeightUnit,
+  type WeightImplement,
+} from "@workout-app/engine";
 import {
   localDateAt,
   newId,
@@ -17,6 +22,8 @@ import { saveRow } from "../sync/writes";
 export type SetValues = {
   /** Null for bodyweight and band sets. */
   load: number | null;
+  /** The band from the inventory, for band sets. */
+  band: string | null;
   reps: number;
   rir: number | null;
 };
@@ -106,40 +113,165 @@ export function implementOf(exercise: Exercise | null): WeightImplement | null {
   return null;
 }
 
-/** Whether the weight stepper shows: a prefilled load or a weighted implement. */
+/** Whether the card takes a weight: a prefilled load or a weighted implement. */
 export const isWeighted = (card: LiftCard) =>
   card.targets.load !== null ||
   (card.targets.band === null && implementOf(card.exercise) !== null);
 
-/** The weight unit of the card's sets. */
-export const unitOf = (card: LiftCard, settings: PlayerSettings): WeightUnit =>
-  card.targets.load?.unit ?? settings.weightUnit;
+/** Whether the card's sets use a band. */
+export const isBanded = (card: LiftCard) =>
+  card.targets.band !== null ||
+  (!isWeighted(card) && (card.exercise?.equipment ?? []).includes("band"));
 
-/** Stepper step for the card's weight, from the rack where there is one. */
-export function weightStep(card: LiftCard, settings: PlayerSettings): number {
-  const fallback = settings.weightUnit === "kg" ? 2.5 : 5;
-  switch (implementOf(card.exercise)) {
-    case "dumbbell":
-      return settings.equipment.dumbbells?.step ?? fallback;
-    case "stack":
-      return settings.equipment.stackStep ?? fallback;
-    default:
-      return fallback;
+/**
+ * The weight unit of the card's sets: the inventory's for implements it
+ * covers, else the target's.
+ */
+export const unitOf = (card: LiftCard, settings: PlayerSettings): WeightUnit =>
+  implementOf(card.exercise) === null
+    ? (card.targets.load?.unit ?? settings.weightUnit)
+    : settings.weightUnit;
+
+/** Stepper step for weights the inventory doesn't cover (kettlebells and the like). */
+export const weightStep = (settings: PlayerSettings): number =>
+  settings.weightUnit === "kg" ? 2.5 : 5;
+
+// A stack has no top, so the picker lists this many steps, or 10 past the
+// current load if that's further.
+const STACK_CHOICES = 50;
+
+/**
+ * Snaps `load` to the nearest weight the inventory can make for the card
+ * (the lighter on a tie). Null when the inventory has none; unchanged when
+ * the card's implement isn't in the inventory model.
+ */
+export function snapLoad(
+  card: LiftCard,
+  settings: PlayerSettings,
+  load: number,
+): number | null {
+  const implement = implementOf(card.exercise);
+  if (implement === null) return load;
+  if (implement !== "barbell" && implement !== "bar") {
+    return roundToLoadable(settings.equipment, implement, load);
   }
+  return nearest(barbellLoads(settings), load);
+}
+
+/**
+ * Every weight the picker offers for the card, lightest first: the dumbbell
+ * rack, fixed barbells plus anything the loadable bar makes, or stack steps.
+ * Null when the card's implement isn't in the inventory model (the plain
+ * stepper is used instead); empty when the inventory has none of it.
+ */
+export function loadChoices(
+  card: LiftCard,
+  settings: PlayerSettings,
+  current: number | null,
+): number[] | null {
+  const { equipment } = settings;
+  switch (implementOf(card.exercise)) {
+    case null:
+      return null;
+    case "dumbbell":
+      return availableLoads(equipment, "dumbbell");
+    case "barbell":
+    case "bar":
+      return barbellLoads(settings);
+    case "stack": {
+      const step = equipment.stackStep;
+      if (step === null) return [];
+      const count = Math.max(
+        STACK_CHOICES,
+        Math.ceil((current ?? 0) / step) + 10,
+      );
+      return Array.from({ length: count }, (_, i) =>
+        roundToLoadable(equipment, "stack", (i + 1) * step)!,
+      );
+    }
+  }
+}
+
+/** The bands the picker offers, lightest first; null for non-band cards. */
+export const bandChoices = (
+  card: LiftCard,
+  settings: PlayerSettings,
+): string[] | null => (isBanded(card) ? settings.equipment.bands : null);
+
+function barbellLoads({ equipment }: PlayerSettings): number[] {
+  const loads = [
+    ...availableLoads(equipment, "barbell"),
+    ...availableLoads(equipment, "bar"),
+  ];
+  return [...new Set(loads)].sort((a, b) => a - b);
+}
+
+function nearest(loads: readonly number[], target: number): number | null {
+  let best: number | null = null;
+  for (const load of loads) {
+    if (best === null || Math.abs(load - target) < Math.abs(best - target)) {
+      best = load;
+    }
+  }
+  return best;
+}
+
+/**
+ * Brings saved or prefilled values in line with the inventory, which may
+ * have changed since: the load snaps to the nearest one on offer and a band
+ * that's gone falls back to the lightest.
+ */
+export function settle(
+  card: LiftCard,
+  settings: PlayerSettings,
+  values: SetValues,
+): SetValues {
+  const load =
+    values.load === null ? null : snapLoad(card, settings, values.load);
+  const bands = bandChoices(card, settings);
+  const band =
+    bands === null
+      ? null
+      : bands.length === 0
+        ? (values.band ?? null)
+        : values.band !== null && bands.includes(values.band)
+          ? values.band
+          : (bands[0] ?? null);
+  return { ...values, load, band };
 }
 
 /**
  * The next set prefilled: the last set logged this session if there is one,
- * else the target (top of the rep range). RIR is left for the owner to pick.
+ * else the target (top of the rep range), snapped to the inventory. RIR is
+ * left for the owner to pick.
  */
-export function prefill(card: LiftCard): SetValues {
+export function prefill(card: LiftCard, settings: PlayerSettings): SetValues {
+  const unit = unitOf(card, settings);
   const last = card.sets.at(-1);
-  if (last) return { load: last.loadValue, reps: last.reps, rir: null };
-  return {
-    load: isWeighted(card) ? (card.targets.load?.value ?? 0) : null,
-    reps: card.targets.repMax,
-    rir: null,
-  };
+  const raw: SetValues = last
+    ? {
+        load:
+          last.loadValue === null
+            ? null
+            : toWeightUnit(
+                { value: last.loadValue, unit: last.loadUnit ?? unit },
+                unit,
+              ),
+        band: last.band,
+        reps: last.reps,
+        rir: null,
+      }
+    : {
+        load: isWeighted(card)
+          ? card.targets.load
+            ? toWeightUnit(card.targets.load, unit)
+            : 0
+          : null,
+        band: card.targets.band,
+        reps: card.targets.repMax,
+        rir: null,
+      };
+  return settle(card, settings, raw);
 }
 
 /**
@@ -192,7 +324,7 @@ export async function logSet(
       index: card.sets.length,
       loadValue: values.load,
       loadUnit: values.load === null ? null : unitOf(card, settings),
-      band: card.targets.band,
+      band: values.band,
       reps: values.reps,
       rir: values.rir,
       isWarmup: false,

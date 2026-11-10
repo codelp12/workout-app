@@ -28,9 +28,9 @@ export function BottomSheet({
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       {trigger && <Dialog.Trigger asChild>{trigger}</Dialog.Trigger>}
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-bg/80" />
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-bg/80" />
         <Dialog.Content
-          className="fixed inset-x-0 bottom-0 mx-auto flex max-h-[85dvh] max-w-md animate-sheet-up flex-col gap-3 overflow-y-auto rounded-t-2xl bg-surface p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-lg outline-none motion-reduce:animate-none"
+          className="fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[85dvh] max-w-md animate-sheet-up flex-col gap-3 overflow-y-auto rounded-t-2xl bg-surface p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-lg outline-none motion-reduce:animate-none"
           // Without a description, tell Radix there is none on purpose.
           {...(description ? {} : { "aria-describedby": undefined })}
         >

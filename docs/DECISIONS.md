@@ -2,6 +2,13 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-11-10: Load picker (#52)
+
+- **The weight is a picker, not a typed number** (`LoadPicker` in `apps/web/src/components/`). − and + step to the next lighter or heavier load the equipment can make, and tapping the weight opens a sheet listing them all. There's no text field, so an unloadable weight can't be shown or logged. (§5.1, §6.3)
+- **What's offered** (`loadChoices()` in `apps/web/src/players/lift-log.ts`, built on the engine's `availableLoads`/`roundToLoadable`): the dumbbell rack; fixed barbells plus everything the optional bar and plates make; for cable or machine, stack steps (the first 50, or 10 past the current load if that's further, since a stack has no top). Band exercises get a chip row of the inventory's bands. Kettlebells and other implements the inventory doesn't model keep the plain stepper. (§2, §6.3)
+- **Prefills and saved drafts snap to the nearest load on offer** (the lighter on a tie, like the engine), so a target, the previous set or a resumed draft never shows a weight the equipment no longer makes after an equipment edit. A band that's gone falls back to the lightest, which is also the default for a band exercise with no history. (§5.0, §5.1)
+- **If the equipment has none of the implement** (e.g. dumbbells turned off), the card says so with a link to Settings and Log set stays disabled rather than logging a made-up weight. (§5.1)
+
 ## 2026-11-10: Lift player core (#51)
 
 - **One `session_log` per planned session** (`sessionLogId(plannedSessionId)`, a UUIDv5), created when the first set is logged, so just opening a session writes nothing. Logging the same session on two devices fills one log instead of making two. `endedAt` stays null until finishing lands (#55). (§3.2, §4)
