@@ -6,6 +6,7 @@ import {
   addDays,
   localDateAt,
   newId,
+  sessionLogId,
   type PlannedItem,
   type PlannedSession,
   type Template,
@@ -170,6 +171,28 @@ describe("Today", () => {
     const card = within(await am.findByRole("listitem", { name: "Push A" }));
     expect(await card.findByText("Done")).toBeTruthy();
     expect(card.queryByRole("button")).toBeNull();
+  });
+
+  it("shows a session as done once its log is finished", async () => {
+    await localDb.rows("session_log").clear();
+    await localDb.rows("session_log").put({
+      id: sessionLogId(push.id),
+      ...sync,
+      plannedSessionId: push.id,
+      modality: "lift",
+      startedAt: 1,
+      endedAt: 2,
+      localDate: today,
+      timezone: "UTC",
+      rpe: 7,
+      notes: null,
+    });
+    renderAt("/");
+    const am = await slot("AM");
+    const card = within(await am.findByRole("listitem", { name: "Push A" }));
+    expect(await card.findByText("Done")).toBeTruthy();
+    expect(card.queryByRole("button")).toBeNull();
+    await localDb.rows("session_log").clear();
   });
 
   it("opens a climb in the climb player and handles a missing session", async () => {

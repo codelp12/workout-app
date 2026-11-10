@@ -430,6 +430,51 @@ export async function logSet(
   );
 }
 
+/** What the owner says about the session when finishing it. */
+export type Finish = { rpe: number; notes: string | null };
+
+/**
+ * Finishes the session's log with its RPE and notes; the planned session then
+ * reads as done. The player's saved position and this device's active-workout
+ * pointer are cleared, so Today no longer reopens it.
+ */
+export async function finishSession(
+  db: LocalDb,
+  view: SessionView,
+  { rpe, notes }: Finish,
+  now = Date.now(),
+): Promise<void> {
+  const log = await db.rows("session_log").get(sessionLogId(view.session.id));
+  if (!log || log.deletedAt !== null) throw new Error("Nothing logged yet");
+  await saveRow(
+    db,
+    "session_log",
+    {
+      id: log.id,
+      createdAt: log.createdAt,
+      updatedAt: now,
+      deletedAt: null,
+      plannedSessionId: log.plannedSessionId,
+      modality: log.modality,
+      startedAt: log.startedAt,
+      endedAt: now,
+      localDate: log.localDate,
+      timezone: log.timezone,
+      rpe,
+      notes: notes?.trim() || null,
+    },
+    now,
+  );
+  try {
+    localStorage.removeItem(positionKey(view.session.id));
+    if (localStorage.getItem(ACTIVE_KEY) === view.session.id) {
+      localStorage.removeItem(ACTIVE_KEY);
+    }
+  } catch {
+    // Without storage there's nothing to clear.
+  }
+}
+
 const ACTIVE_KEY = "workout-app:active-lift";
 
 /** Remembers the session this device is logging, for {@link openWorkout}. */

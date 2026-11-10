@@ -6,6 +6,7 @@ import {
 } from "@workout-app/engine";
 import {
   addDays,
+  sessionLogId,
   DAY_SLOTS,
   weekId,
   weekStartOf,
@@ -137,15 +138,33 @@ export function formatLongDate(date: string): string {
 
 type Placed = Pick<SessionView, "session" | "planned">;
 
+/**
+ * Marks a planned session `done` once its log is finished. The server owns
+ * plan rows, so the client works this out from the log instead of writing it.
+ */
+async function withStatus(
+  sessions: PlannedSession[],
+): Promise<PlannedSession[]> {
+  const logs = await localDb
+    .rows("session_log")
+    .bulkGet(sessions.map((s) => sessionLogId(s.id)));
+  return sessions.map((s, i) => {
+    const log = logs[i];
+    const finished = log && log.deletedAt === null && log.endedAt !== null;
+    return finished && s.status === "planned" ? { ...s, status: "done" } : s;
+  });
+}
+
 /** Live sessions, not marked `moved`, where they sit now. */
 async function placedSessions(): Promise<Placed[]> {
   const moves = latestMoves(await localDb.rows("plan_override").toArray());
-  return (await localDb.rows("planned_session").toArray())
-    .filter((s) => s.deletedAt === null && s.status !== "moved")
-    .map((s) => ({
-      session: placeSession(s, moves),
-      planned: { date: s.date, slot: s.slot },
-    }));
+  const sessions = (await localDb.rows("planned_session").toArray()).filter(
+    (s) => s.deletedAt === null && s.status !== "moved",
+  );
+  return (await withStatus(sessions)).map((s) => ({
+    session: placeSession(s, moves),
+    planned: { date: s.date, slot: s.slot },
+  }));
 }
 
 const utc = (date: string) => {
@@ -298,14 +317,15 @@ export async function weekPlan(weekStart: string): Promise<WeekPlan> {
 
 /** A live planned session where it sits now, or `null` if there's no such session. */
 export async function readSession(id: string): Promise<SessionView | null> {
-  const session = await localDb.rows("planned_session").get(id);
-  if (!session || session.deletedAt !== null) return null;
+  const row = await localDb.rows("planned_session").get(id);
+  if (!row || row.deletedAt !== null) return null;
+  const [session] = await withStatus([row]);
   const moves = latestMoves(await localDb.rows("plan_override").toArray());
   return (
     await views([
       {
-        session: placeSession(session, moves),
-        planned: { date: session.date, slot: session.slot },
+        session: placeSession(session!, moves),
+        planned: { date: row.date, slot: row.slot },
       },
     ])
   )[0]!;

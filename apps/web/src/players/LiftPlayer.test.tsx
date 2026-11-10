@@ -693,3 +693,47 @@ describe("swap, skip, add set and warm-ups", () => {
     expect(card.querySelector("details")).toBeNull();
   });
 });
+
+describe("finishing", () => {
+  it("finishes with RPE and notes, marks the session done and queues it for sync", async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderPlayer();
+    expect(screen.queryByRole("button", { name: "Finish workout" })).toBeNull();
+    const card = await screen.findByRole("article", { name: "Dumbbell Squat" });
+    await user.click(within(card).getByRole("radio", { name: "2" }));
+    await user.click(within(card).getByRole("button", { name: "Log set" }));
+    expect(await within(card).findByText("Set 2 of 2")).toBeTruthy();
+
+    await user.click(
+      await screen.findByRole("button", { name: "Finish workout" }),
+    );
+    const sheet = await screen.findByRole("dialog", { name: "Finish workout" });
+    const finish = within(sheet).getByRole("button", { name: "Finish" });
+    expect((finish as HTMLButtonElement).disabled).toBe(true);
+    await user.click(within(sheet).getByRole("radio", { name: "7" }));
+    await user.type(within(sheet).getByLabelText("Notes"), "  Felt strong ");
+    await user.click(finish);
+
+    const done = await screen.findByRole("region", {
+      name: "Workout finished",
+    });
+    expect(
+      within(done).getByText(/1 working set · \d+ min · RPE 7/),
+    ).toBeTruthy();
+    expect(within(done).getByText("Felt strong")).toBeTruthy();
+    expect(screen.queryByRole("article")).toBeNull();
+
+    const log = await localDb.rows("session_log").get(sessionLogId(legs.id));
+    expect(log).toMatchObject({ rpe: 7, notes: "Felt strong" });
+    expect(log!.endedAt).toBeGreaterThanOrEqual(log!.startedAt);
+    const queued = await localDb.outbox.toArray();
+    expect(queued.filter((op) => op.entity === "session_log")).toHaveLength(2);
+    expect(await openWorkout(localDb, today)).toBeNull();
+
+    unmount();
+    renderPlayer();
+    expect(
+      await screen.findByRole("region", { name: "Workout finished" }),
+    ).toBeTruthy();
+  });
+});
