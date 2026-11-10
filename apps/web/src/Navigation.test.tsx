@@ -4,6 +4,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { ToastProvider } from "./components/Toast";
 import { Navigation } from "./Navigation";
 
 beforeAll(() => {
@@ -22,9 +23,11 @@ const tabs = [
 
 function renderAt(path: string) {
   render(
-    <MemoryRouter initialEntries={[path]}>
-      <Navigation header={<p>Header</p>} />
-    </MemoryRouter>,
+    <ToastProvider>
+      <MemoryRouter initialEntries={[path]}>
+        <Navigation header={<p>Header</p>} />
+      </MemoryRouter>
+    </ToastProvider>,
   );
 }
 

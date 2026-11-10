@@ -50,6 +50,7 @@ const rowsMatch: RowsMatch = {
   run_log: true,
   project: true,
   ascent: true,
+  problem_report: true,
 };
 
 const now = Date.UTC(2026, 9, 31, 14);
@@ -252,6 +253,16 @@ const fixtures: { [E in EntityName]: EntityRow<E> } = {
     style: "flash",
     attempts: 1,
     tags: ["crimp"],
+  },
+  problem_report: {
+    ...base(),
+    text: "Rest timer kept going after I finished.",
+    appBuild: "2026-11-10T17:00Z",
+    screen: `/session/${sessionLogId}`,
+    userAgent: "Mozilla/5.0 (iPhone)",
+    syncStatus: "Synced",
+    status: "filed",
+    githubIssue: 112,
   },
 };
 

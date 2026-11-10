@@ -114,15 +114,17 @@ The same app, run with Docker Desktop on a Windows 10 or 11 PC that stays on. Ru
 
 ## Day to day
 
-| Task         | Command (in `~/workout-app` on the host)                            |
-| ------------ | ------------------------------------------------------------------- |
-| Update       | `git pull && docker compose up -d --build && docker image prune -f` |
-| Status       | `docker compose ps` and `tailscale serve status`                    |
-| Logs         | `docker compose logs -f --tail=100`                                 |
-| Restart      | `docker compose restart`                                            |
-| Stop         | `docker compose down` (keeps data)                                  |
-| New password | `docker compose exec app node dist/set-password.js` (signs out all) |
-| Stop serving | `sudo tailscale serve reset`                                        |
+| Task            | Command (in `~/workout-app` on the host)                               |
+| --------------- | ---------------------------------------------------------------------- |
+| Update          | `git pull && docker compose up -d --build && docker image prune -f`    |
+| Status          | `docker compose ps` and `tailscale serve status`                       |
+| Logs            | `docker compose logs -f --tail=100`                                    |
+| Restart         | `docker compose restart`                                               |
+| Stop            | `docker compose down` (keeps data)                                     |
+| New password    | `docker compose exec app node dist/set-password.js` (signs out all)    |
+| Problem reports | `docker compose exec app node dist/reports.js` (lists new ones)        |
+| Mark one filed  | `docker compose exec app node dist/reports.js mark-filed <id> <issue>` |
+| Stop serving    | `sudo tailscale serve reset`                                           |
 
 On Windows, run these in PowerShell from `$HOME\workout-app` and leave out `sudo`. Windows PowerShell 5.1 has no `&&`, so run the update commands one at a time.
 

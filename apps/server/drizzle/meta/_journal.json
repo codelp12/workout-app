@@ -50,6 +50,13 @@
       "when": 1793632328773,
       "tag": "0006_settings_onboarding",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1794331507879,
+      "tag": "0007_problem_report",
+      "breakpoints": true
     }
   ]
 }
