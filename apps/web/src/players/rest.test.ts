@@ -5,7 +5,10 @@ import { formatClock, latestRest, secondsLeft } from "./rest";
 
 const card = (restSec: number, completedAt: number[]): LiftCard => ({
   itemId: `item-${restSec}`,
+  item: { id: `item-${restSec}`, plannedSessionId: "s", exerciseId: null },
   exercise: null,
+  substitutes: [],
+  skipped: false,
   targets: {
     sets: 3,
     load: null,
@@ -16,6 +19,7 @@ const card = (restSec: number, completedAt: number[]): LiftCard => ({
     restSec,
   },
   sets: completedAt.map((at, index) => ({ index, completedAt: at }) as SetLog),
+  warmups: [],
   lastTime: [],
 });
 

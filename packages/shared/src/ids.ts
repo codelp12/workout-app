@@ -56,6 +56,19 @@ export function moveOverrideId(sessionId: string): string {
 }
 
 /**
+ * The id of the `swap` override for a planned item: one per item, so swapping
+ * again updates the same row.
+ */
+export function swapOverrideId(itemId: string): string {
+  return v5(`swap-override:${itemId}`, LIBRARY_NAMESPACE);
+}
+
+/** The id of the `trim` override that skips a planned item: one per item. */
+export function skipOverrideId(itemId: string): string {
+  return v5(`skip-override:${itemId}`, LIBRARY_NAMESPACE);
+}
+
+/**
  * The id of the log of a planned session: one per session, so logging it on
  * two devices fills the same log instead of making two.
  */

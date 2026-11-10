@@ -69,3 +69,72 @@ test("a set logs in two taps and the player resumes after a kill", async ({
     resumed.getByRole("spinbutton", { name: "Reps" }),
   ).toHaveAttribute("aria-valuenow", reps!);
 });
+
+type PullPage = {
+  changes: {
+    row: { kind?: string; plannedSessionId?: string; opId?: string };
+  }[];
+  cursor: number;
+  hasMore: boolean;
+};
+
+test("swaps and skips sync to the server", async ({ page }, testInfo) => {
+  const title = sessions[testInfo.project.name] ?? "Legs A";
+  await page.goto("/week?show=lift");
+  await page.getByLabel("Password").fill(E2E_PASSWORD);
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page.getByTestId("sync-chip")).toHaveText("Synced");
+  await expect(page.getByText("No exercises yet")).toHaveCount(0);
+  await page.getByRole("button", { name: new RegExp(`^${title}, `) }).click();
+  await page
+    .getByRole("dialog", { name: title })
+    .getByRole("button", { name: "Open session" })
+    .click();
+  await expect(page).toHaveURL(/\/session\//);
+  const sessionId = new URL(page.url()).pathname.split("/").pop()!;
+  const player = page.getByRole("region", { name: "Lift player" });
+  const card = player.getByRole("article");
+
+  // The first card belongs to the other test; swap the second, skip the third.
+  await player.getByRole("button", { name: "Next" }).click();
+  await expect(player.getByText("Exercise 2 of")).toBeVisible();
+  await card.getByRole("button", { name: "Swap" }).click();
+  const sheet = page.getByRole("dialog", { name: "Swap exercise" });
+  const other = sheet
+    .getByRole("list", { name: "Substitutes" })
+    .getByRole("button", { pressed: false })
+    .first();
+  const swappedTo = (await other.locator("span").first().textContent())!;
+  await other.click();
+  await expect(sheet).toBeHidden();
+  await expect(player.getByRole("article", { name: swappedTo })).toBeVisible();
+
+  await player.getByRole("button", { name: "Next" }).click();
+  await expect(player.getByText("Exercise 3 of")).toBeVisible();
+  await card.getByRole("button", { name: "Skip" }).click();
+  await expect(player.getByText("Exercise 4 of")).toBeVisible();
+  await player.getByRole("button", { name: "Previous" }).click();
+  await expect(card.getByText("Skipped.")).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("lift-skipped-390x844.png"),
+  });
+
+  await expect
+    .poll(async () => {
+      const kinds: string[] = [];
+      for (let since = 0, more = true; more;) {
+        const res = await page.request.get(`/api/sync/pull?since=${since}`);
+        const body = (await res.json()) as PullPage;
+        for (const { row } of body.changes) {
+          // Plan overrides only: planned items carry a `kind` too.
+          if (row.plannedSessionId === sessionId && "opId" in row) {
+            kinds.push(row.kind!);
+          }
+        }
+        since = body.cursor;
+        more = body.hasMore;
+      }
+      return kinds.sort();
+    })
+    .toEqual(["swap", "trim"]);
+});

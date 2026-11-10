@@ -12,6 +12,8 @@ import {
   loadChoices,
   prefill,
   settle,
+  warmupCards,
+  warmupPlan,
   type LiftCard,
 } from "./lift-log";
 
@@ -31,9 +33,13 @@ const card = (
   fields: Partial<LiftTargets> = {},
 ): LiftCard => ({
   itemId: "item",
+  item: { id: "item", plannedSessionId: "session", exerciseId: null },
   exercise: testExercise({ equipment }),
+  substitutes: [],
+  skipped: false,
   targets: targets(fields),
   sets: [],
+  warmups: [],
   lastTime: [],
 });
 
@@ -173,5 +179,63 @@ describe("load picker choices", () => {
       "Light",
     );
     expect(bandChoices(card(["dumbbell"]), settings)).toBeNull();
+  });
+});
+
+describe("warm-ups", () => {
+  const settings = settingsFor(DEFAULT_EQUIPMENT);
+  const loads = (c: LiftCard, working: number | null) =>
+    warmupPlan(c, settings, working).map((v) => [v.load, v.reps]);
+
+  it("ramps through about 40/60/80% of the working load, on the rack", () => {
+    expect(loads(card(["dumbbell"]), 50)).toEqual([
+      [20, 8],
+      [30, 5],
+      [40, 3],
+    ]);
+  });
+
+  it("drops steps that round to the same weight or to the working load", () => {
+    expect(loads(card(["dumbbell"]), 10)).toEqual([[5, 8]]);
+  });
+
+  it("rounds weights the inventory doesn't model to the stepper's step", () => {
+    const kettlebell = card(["kettlebell"], {
+      load: { value: 35, unit: "lb" },
+    });
+    expect(loads(kettlebell, 35)).toEqual([
+      [15, 8],
+      [20, 5],
+      [30, 3],
+    ]);
+  });
+
+  it("has none for unweighted cards or without a working load", () => {
+    expect(loads(card(["bodyweight"]), null)).toEqual([]);
+    expect(loads(card(["dumbbell"]), 0)).toEqual([]);
+  });
+
+  it("goes on the first card of each movement pattern that ramps", () => {
+    const withPattern = (
+      itemId: string,
+      movementPattern: string | null,
+      fields: Partial<LiftCard> = {},
+      ramp?: boolean,
+    ): LiftCard => ({
+      ...card(["dumbbell"], ramp === undefined ? {} : { ramp }),
+      itemId,
+      exercise: testExercise({ equipment: ["dumbbell"], movementPattern }),
+      ...fields,
+    });
+    const cards = [
+      withPattern("skipped squat", "squat", { skipped: true }),
+      withPattern("squat", "squat"),
+      withPattern("lunge", "squat"),
+      withPattern("no ramp", "hinge", {}, false),
+      withPattern("hinge", "hinge"),
+      withPattern("unpatterned", null),
+      withPattern("no exercise", null, { exercise: null }),
+    ];
+    expect([...warmupCards(cards)]).toEqual(["squat", "hinge", "unpatterned"]);
   });
 });

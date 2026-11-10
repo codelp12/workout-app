@@ -337,6 +337,17 @@ export const moveOverrideDataSchema = z.object({
 });
 export type MoveOverrideData = z.infer<typeof moveOverrideDataSchema>;
 
+/** `data` of a `swap` override: the exercise done in place of the planned one. */
+export const swapOverrideDataSchema = z.object({
+  itemId: z.uuid(),
+  exerciseId: z.uuid(),
+});
+export type SwapOverrideData = z.infer<typeof swapOverrideDataSchema>;
+
+/** `data` of a `trim` override: a planned item the owner skipped. */
+export const trimOverrideDataSchema = z.object({ itemId: z.uuid() });
+export type TrimOverrideData = z.infer<typeof trimOverrideDataSchema>;
+
 // --- Logs -------------------------------------------------------------------
 
 export const sessionLogSchema = z.object({

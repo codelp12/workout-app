@@ -14,6 +14,8 @@ import {
   localDateAt,
   newId,
   sessionLogId,
+  skipOverrideId,
+  swapOverrideId,
   type PlannedItem,
   type PlannedSession,
   type SessionLog,
@@ -509,5 +511,185 @@ describe("LiftPlayer", () => {
       );
       expect(set).toMatchObject({ loadValue: null, band: "Heavy" });
     });
+  });
+});
+
+describe("swap, skip, add set and warm-ups", () => {
+  const sessionSets = async () =>
+    (await localDb.rows("set_log").toArray())
+      .filter((s) => s.sessionLogId === sessionLogId(legs.id))
+      .sort((a, b) => a.completedAt! - b.completedAt!);
+
+  it("swaps within the substitution group, dumbbell and band first, and queues it for sync", async () => {
+    const user = userEvent.setup();
+    const group = { substitutionGroup: "squat" };
+    const barbell = testExercise({
+      name: "Barbell Squat",
+      equipment: ["barbell"],
+      ...group,
+    });
+    const band = testExercise({
+      name: "Band Squat",
+      equipment: ["band"],
+      ...group,
+    });
+    const press = testExercise({
+      name: "Dumbbell Press",
+      equipment: ["dumbbell"],
+    });
+    await localDb
+      .rows("exercise")
+      .bulkPut([{ ...squat, ...group }, barbell, band, press]);
+    renderPlayer();
+    const card = await screen.findByRole("article", { name: "Dumbbell Squat" });
+    await user.click(within(card).getByRole("button", { name: "Swap" }));
+    const sheet = await screen.findByRole("dialog", { name: "Swap exercise" });
+    const options = within(
+      within(sheet).getByRole("list", { name: "Substitutes" }),
+    ).getAllByRole("button");
+    expect(options.map((o) => o.firstChild?.textContent)).toEqual([
+      "Dumbbell Squat",
+      "Band Squat",
+      "Barbell Squat",
+    ]);
+    expect(options[0]!.getAttribute("aria-pressed")).toBe("true");
+
+    await user.click(options[2]!);
+    const swapped = await screen.findByRole("article", {
+      name: "Barbell Squat",
+    });
+    const override = await localDb
+      .rows("plan_override")
+      .get(swapOverrideId(items[0]!.id));
+    expect(override).toMatchObject({
+      kind: "swap",
+      plannedSessionId: legs.id,
+      data: { itemId: items[0]!.id, exerciseId: barbell.id },
+    });
+    const ops = await localDb.outbox.toArray();
+    expect(ops.some((o) => o.opId === override!.opId)).toBe(true);
+
+    await user.click(within(swapped).getByRole("radio", { name: "2" }));
+    await user.click(within(swapped).getByRole("button", { name: "Log set" }));
+    await within(swapped).findByText("Set 2 of 2");
+    expect((await sessionSets()).map((s) => s.exerciseId)).toEqual([
+      barbell.id,
+    ]);
+    // With a set logged under it, the swap is settled.
+    expect(within(swapped).queryByRole("button", { name: "Swap" })).toBeNull();
+  });
+
+  it("skips an exercise, queues it for sync and can undo it", async () => {
+    const user = userEvent.setup();
+    renderPlayer();
+    const card = await screen.findByRole("article", { name: "Dumbbell Squat" });
+    await user.click(within(card).getByRole("button", { name: "Skip" }));
+
+    expect(await screen.findByRole("article", { name: "Plank" })).toBeTruthy();
+    const override = await localDb
+      .rows("plan_override")
+      .get(skipOverrideId(items[0]!.id));
+    expect(override).toMatchObject({
+      kind: "trim",
+      deletedAt: null,
+      data: { itemId: items[0]!.id },
+    });
+    const ops = await localDb.outbox.toArray();
+    expect(ops.some((o) => o.opId === override!.opId)).toBe(true);
+
+    await user.click(screen.getByRole("button", { name: "Previous" }));
+    const skipped = await screen.findByRole("article", {
+      name: "Dumbbell Squat",
+    });
+    expect(within(skipped).getByText("Skipped.")).toBeTruthy();
+    expect(
+      within(skipped).queryByRole("button", { name: "Log set" }),
+    ).toBeNull();
+    await user.click(
+      within(skipped).getByRole("button", { name: "Undo skip" }),
+    );
+    expect(await within(skipped).findByText("Set 1 of 2")).toBeTruthy();
+    const undone = await localDb
+      .rows("plan_override")
+      .get(skipOverrideId(items[0]!.id));
+    expect(undone?.deletedAt).not.toBeNull();
+  });
+
+  it("adds a set past the plan", async () => {
+    const user = userEvent.setup();
+    renderPlayer();
+    let card = await screen.findByRole("article", { name: "Dumbbell Squat" });
+    for (let i = 0; i < 2; i++) {
+      await user.click(within(card).getByRole("radio", { name: "2" }));
+      await user.click(within(card).getByRole("button", { name: "Log set" }));
+      await screen.findByText(i === 0 ? "Set 2 of 2" : "Exercise 2 of 2");
+    }
+    await user.click(screen.getByRole("button", { name: "Previous" }));
+    card = await screen.findByRole("article", { name: "Dumbbell Squat" });
+    expect(within(card).getByText("All 2 sets done.")).toBeTruthy();
+    await user.click(within(card).getByRole("button", { name: "Add set" }));
+    expect(within(card).getByText("Set 3 of 3")).toBeTruthy();
+    await user.click(within(card).getByRole("radio", { name: "1" }));
+    await user.click(within(card).getByRole("button", { name: "Log set" }));
+    expect(await screen.findByRole("article", { name: "Plank" })).toBeTruthy();
+    expect((await sessionSets()).map((s) => s.index)).toEqual([0, 1, 2]);
+  });
+
+  it("collapses the warm-ups and logs them flagged, outside the working sets", async () => {
+    const user = userEvent.setup();
+    // An earlier warm-up stays out of "Last time".
+    await localDb
+      .rows("set_log")
+      .put({ ...lastSet(0, 8), id: newId(), loadValue: 20, isWarmup: true });
+    renderPlayer();
+    const card = await screen.findByRole("article", { name: "Dumbbell Squat" });
+    expect(
+      within(card).getByText("45 lb × 10 · RIR 2, 45 lb × 9 · RIR 2"),
+    ).toBeTruthy();
+    const details = card.querySelector("details")!;
+    expect(details.open).toBe(false);
+    expect(within(card).getByText("Warm-up · 0 of 3")).toBeTruthy();
+    await user.click(within(card).getByText("Warm-up · 0 of 3"));
+    expect(details.open).toBe(true);
+    const list = within(card).getByRole("list", { name: "Warm-up sets" });
+    expect(
+      [...list.querySelectorAll("li")].map((li) => li.firstChild?.textContent),
+    ).toEqual([
+      "Warm-up 1 20 lb × 8",
+      "Warm-up 2 30 lb × 5",
+      "Warm-up 3 40 lb × 3",
+    ]);
+    const second = within(list).getByRole("button", { name: "Log warm-up 2" });
+    expect((second as HTMLButtonElement).disabled).toBe(true);
+
+    await user.click(
+      within(list).getByRole("button", { name: "Log warm-up 1" }),
+    );
+    expect(await within(card).findByText("Warm-up · 1 of 3")).toBeTruthy();
+    expect(within(card).getByText("Set 1 of 2")).toBeTruthy();
+    expect(screen.queryByRole("timer")).toBeNull();
+    expect(await sessionSets()).toEqual([
+      expect.objectContaining({
+        exerciseId: squat.id,
+        index: 0,
+        loadValue: 20,
+        reps: 8,
+        rir: null,
+        isWarmup: true,
+      }),
+    ]);
+
+    await user.click(within(card).getByRole("radio", { name: "2" }));
+    await user.click(within(card).getByRole("button", { name: "Log set" }));
+    await within(card).findByText("Set 2 of 2");
+    const [, working] = await sessionSets();
+    expect(working).toMatchObject({ index: 0, loadValue: 50, isWarmup: false });
+  });
+
+  it("has no warm-ups on a bodyweight card", async () => {
+    savePosition(legs.id, { card: 1, drafts: {} });
+    renderPlayer();
+    const card = await screen.findByRole("article", { name: "Plank" });
+    expect(card.querySelector("details")).toBeNull();
   });
 });
