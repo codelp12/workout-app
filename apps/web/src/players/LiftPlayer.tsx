@@ -30,6 +30,10 @@ import {
   type PlayerPosition,
   type SetValues,
 } from "./lift-log";
+import { latestRest } from "./rest";
+import { primeRestCue } from "./rest-cue";
+import { RestTimer } from "./RestTimer";
+import { useWakeLock } from "./use-wake-lock";
 
 const IMPLEMENT_NAMES: Record<WeightImplement, string> = {
   dumbbell: "dumbbells",
@@ -90,6 +94,7 @@ function ExerciseCard({
   const unloadable = loads !== null && loads.length === 0;
 
   async function log() {
+    primeRestCue();
     setSaving(true);
     try {
       await logSet(localDb, view, card, values, settings);
@@ -237,7 +242,8 @@ function ExerciseCard({
 /**
  * The lift player (SPEC §6.3): one card per exercise, swiped or stepped
  * through. Each set is saved as it's logged, and the card on screen and any
- * unlogged values survive the app being killed.
+ * unlogged values survive the app being killed. The screen stays on until the
+ * session is finished or the player is left.
  */
 export function LiftPlayer({ view }: { view: SessionView }) {
   const sessionId = view.session.id;
@@ -250,6 +256,7 @@ export function LiftPlayer({ view }: { view: SessionView }) {
   const swipeStart = useRef<number | null>(null);
 
   useEffect(() => savePosition(sessionId, position), [sessionId, position]);
+  useWakeLock(data !== undefined && data.log?.endedAt == null);
 
   if (!data || !settings) return <section aria-label="Lift player" />;
   const { cards } = data;
@@ -265,6 +272,7 @@ export function LiftPlayer({ view }: { view: SessionView }) {
 
   const index = Math.min(Math.max(position.card, 0), cards.length - 1);
   const current = cards[index]!;
+  const rest = latestRest(cards);
   const go = (card: number) =>
     setPosition((p) => ({
       ...p,
@@ -315,6 +323,7 @@ export function LiftPlayer({ view }: { view: SessionView }) {
           Next
         </button>
       </nav>
+      {rest && <RestTimer rest={rest} />}
       <ExerciseCard
         key={current.itemId}
         view={view}

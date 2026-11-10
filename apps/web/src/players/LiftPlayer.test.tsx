@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import "fake-indexeddb/auto";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -19,7 +20,7 @@ import {
   type SetLog,
 } from "@workout-app/shared";
 import { MemoryRouter, Route, Routes } from "react-router";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { testExercise } from "../library/test-exercise";
 import { Session } from "../screens/Session";
 import { deviceTimezone } from "../settings/settings";
@@ -279,6 +280,118 @@ describe("LiftPlayer", () => {
         .getByRole("spinbutton", { name: "Reps" })
         .getAttribute("aria-valuenow"),
     ).toBe("9");
+  });
+
+  it("times the rest from the set, so it's right after a screen lock or a kill", async () => {
+    let clock = Date.now();
+    vi.spyOn(Date, "now").mockImplementation(() => clock);
+    try {
+      const user = userEvent.setup();
+      const first = renderPlayer();
+      const card = await screen.findByRole("article", {
+        name: "Dumbbell Squat",
+      });
+      expect(screen.queryByRole("region", { name: "Rest timer" })).toBeNull();
+      await user.click(within(card).getByRole("radio", { name: "2" }));
+      await user.click(within(card).getByRole("button", { name: "Log set" }));
+      const timer = await screen.findByRole("region", { name: "Rest timer" });
+      expect(within(timer).getByRole("timer").textContent).toBe("2:30");
+
+      // Locked for 100 s: whatever ran meanwhile, it reads from the clock.
+      clock += 100_000;
+      act(() => {
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+      expect(within(timer).getByRole("timer").textContent).toBe("0:50");
+
+      first.unmount();
+      clock += 20_000;
+      renderPlayer();
+      const resumed = await screen.findByRole("region", { name: "Rest timer" });
+      expect(within(resumed).getByRole("timer").textContent).toBe("0:30");
+
+      clock += 30_000;
+      act(() => {
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+      expect(within(resumed).getByRole("status").textContent).toBe("Rest over");
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
+  describe("wake lock", () => {
+    let visibility: DocumentVisibilityState = "visible";
+    const sentinels: { released: boolean; release: () => Promise<void> }[] = [];
+    const request = vi.fn(() => {
+      const sentinel = {
+        released: false,
+        release: vi.fn(() => {
+          sentinel.released = true;
+          return Promise.resolve();
+        }),
+      };
+      sentinels.push(sentinel);
+      return Promise.resolve(sentinel);
+    });
+
+    beforeEach(() => {
+      visibility = "visible";
+      sentinels.length = 0;
+      request.mockClear();
+      Object.defineProperty(navigator, "wakeLock", {
+        configurable: true,
+        value: { request },
+      });
+      Object.defineProperty(document, "visibilityState", {
+        configurable: true,
+        get: () => visibility,
+      });
+    });
+
+    afterEach(() => {
+      Reflect.deleteProperty(navigator, "wakeLock");
+      Reflect.deleteProperty(document, "visibilityState");
+    });
+
+    function setVisibility(state: DocumentVisibilityState) {
+      visibility = state;
+      act(() => {
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+    }
+
+    it("keeps the screen on during the session, again after the app is hidden", async () => {
+      const player = renderPlayer();
+      await screen.findByRole("article", { name: "Dumbbell Squat" });
+      await vi.waitFor(() => expect(request).toHaveBeenCalledWith("screen"));
+      expect(request).toHaveBeenCalledTimes(1);
+
+      // The browser drops the lock while hidden; it's taken again on return.
+      sentinels[0]!.released = true;
+      setVisibility("hidden");
+      expect(request).toHaveBeenCalledTimes(1);
+      setVisibility("visible");
+      await vi.waitFor(() => expect(request).toHaveBeenCalledTimes(2));
+
+      player.unmount();
+      expect(sentinels[1]!.release).toHaveBeenCalled();
+    });
+
+    it("lets the screen lock once the session is finished", async () => {
+      const player = renderPlayer();
+      await screen.findByRole("article", { name: "Dumbbell Squat" });
+      await vi.waitFor(() => expect(request).toHaveBeenCalledTimes(1));
+      await localDb.rows("session_log").put({
+        ...lastWeek,
+        id: sessionLogId(legs.id),
+        plannedSessionId: legs.id,
+        localDate: today,
+        endedAt: Date.now(),
+      });
+      await vi.waitFor(() => expect(sentinels[0]!.release).toHaveBeenCalled());
+      player.unmount();
+    });
   });
 
   describe("load picker", () => {

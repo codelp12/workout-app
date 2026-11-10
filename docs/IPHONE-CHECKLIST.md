@@ -86,3 +86,30 @@ Later phases add items to this list per SPEC §10: logging a set offline, killin
 - 5 Exactly once after reconnect: pass / fail
 - Anything odd:
 ```
+
+## Rest timer and wake lock (#53)
+
+**Before you start:** same as above, with the new build deployed. Silent switch off and volume up. Auto-Lock on (Settings → Display & Brightness → Auto-Lock, 30 seconds makes this quick).
+
+1. **Start a lift session** from Today in the installed app and log a set. A rest timer appears above the card, counting down from the exercise's rest.
+2. **Wake lock.** Put the phone down without touching it for longer than your Auto-Lock time. The screen should stay on.
+3. **Rest over in the foreground.** Leave the app open until the timer hits zero. You should hear two short beeps and the timer should turn orange and say **Rest over** with a `+0:0x` count.
+4. **Rest timer after a screen lock.** Log another set, note the time left, then press the side button to lock the phone. Wait about a minute and unlock. The timer should be about a minute lower than when you locked it, not where it was.
+5. **Rest over while locked.** Log a set, lock the phone, and wait until the rest is over. Unlock: it should show **Rest over** with the overtime, and not beep.
+6. **Kill mid-rest.** Log a set, swipe the app away, and reopen it. It should resume on the same card with the timer still counting down from the same set.
+7. **Wake lock after switching apps.** Switch to another app and back, then leave the phone untouched past the Auto-Lock time again. The screen should stay on.
+8. **Leaving releases it.** Tap **Back** to Today and leave the phone untouched. The screen should lock as usual.
+
+### Results to post on #53
+
+```md
+- iPhone model / iOS version:
+- 2 Screen stays on during the session: pass / fail
+- 3 Beeps and "Rest over" in the foreground: pass / fail (beeps: yes / no)
+- 4 Timer right after a screen lock: pass / fail
+- 5 "Rest over" after locking, no beep: pass / fail
+- 6 Timer survives a kill: pass / fail
+- 7 Screen stays on after switching apps: pass / fail
+- 8 Screen locks after leaving the player: pass / fail
+- Anything odd:
+```
