@@ -2,6 +2,13 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-11-10: Run logging (#57)
+
+- **The run player is a form you fill in after the run**, under bars for the planned run. Each bar is one planned item, sized by distance and labelled with distance and target RPE. The Phase 1 stub plans one item per run, so you get one bar for now; warm-up, rep and cool-down bars come with the running engine (Phase 3). (§6.4)
+- **The form has workout type, distance, minutes and seconds, RPE, and a collapsed "Heart rate, elevation and splits" section.** It prefills the planned workout type and distance. Pace is worked out as duration ÷ distance and shown as `m:ss /mi` (or `/km`) while you type, for the run and for each split. Distance uses the settings' distance unit. Elevation is in ft for mi and m for km. A run needs a distance, a duration and an RPE to save; heart rate, elevation, splits and notes are optional. Splits default to 1 unit each. (§4, §6.4)
+- **Saving writes a finished `session_log`** (ended now, started the duration earlier, with the RPE and notes) and a `run_log`, both through the outbox, so it works offline and syncs when the device is back online. The planned run then reads as done, as it does for lifts (#55). A logged run shows a summary and can't be edited. (§3.1, §4)
+- **The form isn't saved until you tap Save run.** It takes under a minute to fill in, so it isn't stored in `localStorage` like the lift player's position, and an iOS kill mid-entry loses the typed values.
+
 ## 2026-11-10: Finish a lifting session (#55)
 
 - **"Finish workout" sits under the card once a set is logged** and opens a sheet with session RPE (1–10, required) and notes (optional). Finishing sets the `session_log`'s `endedAt`, `rpe` and `notes`, which go through the outbox like any other write, then syncs straight away. (§3.2, §4)
