@@ -16,11 +16,11 @@ import { skipItem, swapExercise } from "../plan/item-overrides";
 import { liftDetail, type SessionView } from "../plan/sessions";
 import { readSettings, type SettingsData } from "../settings/settings";
 import { localDb, syncSoon } from "../sync";
-import { button, buttonBase, card as cardClass, input } from "../ui";
+import { button, buttonBase, card as cardClass } from "../ui";
 import { useLiveQuery } from "../use-live-query";
+import { FinishSheet } from "./FinishSheet";
 import {
   bandChoices,
-  finishSession,
   implementOf,
   isWeighted,
   loadChoices,
@@ -73,70 +73,6 @@ function describeSet(
 function lastTimeLine(sets: SetLog[]): string {
   if (sets.length === 0) return "First time";
   return sets.map(describeSet).join(", ");
-}
-
-const RPE_OPTIONS = Array.from({ length: 10 }, (_, i) => ({
-  value: String(i + 1),
-  label: String(i + 1),
-}));
-
-function FinishSheet({ view }: { view: SessionView }) {
-  const notesId = useId();
-  const [open, setOpen] = useState(false);
-  const [rpe, setRpe] = useState<number | null>(null);
-  const [notes, setNotes] = useState("");
-  const [saving, setSaving] = useState(false);
-  async function finish() {
-    if (rpe === null) return;
-    setSaving(true);
-    try {
-      await finishSession(localDb, view, { rpe, notes });
-      syncSoon();
-      setOpen(false);
-    } finally {
-      setSaving(false);
-    }
-  }
-  return (
-    <BottomSheet
-      title="Finish workout"
-      open={open}
-      onOpenChange={setOpen}
-      trigger={
-        <button type="button" className={`${button} min-h-tap w-full`}>
-          Finish workout
-        </button>
-      }
-    >
-      <ChipGroup
-        type="single"
-        label="Session RPE"
-        modality="lift"
-        options={RPE_OPTIONS}
-        value={rpe === null ? undefined : String(rpe)}
-        onValueChange={(value) => setRpe(Number(value))}
-      />
-      <label htmlFor={notesId} className="font-medium">
-        Notes
-      </label>
-      <textarea
-        id={notesId}
-        rows={3}
-        className={`${input} py-2`}
-        placeholder="How it went, anything to remember…"
-        value={notes}
-        onChange={(event) => setNotes(event.target.value)}
-      />
-      <button
-        type="button"
-        className={`${buttonBase} min-h-tap bg-lift text-bg`}
-        disabled={saving || rpe === null}
-        onClick={() => void finish()}
-      >
-        Finish
-      </button>
-    </BottomSheet>
-  );
 }
 
 function Finished({ data }: { data: LiftSession }) {
@@ -672,7 +608,9 @@ export function LiftPlayer({ view }: { view: SessionView }) {
         }}
         onSwapped={() => setPosition((p) => ({ ...p, drafts: dropDraft(p) }))}
       />
-      {data.log && <FinishSheet view={view} />}
+      {data.log && (
+        <FinishSheet view={view} title="Finish workout" modality="lift" />
+      )}
     </section>
   );
 }
