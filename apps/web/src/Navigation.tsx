@@ -11,6 +11,7 @@ import { ExerciseDetail } from "./screens/ExerciseDetail";
 import { Library } from "./screens/Library";
 import { Log } from "./screens/Log";
 import { Onboarding } from "./screens/Onboarding";
+import { Session } from "./screens/Session";
 import { Settings } from "./screens/Settings";
 import { TemplateEditor } from "./screens/TemplateEditor";
 import { Today } from "./screens/Today";
@@ -160,6 +161,7 @@ export function Navigation({ header }: { header?: ReactNode }) {
         ))}
         <Route path="/library/:id" element={<ExerciseDetail />} />
         <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="/session/:id" element={<Session />} />
         <Route path="/settings/templates/:id" element={<TemplateEditor />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
