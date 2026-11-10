@@ -5,19 +5,25 @@ import {
   type RunPrescription,
 } from "@workout-app/engine";
 import {
+  addDays,
   DAY_SLOTS,
   weekId,
   weekStartOf,
   type DaySlot,
+  type Modality,
   type PlannedItem,
   type PlannedSession,
   type Week,
 } from "@workout-app/shared";
 import { localDb } from "../sync";
+import { latestMoves, placeSession, type Placement } from "./moves";
 
 /** A planned session with what the screens show about it. */
 export type SessionView = {
+  /** The session where it sits now, after any move by hand. */
   session: PlannedSession;
+  /** Where the plan put it. */
+  planned: Placement;
   title: string;
   /** Live items, in order. */
   items: PlannedItem[];
@@ -129,7 +135,47 @@ export function formatLongDate(date: string): string {
   }).format(Date.UTC(y!, m! - 1, d));
 }
 
-async function views(sessions: PlannedSession[]): Promise<SessionView[]> {
+type Placed = Pick<SessionView, "session" | "planned">;
+
+/** Live sessions, not marked `moved`, where they sit now. */
+async function placedSessions(): Promise<Placed[]> {
+  const moves = latestMoves(await localDb.rows("plan_override").toArray());
+  return (await localDb.rows("planned_session").toArray())
+    .filter((s) => s.deletedAt === null && s.status !== "moved")
+    .map((s) => ({
+      session: placeSession(s, moves),
+      planned: { date: s.date, slot: s.slot },
+    }));
+}
+
+const utc = (date: string) => {
+  const [y, m, d] = date.split("-").map(Number);
+  return Date.UTC(y!, m! - 1, d);
+};
+
+/** "Mon 9" for a `YYYY-MM-DD` date. */
+export function formatShortDay(date: string): string {
+  const parts = new Intl.DateTimeFormat(undefined, {
+    weekday: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  }).formatToParts(utc(date));
+  const part = (type: string) => parts.find((p) => p.type === type)?.value;
+  return `${part("weekday")} ${part("day")}`;
+}
+
+/** "Nov 9 – Nov 15" for the week starting `weekStart`. */
+export function formatWeekRange(weekStart: string): string {
+  const format = new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+  return `${format.format(utc(weekStart))} – ${format.format(utc(addDays(weekStart, 6)))}`;
+}
+
+async function views(placed: Placed[]): Promise<SessionView[]> {
+  const sessions = placed.map((p) => p.session);
   const ids = new Set(sessions.map((s) => s.id));
   const items = (await localDb.rows("planned_item").toArray())
     .filter((i) => i.deletedAt === null && ids.has(i.plannedSessionId))
@@ -148,8 +194,9 @@ async function views(sessions: PlannedSession[]): Promise<SessionView[]> {
   const exerciseNames = new Map(
     exercises.flatMap((e) => (e ? [[e.id, e.name]] : [])),
   );
-  return sessions.map((session) => ({
+  return placed.map(({ session, planned }) => ({
     session,
+    planned,
     title: sessionTitle(
       session,
       (session.templateId && names.get(session.templateId)) || null,
@@ -165,17 +212,8 @@ export type DayPlan = {
   slots: Record<DaySlot, SessionView[]>;
 };
 
-/**
- * The sessions planned on `date` by slot, leaving out deleted ones and ones
- * moved to another day.
- */
-export async function dayPlan(date: string): Promise<DayPlan> {
-  const week = await localDb.rows("week").get(weekId(weekStartOf(date)));
-  const sessions = (await localDb.rows("planned_session").toArray()).filter(
-    (s) => s.date === date && s.deletedAt === null && s.status !== "moved",
-  );
-  const all = await views(sessions);
-  const slots = Object.fromEntries(
+const bySlot = (all: SessionView[]) =>
+  Object.fromEntries(
     DAY_SLOTS.map((slot) => [
       slot,
       all
@@ -183,12 +221,92 @@ export async function dayPlan(date: string): Promise<DayPlan> {
         .sort((a, b) => a.session.modality.localeCompare(b.session.modality)),
     ]),
   ) as Record<DaySlot, SessionView[]>;
-  return { week: week && week.deletedAt === null ? week : null, slots };
+
+async function readWeek(weekStart: string): Promise<Week | null> {
+  const week = await localDb.rows("week").get(weekId(weekStart));
+  return week && week.deletedAt === null ? week : null;
 }
 
-/** A live planned session, or `null` if there's no such session. */
+/**
+ * The sessions on `date` by slot, where the owner put them, leaving out
+ * deleted ones and ones marked `moved`.
+ */
+export async function dayPlan(date: string): Promise<DayPlan> {
+  const placed = (await placedSessions()).filter(
+    (p) => p.session.date === date,
+  );
+  return {
+    week: await readWeek(weekStartOf(date)),
+    slots: bySlot(await views(placed)),
+  };
+}
+
+/** Planned and finished sessions in a week, per modality. */
+export type WeekTally = Record<Modality, { planned: number; done: number }>;
+
+export type WeekPlan = {
+  week: Week | null;
+  /** Monday to Sunday. */
+  days: { date: string; slots: Record<DaySlot, SessionView[]> }[];
+  tally: { last: WeekTally; current: WeekTally };
+};
+
+const inWeek = (weekStart: string, date: string) =>
+  date >= weekStart && date <= addDays(weekStart, 6);
+
+/**
+ * The week starting Monday `weekStart`, day by day, with the sessions where
+ * the owner put them, plus how many were planned and done this week and last.
+ * "Done" counts finished session logs on the week's dates.
+ */
+export async function weekPlan(weekStart: string): Promise<WeekPlan> {
+  const placed = await placedSessions();
+  const logs = (await localDb.rows("session_log").toArray()).filter(
+    (l) => l.deletedAt === null && l.endedAt !== null,
+  );
+  const tally = (start: string): WeekTally => {
+    const count = (modality: Modality) => ({
+      planned: placed.filter(
+        (p) => p.session.modality === modality && inWeek(start, p.session.date),
+      ).length,
+      done: logs.filter(
+        (l) => l.modality === modality && inWeek(start, l.localDate),
+      ).length,
+    });
+    return {
+      lift: count("lift"),
+      run: count("run"),
+      climb: count("climb"),
+      mobility: count("mobility"),
+    };
+  };
+  const all = await views(
+    placed.filter((p) => inWeek(weekStart, p.session.date)),
+  );
+  return {
+    week: await readWeek(weekStart),
+    days: Array.from({ length: 7 }, (_, i) => {
+      const date = addDays(weekStart, i);
+      return {
+        date,
+        slots: bySlot(all.filter((v) => v.session.date === date)),
+      };
+    }),
+    tally: { last: tally(addDays(weekStart, -7)), current: tally(weekStart) },
+  };
+}
+
+/** A live planned session where it sits now, or `null` if there's no such session. */
 export async function readSession(id: string): Promise<SessionView | null> {
   const session = await localDb.rows("planned_session").get(id);
   if (!session || session.deletedAt !== null) return null;
-  return (await views([session]))[0]!;
+  const moves = latestMoves(await localDb.rows("plan_override").toArray());
+  return (
+    await views([
+      {
+        session: placeSession(session, moves),
+        planned: { date: session.date, slot: session.slot },
+      },
+    ])
+  )[0]!;
 }

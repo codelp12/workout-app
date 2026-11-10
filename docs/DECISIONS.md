@@ -2,6 +2,14 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-11-10: Week view (#49)
+
+- **A move is a `plan_override` row of kind `move`, one per session** (`moveOverrideId(sessionId)`, a UUIDv5), with `data: { date, slot }`. Moving a session again updates the same row, so last-write-wins settles two devices moving it at once; moving it back to where the plan put it deletes the override. The row records the outbox op that wrote it (`opId`). Plan rows stay server-owned and untouched. (§3.1, §3.2, §4)
+- **Screens apply the moves when they read the plan** (`latestMoves()` and `placeSession()` in `apps/web/src/plan/moves.ts`), so Today, the session screen and Week all show a moved session on its new day, offline and on every synced device. The server stores overrides as plain rows for now; validating them and regenerating the plan around them comes with the Phase 5 scheduler, as #27 noted. (§3.2, §5.4)
+- **Moving is tap-to-move, not drag.** Tapping a session opens a sheet with day and AM/PM chips, Move and Put back. Drag-and-drop on a phone needs a library outside §2 (e.g. dnd-kit), so it waits for the owner's sign-off. Moves stay inside the shown week; done and skipped sessions can't be moved (§5.4 pins completed sessions). Any slot is allowed: the constraint warnings come with the scheduler. (§5.4, §6.2)
+- **The grid is the current week, one row per day with AM and PM columns**, color-coded by modality, with today highlighted. Filters (All, Lifting, Running, Climbing) live in the URL (`/week?show=run`) like the Library's. (§6.2)
+- **The last-week vs this-week strip counts sessions done of planned per modality.** "Done" is a finished `session_log` (`endedAt` set) on the week's dates, so it fills in once the players write logs (#51, #57, #58). Volume comparisons (sets, miles, problems) belong to the Progress screen. (§6.2, §6.6)
+
 ## 2026-11-09: Today view (#48)
 
 - **Today reads the plan straight from IndexedDB** (`dayPlan()` in `apps/web/src/plan/sessions.ts`), so it works offline and shows the provisional week until the server's arrives. "Today" is the date in the settings' time zone, rechecked every minute and when the app returns to the foreground. Sessions are grouped AM and PM; ones marked `moved` are left out, and done or skipped ones show their status instead of Start. A deload week is labelled. (§3.2, §6.1)
