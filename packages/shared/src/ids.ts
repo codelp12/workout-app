@@ -54,3 +54,11 @@ export function plannedItemId(sessionId: string, position: number): string {
 export function moveOverrideId(sessionId: string): string {
   return v5(`move-override:${sessionId}`, LIBRARY_NAMESPACE);
 }
+
+/**
+ * The id of the log of a planned session: one per session, so logging it on
+ * two devices fills the same log instead of making two.
+ */
+export function sessionLogId(plannedSessionId: string): string {
+  return v5(`session-log:${plannedSessionId}`, LIBRARY_NAMESPACE);
+}

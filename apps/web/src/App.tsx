@@ -1,8 +1,10 @@
+import { localDateAt } from "@workout-app/shared";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { checkSession, signOut, type AuthState } from "./auth";
 import { Navigation } from "./Navigation";
 import { planProvisionalWeek } from "./plan/provisional";
+import { openWorkout } from "./players/lift-log";
 import { onboardingOffered } from "./settings/onboarding-flag";
 import { readSettings } from "./settings/settings";
 import { SignIn } from "./SignIn";
@@ -13,10 +15,11 @@ import { button } from "./ui";
 import { useLiveQuery } from "./use-live-query";
 
 /**
- * Opens the first-run wizard when a fresh install starts on Today. Checked
- * once per launch, after the local settings load; deep links aren't redirected.
+ * When the app starts on Today, opens the first-run wizard on a fresh install,
+ * or else the lift session still in progress today. Checked once per launch,
+ * after the local settings load; deep links aren't redirected.
  */
-function useFirstRunWizard() {
+function useLaunchRedirect() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const settings = useLiveQuery(readSettings, null);
@@ -24,14 +27,20 @@ function useFirstRunWizard() {
   useEffect(() => {
     if (checked.current || !settings) return;
     checked.current = true;
-    if (pathname === "/" && !settings.onboarding && !onboardingOffered()) {
+    if (pathname !== "/") return;
+    if (!settings.onboarding && !onboardingOffered()) {
       void navigate("/onboarding");
+      return;
     }
+    // iOS reopens a killed PWA on Today; go back to the workout in progress.
+    void openWorkout(localDb, localDateAt(settings.timezone, Date.now())).then(
+      (id) => id && navigate(`/session/${id}`),
+    );
   }, [settings, pathname, navigate]);
 }
 
 export function App() {
-  useFirstRunWizard();
+  useLaunchRedirect();
   const [auth, setAuth] = useState<AuthState>("checking");
   const syncState = useSyncExternalStore(
     syncEngine.subscribe,
