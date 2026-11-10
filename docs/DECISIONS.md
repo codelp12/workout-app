@@ -2,6 +2,13 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-11-10: Rest timer and wake lock (#53)
+
+- **The rest timer counts from the latest set's `completedAt`**, with that exercise's `restSec` (`latestRest()` in `apps/web/src/players/rest.ts`). The time left is recomputed from the clock every 250 ms and whenever the app returns to the foreground, so a locked screen, a backgrounded app or a kill can't put it out, and there's no timer state to save. It sits above the card, so it stays up when the player moves to the next exercise. (§3.4, §6.3)
+- **At zero it turns orange and says "Rest over" with the overtime** (`+0:32`), and hides 10 minutes after the rest ran out. There's no skip or +30 s button yet; logging the next set restarts it. (§6.3)
+- **The cue is two short beeps from Web Audio** (no sound file to cache), plus a buzz where the browser can vibrate (not iOS). It only plays if the rest ran out in the last 2 seconds with the app in the foreground, so coming back to the app after the rest ended, or reopening it after a kill, stays quiet and just shows "Rest over". iOS only starts audio from a tap, so Log set primes it; the silent switch mutes it. Nothing is scheduled for the background: iOS doesn't run timers or deliver web notifications reliably there. (§3.4)
+- **The lift player holds a Screen Wake Lock while it's open and the session isn't finished** (`useWakeLock()` in `apps/web/src/players/use-wake-lock.ts`). The browser drops the lock whenever the app is hidden, so it's requested again on return; leaving the player or finishing the session (`endedAt`, #55) releases it. Where the API is missing or refuses (e.g. low-power mode), the screen locks as usual. Run and climb players (#57, #58) can reuse the hook. (§3.4)
+
 ## 2026-11-10: CI runs in the Playwright image
 
 - **The `Lint, test and build` job runs inside `mcr.microsoft.com/playwright:v1.64.1-noble`** instead of running `playwright install --with-deps` on the bare runner. The apt step pulled 139 MB of browser libraries from the runner's Ubuntu mirror. On a slow mirror (161 kB/s) that took 10–18 minutes and once hit the 20-minute timeout, while the same step sometimes took 38 seconds. The image ships Chromium, WebKit and their libraries, so E2E has nothing to install. It runs as the runner's user (`--user 1001`) so checkout and caches can write to the workspace, with `--ipc=host` as Playwright recommends for Chromium. The image's tag has to equal `@playwright/test` in `pnpm-lock.yaml`. If they drift, E2E fails with Playwright's "Executable doesn't exist" error, so bump both together. (§10)

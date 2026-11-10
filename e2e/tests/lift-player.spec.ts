@@ -40,6 +40,8 @@ test("a set logs in two taps and the player resumes after a kill", async ({
   await expect(
     first.getByRole("list", { name: "Sets" }).getByRole("listitem"),
   ).toHaveCount(1);
+  const rest = player.getByRole("region", { name: "Rest timer" });
+  await expect(rest.getByRole("timer")).toHaveText(/^\d:\d\d$/);
   await first.getByRole("button", { name: "Decrease Reps" }).click();
   const reps = await first
     .getByRole("spinbutton", { name: "Reps" })
@@ -57,6 +59,9 @@ test("a set logs in two taps and the player resumes after a kill", async ({
     .getByRole("article", { name: exercise });
   await expect(resumed).toBeVisible();
   await expect(reopened).toHaveURL(/\/session\//);
+  await expect(
+    reopened.getByRole("region", { name: "Rest timer" }).getByRole("timer"),
+  ).toBeVisible();
   await expect(
     resumed.getByRole("list", { name: "Sets" }).getByRole("listitem"),
   ).toHaveCount(1);
