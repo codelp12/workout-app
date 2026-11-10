@@ -2,6 +2,16 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-11-10: Climb logging (#58)
+
+- **The climb player has the planned session, grade chips, a session clock, a live pyramid and a project tracker.** Grade chips cover the whole scale for the session's discipline (V0–V12, or YDS 5.6–5.13d for routes), taken from the planned item, then onboarding, defaulting to boulder. (§5.3, §6.5)
+- **A tap logs a send of that grade, with 1 attempt and no tags. Holding a chip for 500 ms opens a sheet instead**, with the grade, style (flash, onsight, send or attempt), attempts, style tags and a project. "More options" opens the same sheet without a long press, for keyboard and screen-reader use. Flash and onsight always count as 1 attempt. Tapping a logged climb reopens the sheet to edit or delete it, so a mistaken tap can be undone. (§5.3)
+- **Style tags are slab, vertical, overhang, crimp, sloper, pinch, dyno and compression.** They're a fixed list for now.
+- **Logging the first climb or tapping Start session starts the `session_log`, and the clock counts from its `startedAt`**, so a screen lock or a kill doesn't reset it. Finishing reuses the lift player's sheet: an RPE is required and notes are optional. It sets `endedAt`, the session then reads as done, and the summary is read-only. Finish appears once at least one climb is logged, as with lifts (#55). (§3.4, §4)
+- **The pyramid counts sends per grade, hardest first, with empty grades in between.** Attempts aren't sends. It's worked out from this session's `ascent` rows on every change, so it updates as you log.
+- **Projects are `project` rows. An ascent links to one through `projectId`, and a new project can be created from the sheet at the ascent's grade.** A project's attempts and session count are summed over all its ascents in every session. A project is `sent` from its first live send and goes back to `active` if that send is deleted or edited away. The tracker lists active projects plus any this session touched. There's no way yet to drop or rename a project. (§4)
+- Everything is written through the outbox, so a session logs offline and syncs later. Nothing on the server changed.
+
 ## 2026-11-10: Run logging (#57)
 
 - **The run player is a form you fill in after the run**, under bars for the planned run. Each bar is one planned item, sized by distance and labelled with distance and target RPE. The Phase 1 stub plans one item per run, so you get one bar for now; warm-up, rep and cool-down bars come with the running engine (Phase 3). (§6.4)

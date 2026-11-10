@@ -113,3 +113,23 @@ Later phases add items to this list per SPEC §10: logging a set offline, killin
 - 8 Screen locks after leaving the player: pass / fail
 - Anything odd:
 ```
+
+## Climb logging (#58)
+
+**Before you start:** same as above, with the new build deployed.
+
+1. **Tap.** Open a climb session from Today and tap a grade chip. It should log one send, start the session clock and add a bar to the pyramid. The page shouldn't scroll or zoom.
+2. **Long press.** Hold a grade chip for about half a second. The "Log a climb" sheet should open with that grade selected. iOS shouldn't show its text-selection or copy menu, and letting go shouldn't log an extra send.
+3. **Scroll over the chips.** Drag the page up and down starting on a chip. It should scroll without logging a climb or opening the sheet.
+4. **Clock after a lock or kill.** Note the session time, lock the phone for a minute, then unlock it. Then swipe the app away and reopen the session. Each time the clock should have kept counting from when the session started.
+
+### Results to post on #58
+
+```md
+- iPhone model / iOS version:
+- 1 Tap logs a send: pass / fail
+- 2 Long press opens the sheet, no iOS menu, no extra send: pass / fail
+- 3 Scrolling over the chips logs nothing: pass / fail
+- 4 Clock right after a lock and a kill: pass / fail
+- Anything odd:
+```
