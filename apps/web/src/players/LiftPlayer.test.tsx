@@ -9,6 +9,7 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
+  defaultSettings,
   localDateAt,
   newId,
   sessionLogId,
@@ -23,7 +24,7 @@ import { testExercise } from "../library/test-exercise";
 import { Session } from "../screens/Session";
 import { deviceTimezone } from "../settings/settings";
 import { localDb } from "../sync";
-import { openWorkout } from "./lift-log";
+import { openWorkout, savePosition } from "./lift-log";
 
 const today = localDateAt(deviceTimezone(), Date.now());
 const sync = {
@@ -154,10 +155,8 @@ describe("LiftPlayer", () => {
       "BraceKnees out",
     );
     expect(
-      within(card)
-        .getByRole("spinbutton", { name: "Weight" })
-        .getAttribute("aria-valuenow"),
-    ).toBe("50");
+      within(card).getByRole("button", { name: "Weight: 50 lb" }),
+    ).toBeTruthy();
     expect(
       within(card)
         .getByRole("spinbutton", { name: "Reps" })
@@ -220,7 +219,7 @@ describe("LiftPlayer", () => {
     const plankCard = await screen.findByRole("article", { name: "Plank" });
     expect(screen.getByText("Exercise 2 of 2")).toBeTruthy();
     expect(
-      within(plankCard).queryByRole("spinbutton", { name: "Weight" }),
+      within(plankCard).queryByRole("group", { name: "Weight" }),
     ).toBeNull();
     // No target RIR, so one tap logs it.
     await user.click(
@@ -280,5 +279,122 @@ describe("LiftPlayer", () => {
         .getByRole("spinbutton", { name: "Reps" })
         .getAttribute("aria-valuenow"),
     ).toBe("9");
+  });
+
+  describe("load picker", () => {
+    const squatTargets = (load: number) => ({
+      ...items[0]!.targets,
+      load: { value: load, unit: "lb" },
+    });
+
+    it("never shows a weight the rack can't make", async () => {
+      const user = userEvent.setup();
+      await localDb
+        .rows("planned_item")
+        .put({ ...items[0]!, targets: squatTargets(52) });
+      renderPlayer();
+      const card = await screen.findByRole("article", {
+        name: "Dumbbell Squat",
+      });
+      // 52 lb isn't on a 5 lb rack: the nearest is offered.
+      await user.click(
+        within(card).getByRole("button", { name: "Weight: 50 lb" }),
+      );
+      const sheet = await screen.findByRole("dialog", {
+        name: "Pick a weight",
+      });
+      const offered = within(
+        within(sheet).getByRole("list", { name: "Weight options" }),
+      )
+        .getAllByRole("button")
+        .map((b) => Number.parseFloat(b.textContent));
+      expect(offered).toEqual(
+        Array.from({ length: 24 }, (_, i) => 5 * (i + 1)),
+      );
+      await user.click(within(sheet).getByRole("button", { name: "55 lb" }));
+      await user.click(
+        within(card).getByRole("button", { name: "Increase Weight" }),
+      );
+      await user.click(within(card).getByRole("radio", { name: "2" }));
+      await user.click(within(card).getByRole("button", { name: "Log set" }));
+      expect(await within(card).findByText("60 lb × 10 · RIR 2")).toBeTruthy();
+    });
+
+    it("snaps a saved weight to the rack after the equipment changes", async () => {
+      await localDb.rows("settings").put({
+        ...defaultSettings(deviceTimezone(), 0),
+        ...sync,
+        equipment: {
+          ...defaultSettings(deviceTimezone(), 0).equipment,
+          dumbbells: { min: 10, max: 60, step: 10 },
+        },
+      });
+      savePosition(legs.id, {
+        card: 0,
+        drafts: {
+          [items[0]!.id]: { load: 45, band: null, reps: 8, rir: null },
+        },
+      });
+      renderPlayer();
+      const card = await screen.findByRole("article", {
+        name: "Dumbbell Squat",
+      });
+      expect(
+        await within(card).findByRole("button", { name: "Weight: 40 lb" }),
+      ).toBeTruthy();
+    });
+
+    it("says so and won't log when the equipment has no dumbbells", async () => {
+      await localDb.rows("settings").put({
+        ...defaultSettings(deviceTimezone(), 0),
+        ...sync,
+        equipment: {
+          ...defaultSettings(deviceTimezone(), 0).equipment,
+          dumbbells: null,
+        },
+      });
+      renderPlayer();
+      const card = await screen.findByRole("article", {
+        name: "Dumbbell Squat",
+      });
+      expect(
+        await within(card).findByText(/No dumbbells in your equipment/),
+      ).toBeTruthy();
+      expect(within(card).queryByRole("group", { name: "Weight" })).toBeNull();
+      const log = within(card).getByRole("button", { name: "Log set" });
+      expect((log as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it("offers the inventory's bands and logs the one picked", async () => {
+      const user = userEvent.setup();
+      const curl = testExercise({ name: "Band Curl", equipment: ["band"] });
+      await localDb.rows("exercise").put(curl);
+      await localDb.rows("planned_item").put({
+        ...items[0]!,
+        exerciseId: curl.id,
+        targets: { ...items[0]!.targets, load: null, band: "Medium" },
+      });
+      renderPlayer();
+      const card = await screen.findByRole("article", { name: "Band Curl" });
+      const bands = within(card).getByRole("radiogroup", { name: "Band" });
+      expect(
+        within(bands)
+          .getAllByRole("radio")
+          .map((b) => b.textContent),
+      ).toEqual(["Light", "Medium", "Heavy", "Extra heavy"]);
+      expect(
+        within(bands)
+          .getByRole("radio", { name: "Medium" })
+          .getAttribute("aria-checked"),
+      ).toBe("true");
+      await user.click(within(bands).getByRole("radio", { name: "Heavy" }));
+      await user.click(within(card).getByRole("radio", { name: "2" }));
+      await user.click(within(card).getByRole("button", { name: "Log set" }));
+      expect(await within(card).findByText("Heavy × 10 · RIR 2")).toBeTruthy();
+      const set = (await localDb.rows("set_log").toArray()).find(
+        (s) => s.exerciseId === curl.id,
+      );
+      expect(set).toMatchObject({ loadValue: null, band: "Heavy" });
+    });
   });
 });

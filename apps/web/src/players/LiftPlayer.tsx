@@ -1,8 +1,9 @@
-import { formatAmount } from "@workout-app/engine";
+import { formatAmount, type WeightImplement } from "@workout-app/engine";
 import type { SetLog } from "@workout-app/shared";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Link } from "react-router";
 import { ChipGroup } from "../components/ChipGroup";
+import { LoadPicker } from "../components/LoadPicker";
 import { Stepper } from "../components/Stepper";
 import { ExerciseImage } from "../library/ExerciseImage";
 import { liftDetail, type SessionView } from "../plan/sessions";
@@ -11,12 +12,17 @@ import { localDb, syncSoon } from "../sync";
 import { button, buttonBase, card as cardClass } from "../ui";
 import { useLiveQuery } from "../use-live-query";
 import {
+  bandChoices,
+  implementOf,
+  isWeighted,
+  loadChoices,
   loadPosition,
   logSet,
   markActive,
   prefill,
   readLiftSession,
   savePosition,
+  settle,
   unitOf,
   weightStep,
   type LiftCard,
@@ -24,6 +30,13 @@ import {
   type PlayerPosition,
   type SetValues,
 } from "./lift-log";
+
+const IMPLEMENT_NAMES: Record<WeightImplement, string> = {
+  dumbbell: "dumbbells",
+  barbell: "barbells",
+  bar: "barbells",
+  stack: "cable or machine stack",
+};
 
 const RIR_OPTIONS = ["0", "1", "2", "3", "4"].map((value) => ({
   value,
@@ -70,6 +83,11 @@ function ExerciseCard({
   const done = sets.length >= targets.sets;
   const needsRir = targets.targetRir !== null;
   const unit = unitOf(card, settings);
+  const weighted = isWeighted(card);
+  const loads = weighted ? loadChoices(card, settings, values.load) : null;
+  const bands = bandChoices(card, settings);
+  const implement = implementOf(exercise);
+  const unloadable = loads !== null && loads.length === 0;
 
   async function log() {
     setSaving(true);
@@ -144,17 +162,45 @@ function ExerciseCard({
           <h3 className="font-semibold">
             Set {sets.length + 1} of {targets.sets}
           </h3>
-          {values.load !== null && (
-            <Stepper
+          {loads && values.load !== null && loads.length > 0 && (
+            <LoadPicker
               label="Weight"
               value={values.load}
-              step={weightStep(card, settings)}
+              options={loads}
               unit={unit}
               onValueChange={(load) => onValues({ ...values, load })}
             />
           )}
-          {values.load === null && targets.band && (
-            <p className="text-fg-muted">Band: {targets.band}</p>
+          {unloadable && implement && (
+            <p className="text-fg-muted">
+              No {IMPLEMENT_NAMES[implement]} in your equipment.{" "}
+              <Link to="/settings" className="text-accent underline">
+                Add them in Settings
+              </Link>{" "}
+              to log this set.
+            </p>
+          )}
+          {!loads && values.load !== null && (
+            <Stepper
+              label="Weight"
+              value={values.load}
+              step={weightStep(settings)}
+              unit={unit}
+              onValueChange={(load) => onValues({ ...values, load })}
+            />
+          )}
+          {bands && bands.length > 0 && (
+            <ChipGroup
+              type="single"
+              label="Band"
+              modality="lift"
+              options={bands.map((band) => ({ value: band, label: band }))}
+              value={values.band ?? undefined}
+              onValueChange={(band) => onValues({ ...values, band })}
+            />
+          )}
+          {bands && bands.length === 0 && values.band && (
+            <p className="text-fg-muted">Band: {values.band}</p>
           )}
           <Stepper
             label="Reps"
@@ -172,7 +218,12 @@ function ExerciseCard({
           <button
             type="button"
             className={`${buttonBase} min-h-tap bg-lift text-bg`}
-            disabled={saving || !exercise || (needsRir && values.rir === null)}
+            disabled={
+              saving ||
+              !exercise ||
+              unloadable ||
+              (needsRir && values.rir === null)
+            }
             onClick={() => void log()}
           >
             Log set
@@ -219,7 +270,10 @@ export function LiftPlayer({ view }: { view: SessionView }) {
       ...p,
       card: Math.min(Math.max(card, 0), cards.length - 1),
     }));
-  const values = position.drafts[current.itemId] ?? prefill(current);
+  const draft = position.drafts[current.itemId];
+  const values = draft
+    ? settle(current, settings, draft)
+    : prefill(current, settings);
 
   return (
     <section
