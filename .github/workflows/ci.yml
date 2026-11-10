@@ -17,7 +17,13 @@ jobs:
   check:
     name: Lint, test and build
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
+    # Chromium, WebKit and their system libraries come preinstalled, so E2E
+    # skips `playwright install --with-deps`, whose apt downloads took up to
+    # 18 minutes. Keep the tag equal to @playwright/test in pnpm-lock.yaml.
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+      options: --user 1001 --ipc=host
     steps:
       - uses: actions/checkout@v7
 
@@ -35,8 +41,6 @@ jobs:
       - run: pnpm build
 
       # E2E runs in this job so the required check name stays the same.
-      - name: Install Playwright browsers
-        run: pnpm --filter @workout-app/e2e exec playwright install --with-deps chromium webkit
       - run: pnpm test:e2e
       - name: Upload E2E screenshots and traces
         if: always()
