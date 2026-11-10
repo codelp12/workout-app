@@ -2,6 +2,13 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-11-10: Report a problem (#108)
+
+- **Settings has a "Report a problem" box for the beta.** The owner asked for it on #107. It's outside §6, so §6 item 10 now lists it. It's a plain text box; screenshots are left out. (§6)
+- **Reports are a synced entity, `problem_report`**, so one written offline at the gym queues in the outbox and sends with the next sync, like any other write. Each report carries the text plus details the app fills in: when the web app was built (`__APP_BUILD__`, set in `vite.config.ts`, or `APP_BUILD` at build time), the last screen opened before Settings, the user agent and the sync chip's text. Settings shows the five newest reports as waiting, sent or filed. (§3.1, §3.2)
+- **Reports are pulled by hand, not filed by the server.** `node dist/reports.js` prints new reports as Markdown, and `node dist/reports.js mark-filed <id> <issue>` marks one filed. Marking takes a new `serverSeq`, so the phone shows "Filed as #N". Filing straight to GitHub would need a token on the host and would publish report text to the public repo with nobody checking it first. Each filed report becomes a `bug` issue under the "User reported bugs" epic (#107); `AGENTS.md` has the steps.
+- **A report's short id is the last 8 characters of its id.** Ids are UUIDv7s, which start with a timestamp, so reports written close together share their first characters.
+
 ## 2026-11-10: Run logging (#57)
 
 - **The run player is a form you fill in after the run**, under bars for the planned run. Each bar is one planned item, sized by distance and labelled with distance and target RPE. The Phase 1 stub plans one item per run, so you get one bar for now; warm-up, rep and cool-down bars come with the running engine (Phase 3). (§6.4)

@@ -17,4 +17,5 @@ export const entityTables = {
   run_log: schema.runLog,
   project: schema.project,
   ascent: schema.ascent,
+  problem_report: schema.problemReport,
 } satisfies Record<EntityName, SQLiteTable>;

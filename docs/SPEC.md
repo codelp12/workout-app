@@ -250,7 +250,7 @@ Mobile-first (390×844 baseline), one-handed, dark by default (gym lighting), la
 7. Log grid (the spreadsheet aspect): exercise × week matrix of top sets and targets, weekly tables for running and climbing, filters, CSV export.
 8. Library: search and filter by muscle, equipment and movement pattern; detail page with photos, instructions, cues, common mistakes, personal notes and history.
 9. Plan: current block on the shared calendar with per-modality detail, goals (race, target lifts), templates, availability.
-10. Settings: units, equipment, schedule, export, backup status, engine config viewer, sync debug.
+10. Settings: units, equipment, schedule, export, backup status, engine config viewer, sync debug, report a problem (beta).
 
 ## 7. Exercise library and media
 

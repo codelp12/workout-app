@@ -16,6 +16,7 @@ import { Settings } from "./screens/Settings";
 import { TemplateEditor } from "./screens/TemplateEditor";
 import { Today } from "./screens/Today";
 import { Week } from "./screens/Week";
+import { rememberScreen } from "./settings/problem-report";
 import { useAppUpdate } from "./update/update-context";
 
 type Tab = { path: string; label: string; icon: ReactNode; screen: ReactNode };
@@ -136,6 +137,7 @@ function TabLayout({ header }: { header: ReactNode }) {
   const { pathname } = useLocation();
   useEffect(() => {
     window.scrollTo(0, 0);
+    rememberScreen(pathname);
   }, [pathname]);
   return (
     <>

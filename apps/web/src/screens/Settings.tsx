@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { ChipGroup } from "../components/ChipGroup";
 import { Skeleton } from "../components/Skeleton";
 import { EquipmentEditor } from "../settings/EquipmentEditor";
+import { ReportProblem } from "../settings/ReportProblem";
 import { Section, Subsection } from "../settings/Sections";
 import {
   readSettings,
@@ -278,6 +279,7 @@ export function Settings() {
         <Skeleton className="h-96" />
       )}
       <AppUpdates />
+      <ReportProblem />
       <ImportUnsynced />
     </Screen>
   );

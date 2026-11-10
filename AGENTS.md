@@ -47,3 +47,4 @@ Work is tracked in GitHub Issues and the project board.
 - **Task** (`task` label): one PR-sized unit of work; names its parent epic.
 - **Bug** (`bug` label): something broken.
 - When asked to write tickets, use the templates in `.github/ISSUE_TEMPLATE/`, create the epic first, then its tasks, then update the epic's checklist with the task numbers.
+- **User reported bugs:** the owner pastes the output of `docker compose exec app node dist/reports.js` (Settings → Report a problem). File each report as a `bug` issue with the bug template: the report text goes under "What happened" and its details (screen, build, sync status, device) under "Steps to reproduce". Add each one as a sub-issue of the "User reported bugs" epic (#107) and to its checklist. Then give the owner one `docker compose exec app node dist/reports.js mark-filed <short id> <issue>` command per report, one per line.

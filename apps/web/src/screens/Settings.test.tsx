@@ -8,7 +8,7 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { SETTINGS_ID } from "@workout-app/shared";
+import { newId, SETTINGS_ID } from "@workout-app/shared";
 import { MemoryRouter } from "react-router";
 import {
   afterEach,
@@ -21,6 +21,7 @@ import {
 } from "vitest";
 import { ToastProvider } from "../components/Toast";
 import { Navigation } from "../Navigation";
+import { rememberScreen } from "../settings/problem-report";
 import { localDb } from "../sync";
 import { UpdateContext, type AppUpdate } from "../update/update-context";
 
@@ -233,5 +234,85 @@ describe("App updates", () => {
         name: "Check for updates",
       }).disabled,
     ).toBe(true);
+  });
+});
+
+describe("Report a problem", () => {
+  const reports = () => localDb.rows("problem_report");
+  const section = () =>
+    within(screen.getByRole("region", { name: "Report a problem" }));
+
+  beforeEach(async () => {
+    await reports().clear();
+    rememberScreen("/week");
+  });
+
+  it("saves a report with its details to the outbox and lists it as waiting", async () => {
+    const user = userEvent.setup();
+    renderSettings();
+    const send = section().getByRole<HTMLButtonElement>("button", {
+      name: "Send report",
+    });
+    expect(send.disabled).toBe(true);
+    expect(await section().findByText("/week")).toBeTruthy();
+
+    await user.type(
+      section().getByLabelText(/What went wrong/),
+      "  Rest timer kept going  ",
+    );
+    await user.click(send);
+
+    expect(
+      await screen.findByText("Report saved", { exact: true }),
+    ).toBeTruthy();
+    const [row] = await reports().toArray();
+    expect(row).toMatchObject({
+      text: "Rest timer kept going",
+      screen: "/week",
+      status: "new",
+      githubIssue: null,
+      serverSeq: 0,
+    });
+    expect(row?.appBuild).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z$/);
+    expect(row?.userAgent).toBe(navigator.userAgent);
+    expect((await localDb.outbox.toArray()).map((op) => op.entity)).toContain(
+      "problem_report",
+    );
+    const list = await screen.findByRole("list", { name: "Your reports" });
+    expect(within(list).getByText("Waiting to send")).toBeTruthy();
+    expect(
+      section().getByLabelText<HTMLTextAreaElement>(/What went wrong/).value,
+    ).toBe("");
+  });
+
+  it("shows which reports were sent and which were filed", async () => {
+    const row = (text: string, createdAt: number, fields: object) => ({
+      id: newId(),
+      userId: 1,
+      createdAt,
+      updatedAt: createdAt,
+      deletedAt: null,
+      text,
+      appBuild: "2026-11-10T16:00Z",
+      screen: null,
+      userAgent: "test",
+      syncStatus: "Synced",
+      status: "new" as const,
+      githubIssue: null,
+      serverSeq: 3,
+      ...fields,
+    });
+    await reports().bulkPut([
+      row("Older", 1, { status: "filed", githubIssue: 112 }),
+      row("Newer", 2, {}),
+    ]);
+    renderSettings();
+
+    const list = await screen.findByRole("list", { name: "Your reports" });
+    expect(
+      within(list)
+        .getAllByRole("listitem")
+        .map((li) => li.textContent),
+    ).toEqual(["NewerSent", "OlderFiled as #112"]);
   });
 });
