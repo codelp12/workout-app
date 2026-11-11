@@ -50,93 +50,94 @@ type SessionSpec = {
 
 /**
  * The fixed Phase 1 week until the scheduler lands (SPEC §5.4): 11 sessions,
- * 6 lifts, 3 runs and 2 climbs, with Saturday lift-free. It meets the hard
- * constraints and avoids the high soft penalties: no quality or long run
- * within a day after Legs, no Legs the day after the long run, and no limit
- * climb on or the day after a Pull day.
+ * 6 lifts, 3 runs and 2 climbs, from the owner's weekly training program
+ * (DECISIONS.md). Thursday is a rest day. It meets the hard constraints, with
+ * no quality or long run within a day after Legs A. By the owner's choice,
+ * the climbs share days with the Pull sessions, and Legs B, a light hip
+ * session, follows Sunday's long run.
  */
 export const DEFAULT_WEEK: readonly SessionSpec[] = [
   {
-    key: "legs_a",
-    weekday: 1,
-    slot: "pm",
-    modality: "lift",
-    template: "legs_a",
-  },
-  {
-    key: "push_a",
-    weekday: 2,
-    slot: "am",
-    modality: "lift",
-    template: "push_a",
-  },
-  {
-    key: "volume",
-    weekday: 2,
-    slot: "pm",
-    modality: "climb",
-    workoutType: "volume",
-    intent: "support",
-  },
-  {
-    key: "quality",
-    weekday: 3,
-    slot: "am",
-    modality: "run",
-    workoutType: "quality",
-    intent: "key",
-  },
-  {
-    key: "pull_a",
-    weekday: 3,
-    slot: "pm",
-    modality: "lift",
-    template: "pull_a",
-  },
-  {
     key: "easy",
-    weekday: 4,
+    weekday: 1,
     slot: "am",
     modality: "run",
     workoutType: "easy",
     intent: "support",
   },
   {
-    key: "legs_b",
-    weekday: 4,
+    key: "push_a",
+    weekday: 1,
     slot: "pm",
     modality: "lift",
-    template: "legs_b",
+    template: "push_a",
   },
   {
-    key: "push_b",
-    weekday: 5,
+    key: "pull_a",
+    weekday: 2,
     slot: "am",
     modality: "lift",
-    template: "push_b",
+    template: "pull_a",
   },
   {
     key: "limit",
-    weekday: 5,
+    weekday: 2,
     slot: "pm",
     modality: "climb",
     workoutType: "limit",
     intent: "key",
   },
   {
-    key: "long",
+    key: "legs_a",
+    weekday: 3,
+    slot: "pm",
+    modality: "lift",
+    template: "legs_a",
+  },
+  {
+    key: "quality",
+    weekday: 5,
+    slot: "am",
+    modality: "run",
+    workoutType: "quality",
+    intent: "key",
+  },
+  {
+    key: "push_b",
+    weekday: 5,
+    slot: "pm",
+    modality: "lift",
+    template: "push_b",
+  },
+  {
+    key: "pull_b",
     weekday: 6,
+    slot: "am",
+    modality: "lift",
+    template: "pull_b",
+  },
+  {
+    key: "volume",
+    weekday: 6,
+    slot: "pm",
+    modality: "climb",
+    workoutType: "volume",
+    intent: "support",
+  },
+  {
+    key: "long",
+    weekday: 7,
     slot: "am",
     modality: "run",
     workoutType: "long",
     intent: "key",
   },
   {
-    key: "pull_b",
+    key: "legs_b",
     weekday: 7,
-    slot: "am",
+    slot: "pm",
     modality: "lift",
-    template: "pull_b",
+    template: "legs_b",
   },
 ];
 

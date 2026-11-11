@@ -5,6 +5,7 @@ import {
   SETTINGS_ID,
   weekId,
   weekStartOf,
+  isTemplateModality,
 } from "@workout-app/shared";
 import type { LocalDb } from "../sync/local-db";
 import { OWNER_USER_ID } from "../sync/writes";
@@ -52,7 +53,7 @@ export function planProvisionalWeek(
 
       const exercises: LiftExercise[] = (
         await db.rows("exercise").toArray()
-      ).filter((e) => e.deletedAt === null && e.modality === "lift");
+      ).filter((e) => e.deletedAt === null && isTemplateModality(e.modality));
       const plan = planWeek({
         weekStart,
         now,

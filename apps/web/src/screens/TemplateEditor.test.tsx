@@ -145,10 +145,10 @@ describe("template editor", () => {
       name: "Add an exercise",
     });
     await user.type(within(sheet).getByLabelText("Search exercises"), "hammer");
-    // Mobility entries aren't offered.
+    // Mobility entries are offered alongside lifts.
     expect(
-      within(sheet).queryByRole("button", { name: "Hammer Stretch" }),
-    ).toBeNull();
+      within(sheet).getByRole("button", { name: "Hammer Stretch" }),
+    ).toBeTruthy();
     await user.click(
       within(sheet).getByRole("button", { name: "Hammer Curls" }),
     );

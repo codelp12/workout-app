@@ -5,9 +5,12 @@ import { libraryExerciseId } from "./ids.js";
  * `e1rm_rir`), as free-exercise-db ids from the default templates.
  */
 export const MAIN_LIFTS = [
-  { sourceId: "Dumbbell_Squat", name: "Dumbbell squat" },
+  { sourceId: "Split_Squat_with_Dumbbells", name: "Dumbbell split squat" },
   { sourceId: "Dumbbell_Bench_Press", name: "Dumbbell bench press" },
-  { sourceId: "Stiff-Legged_Dumbbell_Deadlift", name: "Dumbbell RDL" },
+  {
+    sourceId: "Kettlebell_One-Legged_Deadlift",
+    name: "Single-leg dumbbell RDL",
+  },
   { sourceId: "Seated_Dumbbell_Press", name: "Dumbbell overhead press" },
   { sourceId: "One-Arm_Dumbbell_Row", name: "One-arm dumbbell row" },
 ].map((lift) => ({

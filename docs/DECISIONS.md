@@ -361,3 +361,12 @@ Options considered:
 - **The push response's cursor is informational.** It's the server's latest `serverSeq`. Clients keep pulling from their own cursor, since jumping to it would skip other clients' writes.
 - **Not done yet: engine re-runs and plan ownership.** §3.2 has push re-run the engine and validate `plan_override` ops, and treats plan rows as server-owned. There's no engine yet, so for now every entity is accepted as a plain row. Enforcing plan ownership comes with the engine epics. (§3.1, §3.2)
 - **The server now imports `@workout-app/shared` at runtime**, not just its types. `pnpm deploy` already copies the package's `dist`, so the Docker image needs no change.
+
+## 2026-11-11: Default week from the owner's training program
+
+- **The default week follows the owner's program.** Mon Push A + easy run, Tue Pull A + limit climb, Wed Legs A, Thu rest, Fri quality run + Push B, Sat Pull B + volume climb, Sun long run + Legs B. Still 6 lifts, 3 runs and 2 climbs. The owner chose to pair each climb with a Pull day and put Legs B after the long run. (§5.1, §5.4)
+- **Hip work is preventative and lives in the lift templates.** Hip session 1 is folded into Legs A, hip session 2 into Push B, and Legs B is the hip-focused session. Boxing is left out. Holds are logged as reps (seconds) until timed sets exist. (§5.1)
+- **Exercise substitutions.** free-exercise-db has no Bulgarian split squat, dumbbell single-leg RDL, side plank, donkey kick, runner stretch, hip hike or hip airplane. The templates use Split Squat with Dumbbells, Kettlebell One-Legged Deadlift (done with a dumbbell), Side Bridge, Glute Kickback and Kneeling Hip Flexor, and drop the last two. Onboarding's main lifts follow the templates.
+- **Mobility exercises can sit in lift templates.** The planner, lift player and template editor accept `lift` and `mobility` exercises.
+- **Unedited default templates are upgraded.** On startup the server replaces a default template that exactly matches an earlier default version (`PREVIOUS_DEFAULT_TEMPLATES`) and gives it a new `serverSeq`. Edited or deleted templates are left alone. Already-generated weeks keep their plan.
+- **Follow-ups.** Mixed V-scale and YDS climbing (#119), warm-ups (#121) and stretches (#122).

@@ -2,16 +2,18 @@ import { expect, test } from "@playwright/test";
 import { E2E_PASSWORD } from "../credentials";
 
 // Both browser projects share one server, so each logs its own session.
+// Each shares its day with a run, which the run test leaves open on that
+// day, so Today's own test always has a session to start.
 const sessions: Record<string, string> = {
-  chromium: "Legs A",
-  webkit: "Legs B",
+  chromium: "Push A",
+  webkit: "Push B",
 };
 
 test("a set logs in two taps and the player resumes after a kill", async ({
   page,
   context,
 }, testInfo) => {
-  const title = sessions[testInfo.project.name] ?? "Legs A";
+  const title = sessions[testInfo.project.name] ?? "Push A";
   await page.goto("/week?show=lift");
   await page.evaluate(async () => {
     await navigator.serviceWorker.ready;
@@ -86,7 +88,7 @@ type PullPage = {
 };
 
 test("swaps and skips sync to the server", async ({ page }, testInfo) => {
-  const title = sessions[testInfo.project.name] ?? "Legs A";
+  const title = sessions[testInfo.project.name] ?? "Push A";
   await page.goto("/week?show=lift");
   await page.getByLabel("Password").fill(E2E_PASSWORD);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
@@ -149,7 +151,7 @@ test("swaps and skips sync to the server", async ({ page }, testInfo) => {
 test("a finished session shows as done and syncs", async ({
   page,
 }, testInfo) => {
-  const title = sessions[testInfo.project.name] ?? "Legs A";
+  const title = sessions[testInfo.project.name] ?? "Push A";
   await page.goto("/week?show=lift");
   await page.getByLabel("Password").fill(E2E_PASSWORD);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();

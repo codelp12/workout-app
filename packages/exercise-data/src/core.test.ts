@@ -49,12 +49,15 @@ describe("core set", () => {
       "Legs B",
     ]);
     for (const [, ids] of templates) {
-      expect(ids.length).toBeGreaterThanOrEqual(5);
+      expect(ids.length).toBeGreaterThanOrEqual(3);
       expect(ids.length).toBeLessThanOrEqual(7);
       expect(ids.filter((id) => !isCore(id))).toEqual([]);
-      expect(ids.every((id) => exercises.get(id)?.modality === "lift")).toBe(
-        true,
-      );
+      expect(
+        ids.every((id) => {
+          const m = exercises.get(id)?.modality;
+          return m === "lift" || m === "mobility";
+        }),
+      ).toBe(true);
     }
   });
 
@@ -158,6 +161,6 @@ describe("default templates", () => {
     ).toEqual(["Legs A"]);
     expect(
       templates.filter((t) => t.intensityClass === "heavy").map((t) => t.name),
-    ).toEqual(["Push A", "Pull A", "Legs A"]);
+    ).toEqual(["Push A", "Legs A"]);
   });
 });

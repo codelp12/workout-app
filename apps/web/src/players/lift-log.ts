@@ -15,6 +15,7 @@ import {
   type Settings,
   type SetLog,
   type WeightUnit,
+  isTemplateModality,
 } from "@workout-app/shared";
 import { itemOverrides } from "../plan/item-overrides";
 import type { LiftTargets, SessionView } from "../plan/sessions";
@@ -79,8 +80,8 @@ export async function readLiftSession(
   const logs = new Map(
     live(await db.rows("session_log").toArray()).map((l) => [l.id, l]),
   );
-  const exercises = live(await db.rows("exercise").toArray()).filter(
-    (e) => e.modality === "lift",
+  const exercises = live(await db.rows("exercise").toArray()).filter((e) =>
+    isTemplateModality(e.modality),
   );
   const byId = new Map(exercises.map((e) => [e.id, e]));
   const substitutes = (planned: Exercise | null, current: Exercise | null) => {

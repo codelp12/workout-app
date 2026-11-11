@@ -1,4 +1,8 @@
 import {
+  PREVIOUS_DEFAULT_TEMPLATES,
+  defaultTemplates,
+} from "@workout-app/exercise-data";
+import {
   defaultTemplateId,
   exerciseSchema,
   libraryExerciseId,
@@ -101,7 +105,7 @@ describe("seedTemplates", () => {
 
   it("adds the six default templates once, pointing at seeded exercises", () => {
     seedExercises(db, T0);
-    expect(seedTemplates(db, T0)).toBe(6);
+    expect(seedTemplates(db, T0)).toEqual({ added: 6, upgraded: 0 });
     const rows = db.select().from(template).all();
     for (const row of rows) templateSchema.parse(row);
     const exerciseIds = new Set(
@@ -114,7 +118,45 @@ describe("seedTemplates", () => {
     for (const slot of rows.flatMap((r) => r.slots))
       expect(exerciseIds).toContain(slot.exerciseId);
     expect(rows.find((r) => r.id === pushA)?.name).toBe("Push A");
-    expect(seedTemplates(db, T0 + 1)).toBe(0);
+    expect(seedTemplates(db, T0 + 1)).toEqual({ added: 0, upgraded: 0 });
+  });
+
+  it("upgrades unedited earlier defaults and leaves edited ones alone", () => {
+    const [v1] = PREVIOUS_DEFAULT_TEMPLATES;
+    const legsB = defaultTemplateId("legs_b");
+    for (const data of defaultTemplates(v1))
+      db.insert(template)
+        .values({
+          ...data,
+          userId: 1,
+          createdAt: T0,
+          updatedAt: T0,
+          deletedAt: null,
+          serverSeq: 1,
+        })
+        .run();
+    db.update(template)
+      .set({ name: "My push" })
+      .where(eq(template.id, pushA))
+      .run();
+
+    expect(seedTemplates(db, T0 + 1)).toEqual({ added: 0, upgraded: 5 });
+    const rows = new Map(
+      db
+        .select()
+        .from(template)
+        .all()
+        .map((r) => [r.id, r]),
+    );
+    expect(rows.get(pushA)).toMatchObject({ name: "My push", updatedAt: T0 });
+    const current = defaultTemplates().find((t) => t.id === legsB)!;
+    expect(rows.get(legsB)).toMatchObject({
+      ...current,
+      createdAt: T0,
+      updatedAt: T0 + 1,
+    });
+    expect(rows.get(legsB)!.serverSeq).toBeGreaterThan(1);
+    expect(seedTemplates(db, T0 + 2)).toEqual({ added: 0, upgraded: 0 });
   });
 
   it("never overwrites an edited or deleted template", () => {
@@ -123,7 +165,7 @@ describe("seedTemplates", () => {
       .set({ name: "My push", deletedAt: T0 })
       .where(eq(template.id, pushA))
       .run();
-    expect(seedTemplates(db, T0 + 1)).toBe(0);
+    expect(seedTemplates(db, T0 + 1)).toEqual({ added: 0, upgraded: 0 });
     expect(
       db.select().from(template).where(eq(template.id, pushA)).get(),
     ).toMatchObject({ name: "My push", deletedAt: T0 });

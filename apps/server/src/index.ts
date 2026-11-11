@@ -15,7 +15,10 @@ console.log(`Database ${dbPath}: ${applied} migration(s) applied`);
 const seeded = seedExercises(db);
 if (seeded > 0) console.log(`Added ${seeded} library exercise(s)`);
 const templates = seedTemplates(db);
-if (templates > 0) console.log(`Added ${templates} default template(s)`);
+if (templates.added > 0)
+  console.log(`Added ${templates.added} default template(s)`);
+if (templates.upgraded > 0)
+  console.log(`Upgraded ${templates.upgraded} unedited default template(s)`);
 if (!hasPassword(db))
   console.warn(
     "No password set, so nobody can sign in. Run `node dist/set-password.js`.",

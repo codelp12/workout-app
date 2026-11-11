@@ -58,7 +58,7 @@ describe("planCurrentWeek", () => {
     const sessions = db.select().from(plannedSession).all();
     expect(sessions).toHaveLength(11);
     expect(sessions.every((s) => s.weekId === weekId("2026-11-02"))).toBe(true);
-    expect(db.select().from(plannedItem).all()).toHaveLength(41);
+    expect(db.select().from(plannedItem).all()).toHaveLength(33);
   });
 
   it.each([

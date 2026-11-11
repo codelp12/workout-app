@@ -5,6 +5,7 @@ import {
   SETTINGS_ID,
   weekId,
   weekStartOf,
+  isTemplateModality,
 } from "@workout-app/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "./db.js";
@@ -79,7 +80,7 @@ export function planCurrentWeek(db: Db, now: number): boolean {
       .select()
       .from(exercise)
       .all()
-      .filter((e) => e.deletedAt === null && e.modality === "lift");
+      .filter((e) => e.deletedAt === null && isTemplateModality(e.modality));
     insertPlan(
       tx,
       planWeek({

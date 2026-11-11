@@ -141,7 +141,7 @@ Each modality implements `ModalityEngine { initState, prescribe(state, intent, c
 - Warm-ups: ramp through roughly 40, 60 and 80% of the first working load, rounded to available weights; skip them for later exercises that share a movement pattern.
 - Pain flags follow the ladder in 5.5. At 1–3/10, freeze increases on exercises whose `stress_tags` include the flagged region. At 4+/10, swap in a same-group substitute without that tag, or drop the exercise.
 
-**Default split:** Push/Pull/Legs twice a week, five to seven exercises per session, so each muscle group is trained twice weekly. Other splits are template edits; the scheduler (5.4) only needs session type and intensity class.
+**Default split:** Push/Pull/Legs twice a week, three to seven exercises per session, so each muscle group is trained twice weekly. Legs A and Push B include preventative hip work, and Legs B is a light hip session. Other splits are template edits; the scheduler (5.4) only needs session type and intensity class.
 
 **Review data:** per exercise, last week’s top set and total reps, e1RM change, this week’s target with its reason; weekly hard sets per muscle group.
 
