@@ -11,10 +11,10 @@ test("a fresh install walks through onboarding once", async ({
   await page.getByRole("button", { name: "Next" }).click();
 
   await page
-    .getByRole("button", { name: "I know my dumbbell squat weight" })
+    .getByRole("button", { name: "I know my dumbbell split squat weight" })
     .click();
   await page
-    .getByRole("button", { name: "Increase Dumbbell squat weight" })
+    .getByRole("button", { name: "Increase Dumbbell split squat weight" })
     .click();
   await page.getByRole("button", { name: "Next" }).click();
   await page.getByRole("button", { name: "Add a recent run" }).click();
@@ -39,7 +39,7 @@ test("a fresh install walks through onboarding once", async ({
   await page.getByRole("link", { name: "Run setup again" }).click();
   await page.getByRole("button", { name: "Next" }).click();
   await expect(
-    page.getByRole("spinbutton", { name: "Dumbbell squat weight" }),
+    page.getByRole("spinbutton", { name: "Dumbbell split squat weight" }),
   ).toHaveValue("30");
 });
 

@@ -30,10 +30,20 @@ test("a run logs offline with its pace and syncs", async ({
   await expect(page.getByTestId("sync-chip")).toHaveText("Synced");
   await expect(page.getByText("No exercises yet")).toHaveCount(0);
 
-  const runs = page.getByRole("button", {
-    name: /^(Easy run|Threshold run|Intervals|Long run), /,
-  });
-  const pick = runs.nth(runIndex[testInfo.project.name] ?? 0);
+  const runName = /^(Easy run|Threshold run|Intervals|Long run), /;
+  const days = page.getByRole("list", { name: "Days" });
+  // Other days first: Today's own test needs today's sessions left open.
+  const runs = [
+    ...(await days
+      .locator('li:not([aria-current="date"])')
+      .getByRole("button", { name: runName })
+      .all()),
+    ...(await days
+      .locator('li[aria-current="date"]')
+      .getByRole("button", { name: runName })
+      .all()),
+  ];
+  const pick = runs[runIndex[testInfo.project.name] ?? 0]!;
   const title = (await pick.getAttribute("aria-label"))!.split(", ")[0]!;
   await pick.click();
   await page

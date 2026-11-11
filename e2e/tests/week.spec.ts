@@ -3,8 +3,8 @@ import { E2E_PASSWORD } from "../credentials";
 
 // Both browser projects share one server, so each moves its own session.
 const sessions: Record<string, string> = {
-  chromium: "Push A",
-  webkit: "Push B",
+  chromium: "Pull A",
+  webkit: "Pull B",
 };
 
 async function signIn(page: Page) {
@@ -23,7 +23,7 @@ test("Week filters by modality and a move syncs to another device", async ({
   page,
   browser,
 }, testInfo) => {
-  const title = sessions[testInfo.project.name] ?? "Push A";
+  const title = sessions[testInfo.project.name] ?? "Pull A";
   await signIn(page);
   await expect(page.getByRole("button", { name: /, (AM|PM)/ })).toHaveCount(11);
   await page.screenshot({ path: testInfo.outputPath("week-390x844.png") });
@@ -35,11 +35,11 @@ test("Week filters by modality and a move syncs to another device", async ({
 
   await page.getByRole("button", { name: new RegExp(`^${title}, `) }).click();
   const sheet = page.getByRole("dialog", { name: title });
-  await sheet.getByRole("radio", { name: /^Sat/ }).click();
+  await sheet.getByRole("radio", { name: /^Thu/ }).click();
   await sheet.getByRole("radio", { name: "PM" }).click();
   await page.screenshot({ path: testInfo.outputPath("week-move-390x844.png") });
   await sheet.getByRole("button", { name: "Move" }).click();
-  const moved = day(page, "Saturday").getByRole("button", {
+  const moved = day(page, "Thursday").getByRole("button", {
     name: `${title}, PM, moved`,
   });
   await expect(moved).toBeVisible();
@@ -61,7 +61,7 @@ test("Week filters by modality and a move syncs to another device", async ({
   const phone = await other.newPage();
   await signIn(phone);
   await expect(
-    day(phone, "Saturday").getByRole("button", {
+    day(phone, "Thursday").getByRole("button", {
       name: `${title}, PM, moved`,
     }),
   ).toBeVisible();

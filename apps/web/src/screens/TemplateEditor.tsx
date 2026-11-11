@@ -1,3 +1,4 @@
+import { isTemplateModality } from "@workout-app/shared";
 import type {
   Exercise,
   IntensityClass,
@@ -220,7 +221,7 @@ function AddExercise({
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
-  const lifts = exercises.filter((e) => e.modality === "lift");
+  const lifts = exercises.filter((e) => isTemplateModality(e.modality));
   const results = searchLibrary(lifts, {
     q,
     muscle: [],

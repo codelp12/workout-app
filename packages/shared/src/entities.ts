@@ -55,6 +55,10 @@ export type DistanceUnit = (typeof DISTANCE_UNITS)[number];
 export type ElevationUnit = (typeof ELEVATION_UNITS)[number];
 export type ProblemReportStatus = (typeof PROBLEM_REPORT_STATUSES)[number];
 export type Modality = (typeof MODALITIES)[number];
+
+/** Whether a lift template slot can hold exercises of this modality. */
+export const isTemplateModality = (m: Modality) =>
+  m === "lift" || m === "mobility";
 export type StressTag = (typeof STRESS_TAGS)[number];
 export type ProgressionModel = (typeof PROGRESSION_MODELS)[number];
 export type Mechanic = (typeof MECHANICS)[number];

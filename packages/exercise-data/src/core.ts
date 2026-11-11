@@ -4,7 +4,7 @@
 // under `media/`, so they can be pre-cached for offline use; the rest of the
 // library loads on demand. Ids are free-exercise-db ids (`sourceId`).
 
-import { DEFAULT_TEMPLATES } from "./templates.js";
+import { DEFAULT_TEMPLATES, PREVIOUS_DEFAULT_TEMPLATES } from "./templates.js";
 
 /**
  * Exercises for the default Push/Pull/Legs A and B templates (SPEC §5.1),
@@ -145,10 +145,18 @@ const substitutes = {
   ],
 };
 
-/** Every core exercise id: template exercises first, then substitutes. */
+/**
+ * Every core exercise id: template exercises first, then substitutes, then
+ * anything earlier default templates used, since kept templates may still.
+ */
 export const CORE_EXERCISES: readonly string[] = [
-  ...Object.values(DEFAULT_TEMPLATE_EXERCISES).flat(),
-  ...Object.values(substitutes).flat(),
+  ...new Set([
+    ...Object.values(DEFAULT_TEMPLATE_EXERCISES).flat(),
+    ...Object.values(substitutes).flat(),
+    ...PREVIOUS_DEFAULT_TEMPLATES.flat().flatMap((t) =>
+      t.slots.map(([sourceId]) => sourceId),
+    ),
+  ]),
 ];
 
 const coreIds = new Set(CORE_EXERCISES);

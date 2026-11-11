@@ -91,11 +91,7 @@ describe("planWeek", () => {
       expect(new Set(today.map((s) => s.modality)).size).toBe(today.length);
       expect(new Set(today.map((s) => s.slot)).size).toBe(today.length);
     }
-    expect(
-      plan.sessions
-        .filter((s) => s.modality === "lift")
-        .map((s) => isoWeekday(s.date)),
-    ).not.toContain(6);
+    expect(plan.sessions.map((s) => isoWeekday(s.date))).not.toContain(4);
   });
 
   it("starts a block and gives every item targets and a reason", () => {
@@ -142,7 +138,7 @@ describe("planWeek", () => {
           s.id.length &&
           s.modality === "run" &&
           s.intent === "key" &&
-          isoWeekday(s.date) === 3,
+          isoWeekday(s.date) === 5,
       )?.workoutType;
     expect([plan, ...weeks.slice(0, 1)].map(quality)).toEqual([
       "threshold",
@@ -158,7 +154,7 @@ describe("planWeek", () => {
 
   it("moves a session to the day's other slot when its own is unavailable", () => {
     const availability = DEFAULT_AVAILABILITY.map((d) =>
-      d.weekday === 1 ? { ...d, pm: false } : d,
+      d.weekday === 3 ? { ...d, pm: false } : d,
     );
     const moved = planWeek(
       input({ settings: { ...input().settings, availability } }),
