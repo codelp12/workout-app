@@ -12,7 +12,7 @@
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
-    "@hono/node-server": "^2.1.5",
+    "@hono/node-server": "^2.1.6",
     "@workout-app/engine": "workspace:*",
     "@workout-app/exercise-data": "workspace:*",
     "@workout-app/shared": "workspace:*",
