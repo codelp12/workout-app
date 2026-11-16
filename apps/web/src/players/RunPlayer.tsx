@@ -1,11 +1,10 @@
 import { RUN_WORKOUT_TYPES, formatAmount } from "@workout-app/engine";
-import type { DistanceUnit, RunSplit } from "@workout-app/shared";
+import type { DistanceUnit, RunLog, RunSplit } from "@workout-app/shared";
 import { useCallback, useId, useState } from "react";
 import { Link } from "react-router";
 import { ChipGroup } from "../components/ChipGroup";
 import {
   formatRange,
-  sessionTitle,
   type RunTargets,
   type SessionView,
 } from "../plan/sessions";
@@ -22,6 +21,8 @@ import {
   paceSec,
   parseNumber,
   readRunSession,
+  runFacts,
+  workoutName,
   type RunSession,
 } from "./run-log";
 
@@ -29,9 +30,6 @@ const RPE_OPTIONS = Array.from({ length: 10 }, (_, i) => ({
   value: String(i + 1),
   label: String(i + 1),
 }));
-
-const workoutName = (workoutType: string) =>
-  sessionTitle({ workoutType }, null);
 
 const TYPE_OPTIONS = RUN_WORKOUT_TYPES.map((type) => ({
   value: type,
@@ -329,26 +327,27 @@ function RunForm({ view, unit }: { view: SessionView; unit: DistanceUnit }) {
   );
 }
 
+/** A run's splits with their paces. */
+export function Splits({ run }: { run: RunLog }) {
+  const unit = run.distanceUnit;
+  if (run.splits.length === 0) return null;
+  return (
+    <ol aria-label="Splits" className="flex flex-col tabular-nums">
+      {run.splits.map((split, i) => (
+        <li key={i}>
+          {i + 1}. {formatAmount(split.distanceValue, unit)} in{" "}
+          {formatDuration(split.durationSec)} (
+          {formatPace(split.durationSec / split.distanceValue, unit)})
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 function RunSummary({ session }: { session: Required<RunSession> }) {
   const run = session.run!;
   const log = session.log!;
-  const unit = run.distanceUnit;
-  const pace = paceSec(run.distanceValue, run.durationSec);
-  const facts = [
-    workoutName(run.workoutType),
-    run.distanceValue !== null && formatAmount(run.distanceValue, unit),
-    run.durationSec !== null && formatDuration(run.durationSec),
-    pace !== null && formatPace(pace, unit),
-    run.rpe !== null && `RPE ${run.rpe}`,
-  ].filter(Boolean);
-  const extras = [
-    run.avgHr !== null && `${run.avgHr} bpm`,
-    run.elevationValue !== null &&
-      `${run.elevationValue} ${run.elevationUnit ?? ""} gain`.replace(
-        "  ",
-        " ",
-      ),
-  ].filter(Boolean);
+  const { facts, extras } = runFacts(run);
   return (
     <section aria-label="Run logged" className={`${card} flex flex-col gap-2`}>
       <h2 className="text-xl font-semibold text-run">Run logged</h2>
@@ -356,17 +355,7 @@ function RunSummary({ session }: { session: Required<RunSession> }) {
       {extras.length > 0 && (
         <p className="tabular-nums text-fg-muted">{extras.join(" · ")}</p>
       )}
-      {run.splits.length > 0 && (
-        <ol aria-label="Splits" className="flex flex-col tabular-nums">
-          {run.splits.map((split, i) => (
-            <li key={i}>
-              {i + 1}. {formatAmount(split.distanceValue, unit)} in{" "}
-              {formatDuration(split.durationSec)} (
-              {formatPace(split.durationSec / split.distanceValue, unit)})
-            </li>
-          ))}
-        </ol>
-      )}
+      <Splits run={run} />
       {log.notes && <p className="whitespace-pre-wrap">{log.notes}</p>}
       <Link to="/" className={`${button} min-h-tap self-start`}>
         Back to Today

@@ -75,6 +75,7 @@ test("a set logs in two taps and the player resumes after a kill", async ({
 type PullPage = {
   changes: {
     row: {
+      id?: string;
       kind?: string;
       plannedSessionId?: string;
       opId?: string;
@@ -150,6 +151,7 @@ test("swaps and skips sync to the server", async ({ page }, testInfo) => {
 
 test("a finished session shows as done and syncs", async ({
   page,
+  context,
 }, testInfo) => {
   const title = sessions[testInfo.project.name] ?? "Push A";
   await page.goto("/week?show=lift");
@@ -181,6 +183,7 @@ test("a finished session shows as done and syncs", async ({
     path: testInfo.outputPath("lift-finished-390x844.png"),
   });
 
+  let logId: string | null = null;
   await expect
     .poll(async () => {
       for (let since = 0, more = true; more;) {
@@ -188,6 +191,7 @@ test("a finished session shows as done and syncs", async ({
         const body = (await res.json()) as PullPage;
         for (const { row } of body.changes) {
           if (row.plannedSessionId === sessionId && "endedAt" in row) {
+            logId = row.id ?? null;
             return {
               finished: row.endedAt != null,
               rpe: row.rpe,
@@ -201,6 +205,24 @@ test("a finished session shows as done and syncs", async ({
       return null;
     })
     .toEqual({ finished: true, rpe: 8, notes: "Heavy but good" });
+
+  // The Log reads from the device, so it works offline.
+  await context.setOffline(true);
+  await page.getByRole("link", { name: "Log", exact: true }).click();
+  const entry = page.locator(`a[href="/log/${logId}"]`);
+  await expect(entry).toContainText(title);
+  await entry.click();
+  const summary = page.getByRole("region", { name: "Summary" });
+  await expect(summary).toContainText("RPE 8");
+  await expect(summary).toContainText("Heavy but good");
+  await expect(page.getByRole("list", { name: "Sets" }).first()).toContainText(
+    "Set 1",
+  );
+  await page.screenshot({
+    path: testInfo.outputPath("lift-history-390x844.png"),
+    fullPage: true,
+  });
+  await context.setOffline(false);
 
   await page.goto("/week?show=lift");
   await expect(

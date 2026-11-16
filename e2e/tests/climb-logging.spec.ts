@@ -111,9 +111,9 @@ test("a climb session logs offline with a live pyramid and syncs", async ({
   }
 
   await context.setOffline(false);
+  let logId: string | null = null;
   await expect
     .poll(async () => {
-      let logId: string | null = null;
       let rpe: number | null | undefined = null;
       const ascents: PullPage["changes"][number]["row"][] = [];
       const projectRows = new Map<string, string>();
@@ -154,6 +154,29 @@ test("a climb session logs offline with a live pyramid and syncs", async ({
         `V5 attempt 3 ${projectName}`,
       ],
     });
+
+  // The Log reads from the device, so it works offline.
+  await context.setOffline(true);
+  await page.getByRole("link", { name: "Log", exact: true }).click();
+  const entry = page.locator(`a[href="/log/${logId}"]`);
+  await expect(entry).toContainText(title);
+  await expect(entry).toContainText(
+    finishes ? "3 sends · hardest V3" : "Not finished",
+  );
+  await entry.click();
+  await expect(
+    page
+      .getByRole("region", { name: "Pyramid" })
+      .getByRole("listitem", { name: "V3: 2 sends" }),
+  ).toBeVisible();
+  await expect(page.getByRole("region", { name: "Climbs" })).toContainText(
+    `V5 · Attempt · 3 attempts · ${projectName}`,
+  );
+  await page.screenshot({
+    path: testInfo.outputPath("climb-history-390x844.png"),
+    fullPage: true,
+  });
+  await context.setOffline(false);
 
   if (finishes) {
     await page.goto("/week?show=climb");
