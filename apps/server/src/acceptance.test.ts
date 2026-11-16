@@ -2,7 +2,13 @@ import { newId, sessionLogId } from "@workout-app/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { checkWeek, formatWeekCheck } from "./acceptance.js";
 import { openDb, runMigrations, type Db } from "./db.js";
-import { plannedSession, runLog, sessionLog, setLog } from "./schema.js";
+import {
+  planOverride,
+  plannedSession,
+  runLog,
+  sessionLog,
+  setLog,
+} from "./schema.js";
 import { OWNER_USER_ID } from "./sync.js";
 
 let db: Db;
@@ -151,6 +157,37 @@ describe("checkWeek", () => {
     });
     expect(checkWeek(db, "2026-11-09").sessions).toMatchObject([
       { date: "2026-11-10", title: "push_a", status: "finished" },
+    ]);
+  });
+
+  it("places an unlogged session where the owner moved it", () => {
+    const pull = plan("2026-11-11", { workoutType: "pull_a" });
+    db.insert(planOverride)
+      .values({
+        ...sync,
+        id: newId(),
+        kind: "move",
+        plannedSessionId: pull.id,
+        weekId: null,
+        data: { date: "2026-11-17", slot: "pm" },
+        opId: newId(),
+        supersededAt: null,
+      })
+      .run();
+    expect(checkWeek(db, "2026-11-09").sessions).toEqual([]);
+    expect(checkWeek(db, "2026-11-16").sessions).toMatchObject([
+      { date: "2026-11-17", slot: "pm", title: "pull_a", status: "not logged" },
+    ]);
+  });
+
+  it("lists a session logged in another week only in that week", () => {
+    const push = plan("2026-11-15");
+    const id = sessionLogId(push.id);
+    log("2026-11-16", { id, plannedSessionId: push.id });
+    set(id, 0);
+    expect(checkWeek(db, "2026-11-09").sessions).toEqual([]);
+    expect(checkWeek(db, "2026-11-16").sessions).toMatchObject([
+      { date: "2026-11-16", title: "push_a", status: "finished", sets: 1 },
     ]);
   });
 

@@ -1,9 +1,15 @@
-import { addDays, sessionLogId } from "@workout-app/shared";
-import { and, gte, inArray, isNull, lte, or } from "drizzle-orm";
+import {
+  addDays,
+  moveOverrideDataSchema,
+  sessionLogId,
+  type MoveOverrideData,
+} from "@workout-app/shared";
+import { and, eq, gte, inArray, isNull, lte, or } from "drizzle-orm";
 import type { Db } from "./db.js";
 import {
   ascent,
   exercise,
+  planOverride,
   plannedSession,
   runLog,
   sessionLog,
@@ -42,6 +48,36 @@ export type WeekCheck = {
   }[];
 };
 
+/** Each session's latest live move, as the app places it (SPEC §5.4). */
+function latestMoves(db: Db): Map<string, MoveOverrideData> {
+  const latest = new Map<
+    string,
+    { updatedAt: number; data: MoveOverrideData }
+  >();
+  const rows = db
+    .select()
+    .from(planOverride)
+    .where(
+      and(
+        eq(planOverride.kind, "move"),
+        isNull(planOverride.deletedAt),
+        isNull(planOverride.supersededAt),
+      ),
+    )
+    .all();
+  for (const o of rows) {
+    const data = moveOverrideDataSchema.safeParse(o.data);
+    if (!o.plannedSessionId || !data.success) continue;
+    const current = latest.get(o.plannedSessionId);
+    if (!current || o.updatedAt > current.updatedAt)
+      latest.set(o.plannedSessionId, {
+        updatedAt: o.updatedAt,
+        data: data.data,
+      });
+  }
+  return new Map([...latest].map(([id, m]) => [id, m.data]));
+}
+
 /**
  * The server's record of the week starting Monday `weekStart`, for the Phase 1
  * acceptance week (SPEC §9): each planned session with what was logged for it,
@@ -49,45 +85,53 @@ export type WeekCheck = {
  */
 export function checkWeek(db: Db, weekStart: string): WeekCheck {
   const weekEnd = addDays(weekStart, 6);
-  const logs = db
-    .select()
-    .from(sessionLog)
-    .where(
-      and(
-        isNull(sessionLog.deletedAt),
-        gte(sessionLog.localDate, weekStart),
-        lte(sessionLog.localDate, weekEnd),
-      ),
-    )
-    .all();
-  const loggedPlanIds = logs.flatMap((l) =>
-    l.plannedSessionId ? [l.plannedSessionId] : [],
-  );
-  const planned = db
+  const inWeek = (date: string) => date >= weekStart && date <= weekEnd;
+  const moves = latestMoves(db);
+  const candidates = db
     .select()
     .from(plannedSession)
-    .where(
-      and(
-        isNull(plannedSession.deletedAt),
-        or(
-          and(
-            gte(plannedSession.date, weekStart),
-            lte(plannedSession.date, weekEnd),
+    .where(isNull(plannedSession.deletedAt))
+    .all();
+  const candidateLogIds = candidates.map((p) => sessionLogId(p.id));
+  const logById = new Map(
+    db
+      .select()
+      .from(sessionLog)
+      .where(
+        and(
+          isNull(sessionLog.deletedAt),
+          or(
+            and(
+              gte(sessionLog.localDate, weekStart),
+              lte(sessionLog.localDate, weekEnd),
+            ),
+            inArray(sessionLog.id, candidateLogIds),
           ),
-          inArray(plannedSession.id, loggedPlanIds),
         ),
-      ),
-    )
-    .all()
-    .filter((p) => p.status !== "moved" || loggedPlanIds.includes(p.id));
+      )
+      .all()
+      .map((l) => [l.id, l]),
+  );
+  // Where each session ended up: the day it was logged, else where the owner
+  // moved it, else where it was planned.
+  const planned = candidates.flatMap((p) => {
+    const log = logById.get(sessionLogId(p.id));
+    if (!log && p.status === "moved") return [];
+    const move = moves.get(p.id);
+    const placed = {
+      ...p,
+      date: log?.localDate ?? move?.date ?? p.date,
+      slot: move?.slot ?? p.slot,
+    };
+    return inWeek(placed.date) ? [placed] : [];
+  });
+  const plannedLogIds = new Set(planned.map((p) => sessionLogId(p.id)));
+  const hasPlan = new Set(candidateLogIds);
+  const logs = [...logById.values()].filter(
+    (l) => inWeek(l.localDate) && !hasPlan.has(l.id),
+  );
 
-  const logById = new Map(logs.map((l) => [l.id, l]));
-  const allLogIds = [
-    ...new Set([
-      ...logs.map((l) => l.id),
-      ...planned.map((p) => sessionLogId(p.id)),
-    ]),
-  ];
+  const allLogIds = [...new Set([...logs.map((l) => l.id), ...plannedLogIds])];
   const linked = <T extends { sessionLogId: string; deletedAt: number | null }>(
     rows: T[],
   ) => rows.filter((r) => r.deletedAt === null);
@@ -164,9 +208,7 @@ export function checkWeek(db: Db, weekStart: string): WeekCheck {
       const id = sessionLogId(p.id);
       return describe(id, logById.get(id), p);
     }),
-    ...logs
-      .filter((l) => !planned.some((p) => sessionLogId(p.id) === l.id))
-      .map((l) => describe(l.id, l, undefined)),
+    ...logs.map((l) => describe(l.id, l, undefined)),
   ].sort(
     (a, b) =>
       a.date.localeCompare(b.date) ||
