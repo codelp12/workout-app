@@ -600,6 +600,102 @@ describe("swap, skip, add set and warm-ups", () => {
     expect(within(swapped).queryByRole("button", { name: "Swap" })).toBeNull();
   });
 
+  it("swaps to any exercise by searching the library", async () => {
+    const user = userEvent.setup();
+    const press = testExercise({
+      name: "Dumbbell Press",
+      equipment: ["dumbbell"],
+    });
+    await localDb.rows("exercise").put(press);
+    renderPlayer();
+    const card = await screen.findByRole("article", { name: "Dumbbell Squat" });
+    await user.click(within(card).getByRole("button", { name: "Swap" }));
+    const sheet = await screen.findByRole("dialog", { name: "Swap exercise" });
+    expect(within(sheet).queryByRole("list", { name: "Exercises" })).toBeNull();
+    await user.type(
+      within(sheet).getByRole("searchbox", { name: "Search exercises" }),
+      "press",
+    );
+    await user.click(
+      within(within(sheet).getByRole("list", { name: "Exercises" })).getByRole(
+        "button",
+        { name: "Dumbbell Press" },
+      ),
+    );
+
+    expect(
+      await screen.findByRole("article", { name: "Dumbbell Press" }),
+    ).toBeTruthy();
+    const override = await localDb
+      .rows("plan_override")
+      .get(swapOverrideId(items[0]!.id));
+    expect(override!.data).toEqual({
+      itemId: items[0]!.id,
+      exerciseId: press.id,
+    });
+  });
+
+  it("adds the first exercise to an empty session", async () => {
+    const user = userEvent.setup();
+    await localDb.rows("planned_item").clear();
+    renderPlayer();
+    expect(
+      await screen.findByText("Nothing is planned for this session yet."),
+    ).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Add exercise" }));
+    await user.click(
+      within(
+        await screen.findByRole("dialog", { name: "Add an exercise" }),
+      ).getByRole("button", { name: "Plank" }),
+    );
+    expect(await screen.findByRole("article", { name: "Plank" })).toBeTruthy();
+  });
+
+  it("adds an exercise to the end, queues it for sync and logs it", async () => {
+    const user = userEvent.setup();
+    const curl = testExercise({
+      name: "Dumbbell Curl",
+      equipment: ["dumbbell"],
+      repMin: 10,
+      repMax: 15,
+    });
+    await localDb.rows("exercise").put(curl);
+    renderPlayer();
+    await screen.findByRole("article", { name: "Dumbbell Squat" });
+    await user.click(screen.getByRole("button", { name: "Add exercise" }));
+    const sheet = await screen.findByRole("dialog", {
+      name: "Add an exercise",
+    });
+    expect(
+      within(sheet).queryByRole("button", { name: "Dumbbell Squat" }),
+    ).toBeNull();
+    await user.type(
+      within(sheet).getByRole("searchbox", { name: "Search exercises" }),
+      "curl",
+    );
+    await user.click(
+      within(sheet).getByRole("button", { name: "Dumbbell Curl" }),
+    );
+
+    const card = await screen.findByRole("article", { name: "Dumbbell Curl" });
+    expect(screen.getByText("Exercise 3 of 3")).toBeTruthy();
+    expect(within(card).getByText(/^3 × 10–15/)).toBeTruthy();
+    const [added] = (await localDb.rows("plan_override").toArray()).filter(
+      (o) => o.kind === "add",
+    );
+    expect(added).toMatchObject({
+      plannedSessionId: legs.id,
+      data: { exerciseId: curl.id },
+    });
+    const ops = await localDb.outbox.toArray();
+    expect(ops.some((o) => o.opId === added!.opId)).toBe(true);
+
+    await user.click(within(card).getByRole("radio", { name: "2" }));
+    await user.click(within(card).getByRole("button", { name: "Log set" }));
+    await within(card).findByText("Set 2 of 3");
+    expect((await sessionSets()).map((s) => s.exerciseId)).toEqual([curl.id]);
+  });
+
   it("skips an exercise, queues it for sync and can undo it", async () => {
     const user = userEvent.setup();
     renderPlayer();
@@ -746,9 +842,11 @@ describe("discarding", () => {
       name: "Dumbbell Squat",
     });
     expect(await within(fresh).findByText("Set 1 of 2")).toBeTruthy();
-    expect(
-      screen.queryByRole("button", { name: "Discard workout" }),
-    ).toBeNull();
+    await vi.waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "Discard workout" }),
+      ).toBeNull(),
+    );
     const log = await localDb.rows("session_log").get(sessionLogId(legs.id));
     expect(log!.deletedAt).not.toBeNull();
     const sets = (await localDb.rows("set_log").toArray()).filter(

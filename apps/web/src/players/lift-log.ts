@@ -18,7 +18,7 @@ import {
   type WeightUnit,
   isTemplateModality,
 } from "@workout-app/shared";
-import { itemOverrides } from "../plan/item-overrides";
+import { itemOverrides, type AddedItem } from "../plan/item-overrides";
 import type { LiftTargets, SessionView } from "../plan/sessions";
 import type { LocalDb } from "../sync/local-db";
 import { deleteRow, saveRow } from "../sync/writes";
@@ -39,7 +39,7 @@ export type LiftCard = {
   item: Pick<PlannedItem, "id" | "plannedSessionId" | "exerciseId">;
   /** The exercise being done: the planned one, or what it was swapped for. */
   exercise: Exercise | null;
-  /** The exercises it can be swapped for, preferred first (SPEC §5.1). */
+  /** Same-group exercises to swap to, preferred first (SPEC §5.1). */
   substitutes: Exercise[];
   skipped: boolean;
   targets: LiftTargets;
@@ -51,7 +51,13 @@ export type LiftCard = {
   lastTime: SetLog[];
 };
 
-export type LiftSession = { log: SessionLog | null; cards: LiftCard[] };
+export type LiftSession = {
+  log: SessionLog | null;
+  /** Planned exercises, then the ones the owner added. */
+  cards: LiftCard[];
+  /** Every lift and mobility exercise, to swap to or add, by name. */
+  library: Exercise[];
+};
 
 type PlayerSettings = Pick<Settings, "weightUnit" | "timezone" | "equipment">;
 
@@ -63,9 +69,12 @@ export async function readLiftSession(
   db: LocalDb,
   view: SessionView,
 ): Promise<LiftSession> {
-  const items = view.items.filter((i) => i.kind === "exercise");
   const overrides = itemOverrides(await db.rows("plan_override").toArray());
-  const exerciseOf = (item: PlannedItem) =>
+  const items: AddedItem[] = [
+    ...view.items.filter((i) => i.kind === "exercise"),
+    ...overrides.added.filter((i) => i.plannedSessionId === view.session.id),
+  ];
+  const exerciseOf = (item: AddedItem) =>
     overrides.swaps.get(item.id) ?? item.exerciseId;
   const ids = new Set(
     items.flatMap((i) => {
@@ -145,6 +154,7 @@ export async function readLiftSession(
         lastTime: exerciseId ? lastTime(exerciseId) : [],
       };
     }),
+    library: exercises.sort((a, b) => a.name.localeCompare(b.name)),
   };
 }
 

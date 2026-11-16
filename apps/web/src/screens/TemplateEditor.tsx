@@ -10,9 +10,10 @@ import { useCallback, useId, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { BottomSheet } from "../components/BottomSheet";
 import { ChipGroup } from "../components/ChipGroup";
+import { ExercisePicker } from "../components/ExercisePicker";
 import { Loading, Skeleton } from "../components/Skeleton";
 import { Stepper } from "../components/Stepper";
-import { searchLibrary, vocabLabel } from "../library/filter";
+import { vocabLabel } from "../library/filter";
 import { Section, Subsection } from "../settings/Sections";
 import { localDb } from "../sync";
 import {
@@ -38,8 +39,6 @@ const RIR_OPTIONS = [0, 1, 2, 3, 4].map((n) => ({
   value: String(n),
   label: String(n),
 }));
-
-const MAX_RESULTS = 30;
 
 type Names = ReadonlyMap<string, string>;
 
@@ -220,18 +219,10 @@ function AddExercise({
   exercises: readonly Exercise[];
 }) {
   const [open, setOpen] = useState(false);
-  const [q, setQ] = useState("");
   const lifts = exercises.filter((e) => isTemplateModality(e.modality));
-  const results = searchLibrary(lifts, {
-    q,
-    muscle: [],
-    equipment: [],
-    pattern: [],
-  }).slice(0, MAX_RESULTS);
 
   function add(exercise: Exercise) {
     setOpen(false);
-    setQ("");
     void updateTemplate(template.id, (t) => ({
       slots: [
         ...t.slots,
@@ -260,33 +251,7 @@ function AddExercise({
         </button>
       }
     >
-      <input
-        type="search"
-        aria-label="Search exercises"
-        placeholder="Search exercises"
-        className={`${input} min-h-tap`}
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-      />
-      {lifts.length === 0 ? (
-        <p className="text-fg-muted">
-          The library arrives with your first sync.
-        </p>
-      ) : (
-        <ul aria-label="Exercises" className="flex flex-col gap-1">
-          {results.map((e) => (
-            <li key={e.id}>
-              <button
-                type="button"
-                className="min-h-tap w-full rounded-lg px-3 text-left active:bg-surface-raised"
-                onClick={() => add(e)}
-              >
-                {e.name}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <ExercisePicker exercises={lifts} onPick={add} />
     </BottomSheet>
   );
 }
