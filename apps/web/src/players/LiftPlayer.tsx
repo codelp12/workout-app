@@ -654,13 +654,7 @@ export function LiftPlayer({ view }: { view: SessionView }) {
       <AddExerciseSheet
         view={view}
         library={data.library}
-        onAdded={() =>
-          setPosition((p) => ({
-            ...p,
-            card: cards.length,
-            drafts: dropDraft(p),
-          }))
-        }
+        onAdded={() => setPosition((p) => ({ ...p, card: cards.length }))}
       />
       <FinishSheet
         view={view}
