@@ -96,7 +96,7 @@ All rows carry `id`, `user_id`, `created_at`, `updated_at`, `deleted_at` and `se
 - `template`: reusable session definitions (for example Push A) with ordered slots: exercise or substitution group, sets, rep range, target RIR, rest, `ramp` flag. Each template also carries an intensity class (heavy, moderate or light) and an intent (key, support or recovery) for the scheduler.
 - `block` and `week`: the single global calendar shared by every modality (loading, deload, taper, test) and `engine_version`.
 - `planned_session` (date, slot, modality, workout type, intent key/support/recovery, status planned/done/skipped/moved, generated-by) and `planned_item` (an exercise, run segment or climbing block, with targets and `reasons[]`).
-- `plan_override`: client-owned provisional plan changes (move, trim, swap, provisional week) with the op that created them; superseded when the server regenerates the affected plan rows.
+- `plan_override`: client-owned provisional plan changes (move, trim, swap, add, provisional week) with the op that created them; superseded when the server regenerates the affected plan rows.
 - `session_log` (modality, start and end, session RPE 1–10, notes, link to plan) with children `set_log` (exercise, index, load, unit, reps, RIR, warm-up flag), `run_log` (distance, duration, optional heart rate and elevation, RPE, workout type, splits) and `ascent` (grade, style flash/onsight/send/attempt, attempts, tags, project).
 - `project`: climbing projects with attempts across sessions.
 - `readiness_checkin`: date, sleep, energy, soreness by region, pain flags (body region from the `stress_tags` list, severity 0–10), optional resting HR, HRV and bodyweight.
@@ -243,7 +243,7 @@ Mobile-first (390×844 baseline), one-handed, dark by default (gym lighting), la
 
 1. Today: today’s sessions (AM/PM), readiness check-in, coach note, sync chip.
 2. Week: one combined 7-day grid for all modalities, color-coded, with filters to drill into lifting, running or climbing alone; drag to move with constraint warnings, last-week versus this-week strip, deload indicator.
-3. Lift player: swipeable exercise cards with photos, cue chips and a how-to sheet; target and “last time” lines; weight and rep steppers prefilled from the target; RIR picker (0–4); rest timer; load picker that only offers available weights (dumbbell rack, fixed barbells, bands); swap, skip, add set; collapsed warm-ups; “Why this target?” sheet.
+3. Lift player: swipeable exercise cards with photos, cue chips and a how-to sheet; target and “last time” lines; weight and rep steppers prefilled from the target; RIR picker (0–4); rest timer; load picker that only offers available weights (dumbbell rack, fixed barbells, bands); swap (same-group substitutes first, or any exercise from a search), skip, add set, add exercise; collapsed warm-ups; “Why this target?” sheet.
 4. Run: structured workout bars (warm-up, reps with paces, cool-down), manual entry now and file import later, RPE.
 5. Climb: grade chips, project tracker, session timer, live pyramid.
 6. Progress: e1RM chart and PR list per lift; weekly hard sets per muscle group; running volume, pace and VDOT; climbing pyramid and hardest sends; consistency calendar.

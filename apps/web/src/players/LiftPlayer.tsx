@@ -1,14 +1,15 @@
 import { toWeightUnit, type WeightImplement } from "@workout-app/engine";
-import type { SetLog } from "@workout-app/shared";
+import type { Exercise, SetLog } from "@workout-app/shared";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Link } from "react-router";
 import { BottomSheet } from "../components/BottomSheet";
 import { ChipGroup } from "../components/ChipGroup";
+import { ExercisePicker } from "../components/ExercisePicker";
 import { LoadPicker } from "../components/LoadPicker";
 import { Stepper } from "../components/Stepper";
 import { vocabLabel } from "../library/filter";
 import { ExerciseImage } from "../library/ExerciseImage";
-import { skipItem, swapExercise } from "../plan/item-overrides";
+import { addExercise, skipItem, swapExercise } from "../plan/item-overrides";
 import { liftDetail, type SessionView } from "../plan/sessions";
 import { readSettings, type SettingsData } from "../settings/settings";
 import { localDb, syncSoon } from "../sync";
@@ -92,10 +93,12 @@ function Finished({ data }: { data: LiftSession }) {
 function SwapSheet({
   view,
   card,
+  library,
   onSwapped,
 }: {
   view: SessionView;
   card: LiftCard;
+  library: readonly Exercise[];
   onSwapped: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -108,7 +111,7 @@ function SwapSheet({
   return (
     <BottomSheet
       title="Swap exercise"
-      description="Same movement, other equipment. Dumbbell and band variants first."
+      description="Same movement first, dumbbell and band variants on top. Or search for any exercise."
       open={open}
       onOpenChange={setOpen}
       trigger={
@@ -117,27 +120,67 @@ function SwapSheet({
         </button>
       }
     >
-      <ul aria-label="Substitutes" className="flex flex-col gap-2">
-        {card.substitutes.map((e) => {
-          const current = e.id === card.exercise?.id;
-          return (
-            <li key={e.id}>
-              <button
-                type="button"
-                aria-pressed={current}
-                className={`${button} min-h-tap w-full flex-col items-start text-left ${current ? "ring-2 ring-lift" : ""}`}
-                onClick={() => void swap(e.id)}
-              >
-                <span className="font-medium">{e.name}</span>
-                <span className="text-sm text-fg-muted">
-                  {e.equipment.map(vocabLabel).join(", ") || "No equipment"}
-                  {e.id === card.item.exerciseId ? " · Planned" : ""}
-                </span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+      {card.substitutes.length > 0 && (
+        <ul aria-label="Substitutes" className="flex flex-col gap-2">
+          {card.substitutes.map((e) => {
+            const current = e.id === card.exercise?.id;
+            return (
+              <li key={e.id}>
+                <button
+                  type="button"
+                  aria-pressed={current}
+                  className={`${button} min-h-tap w-full flex-col items-start text-left ${current ? "ring-2 ring-lift" : ""}`}
+                  onClick={() => void swap(e.id)}
+                >
+                  <span className="font-medium">{e.name}</span>
+                  <span className="text-sm text-fg-muted">
+                    {e.equipment.map(vocabLabel).join(", ") || "No equipment"}
+                    {e.id === card.item.exerciseId ? " · Planned" : ""}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <ExercisePicker
+        exercises={library}
+        browse={false}
+        onPick={(e) => void swap(e.id)}
+      />
+    </BottomSheet>
+  );
+}
+
+function AddExerciseSheet({
+  view,
+  library,
+  onAdded,
+}: {
+  view: SessionView;
+  library: readonly Exercise[];
+  onAdded: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  async function add(exercise: Exercise) {
+    await addExercise(localDb, view.session, exercise);
+    syncSoon();
+    setOpen(false);
+    onAdded();
+  }
+  return (
+    <BottomSheet
+      title="Add an exercise"
+      description="It goes at the end: 3 sets in its usual rep range, RIR 2."
+      open={open}
+      onOpenChange={setOpen}
+      trigger={
+        <button type="button" className={`${button} min-h-tap w-full`}>
+          Add exercise
+        </button>
+      }
+    >
+      <ExercisePicker exercises={library} onPick={(e) => void add(e)} />
     </BottomSheet>
   );
 }
@@ -226,6 +269,7 @@ function ExerciseCard({
   onLogged,
   onAddSet,
   onSkipped,
+  library,
   onSwapped,
 }: {
   view: SessionView;
@@ -240,6 +284,7 @@ function ExerciseCard({
   onLogged: (done: boolean) => void;
   onAddSet: () => void;
   onSkipped: (skipped: boolean) => void;
+  library: readonly Exercise[];
   onSwapped: () => void;
 }) {
   const titleId = useId();
@@ -284,11 +329,7 @@ function ExerciseCard({
       : values.load;
   const warmupSets =
     warmups && !skipped ? warmupPlan(card, settings, workingLoad) : [];
-  const canSwap =
-    !skipped &&
-    sets.length === 0 &&
-    card.warmups.length === 0 &&
-    card.substitutes.length > 1;
+  const canSwap = !skipped && sets.length === 0 && card.warmups.length === 0;
 
   return (
     <article
@@ -336,7 +377,12 @@ function ExerciseCard({
       {(canSwap || (!skipped && !done)) && (
         <div className="flex gap-2">
           {canSwap && (
-            <SwapSheet view={view} card={card} onSwapped={onSwapped} />
+            <SwapSheet
+              view={view}
+              card={card}
+              library={library}
+              onSwapped={onSwapped}
+            />
           )}
           {!done && (
             <button
@@ -602,7 +648,19 @@ export function LiftPlayer({ view }: { view: SessionView }) {
         onSkipped={(skipped) => {
           if (skipped && index < cards.length - 1) go(index + 1);
         }}
+        library={data.library}
         onSwapped={() => setPosition((p) => ({ ...p, drafts: dropDraft(p) }))}
+      />
+      <AddExerciseSheet
+        view={view}
+        library={data.library}
+        onAdded={() =>
+          setPosition((p) => ({
+            ...p,
+            card: cards.length,
+            drafts: dropDraft(p),
+          }))
+        }
       />
       <FinishSheet
         view={view}

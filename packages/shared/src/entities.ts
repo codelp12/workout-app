@@ -42,6 +42,7 @@ export const OVERRIDE_KINDS = [
   "move",
   "trim",
   "swap",
+  "add",
   "provisional_week",
 ] as const;
 export const ASCENT_STYLES = ["flash", "onsight", "send", "attempt"] as const;
@@ -353,6 +354,17 @@ export type SwapOverrideData = z.infer<typeof swapOverrideDataSchema>;
 /** `data` of a `trim` override: a planned item the owner skipped. */
 export const trimOverrideDataSchema = z.object({ itemId: z.uuid() });
 export type TrimOverrideData = z.infer<typeof trimOverrideDataSchema>;
+
+/**
+ * `data` of an `add` override: an exercise the owner added to a session,
+ * under a new item id that swaps, skips and logs refer to like a planned item.
+ */
+export const addOverrideDataSchema = z.object({
+  itemId: z.uuid(),
+  exerciseId: z.uuid(),
+  targets: z.record(z.string(), z.unknown()),
+});
+export type AddOverrideData = z.infer<typeof addOverrideDataSchema>;
 
 // --- Logs -------------------------------------------------------------------
 

@@ -7,7 +7,13 @@ import {
 } from "@workout-app/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { openLocalDb } from "../sync/local-db";
-import { itemOverrides, skipItem, swapExercise } from "./item-overrides";
+import {
+  addedTargets,
+  addExercise,
+  itemOverrides,
+  skipItem,
+  swapExercise,
+} from "./item-overrides";
 
 const sync = {
   userId: 1,
@@ -56,6 +62,72 @@ describe("itemOverrides", () => {
     ]);
     expect(swaps.size).toBe(0);
     expect(skips.size).toBe(0);
+  });
+});
+
+describe("added exercises", () => {
+  it("reads live add overrides oldest first and drops malformed ones", () => {
+    const first = newId();
+    const second = newId();
+    const add = (itemId: string, createdAt: number) =>
+      override({
+        kind: "add",
+        createdAt,
+        data: { itemId, exerciseId: dumbbell, targets: { sets: 3 } },
+      });
+    const { added } = itemOverrides([
+      add(second, 2),
+      add(first, 1),
+      { ...add(newId(), 3), deletedAt: 4 },
+      override({ kind: "add", data: { itemId: newId() } }),
+    ]);
+    expect(added).toEqual([
+      {
+        id: first,
+        plannedSessionId: item.plannedSessionId,
+        exerciseId: dumbbell,
+        targets: { sets: 3 },
+      },
+      {
+        id: second,
+        plannedSessionId: item.plannedSessionId,
+        exerciseId: dumbbell,
+        targets: { sets: 3 },
+      },
+    ]);
+  });
+
+  it("adds with the new-slot defaults, queued for sync", async () => {
+    const db = openLocalDb(`item-overrides-add-${newId()}`);
+    const plannedSession = {
+      id: item.plannedSessionId,
+      weekId: session.weekId,
+    };
+    const itemId = await addExercise(
+      db,
+      plannedSession,
+      { id: dumbbell, repMin: null, repMax: null },
+      5,
+    );
+    const [row] = await db.rows("plan_override").toArray();
+    expect(row).toMatchObject({
+      kind: "add",
+      plannedSessionId: item.plannedSessionId,
+      weekId: session.weekId,
+      data: {
+        itemId,
+        exerciseId: dumbbell,
+        targets: addedTargets({ repMin: null, repMax: null }),
+      },
+    });
+    expect(addedTargets({ repMin: null, repMax: null })).toMatchObject({
+      sets: 3,
+      repMin: 8,
+      repMax: 12,
+      targetRir: 2,
+    });
+    const ops = await db.outbox.toArray();
+    expect(ops.map((o) => o.opId)).toEqual([row!.opId]);
   });
 });
 

@@ -393,3 +393,11 @@ Options considered:
 - **Discard deletes what was logged.** Discard workout (lift) and Discard session (climb) tombstone the session's `session_log` and its `set_log`s or ascents, and sync the deletes. The planned session reads as not started again, and logging again revives the same log id (deletes follow last-write-wins). Climb projects the discarded ascents touched are recounted.
 - **Plan changes stay.** Swaps and skips are plan overrides, not logs, so discarding leaves them. Extra sets and in-progress drafts live in the player's saved position, which is cleared.
 - **It asks first.** The button only shows once something is logged, and opens a confirm sheet, since it can't be undone.
+||||||| parent of 723d22a (Swap to any exercise and add exercises in the lift player (#115, #117))
+
+
+## 2026-11-16: Swap to any exercise and add exercises in the lift player (#115, #117)
+
+- **Swap can pick any exercise.** The owner signed off on widening swap past the substitution group (#115). The sheet still lists same-group substitutes first, dumbbell and band variants on top, and below them a search over every lift and mobility exercise. Swap shows even when the group has no other exercise. (§6.3)
+- **Added exercises are `add` overrides.** The owner signed off on adding exercises in the player (#117). Plan rows are server-owned (§3.1), so an added exercise is a new `plan_override` kind, `add`, with `{itemId, exerciseId, targets}`. `itemId` is a new id that swaps, skips and set logs refer to like a planned item's. It goes at the end of the session with the template editor's defaults for a new slot: 3 sets in the exercise's rep range (else 8–12), RIR 2, 90 s rest, no warm-ups. To drop one, skip it. The server stores it like the other kinds until plan regeneration handles overrides. (§3.1, §3.2)
+- **One exercise picker.** The template editor's search sheet became `ExercisePicker`, used by the template editor, swap and add exercise. In swap it lists nothing until you type, so the substitutes stay on top.
