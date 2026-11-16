@@ -1,3 +1,4 @@
+import { fileStamp } from "../download";
 import {
   UNSYNCED_EXPORT_FORMAT,
   unsyncedExportSchema,
@@ -70,7 +71,7 @@ export async function exportUnsynced(
 }
 
 export const exportFileName = (now = Date.now()) =>
-  `workout-app-unsynced-${new Date(now).toISOString().replace(/[:.]/g, "-")}.json`;
+  `workout-app-unsynced-${fileStamp(now)}.json`;
 
 export class ImportError extends Error {}
 

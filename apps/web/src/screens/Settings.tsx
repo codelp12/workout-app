@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { ChipGroup } from "../components/ChipGroup";
 import { Skeleton } from "../components/Skeleton";
 import { EquipmentEditor } from "../settings/EquipmentEditor";
+import { ExportData } from "../settings/ExportData";
 import { ReportProblem } from "../settings/ReportProblem";
 import { Section, Subsection } from "../settings/Sections";
 import {
@@ -275,6 +276,7 @@ export function Settings() {
       ) : (
         <Skeleton className="h-96" />
       )}
+      <ExportData />
       <AppUpdates />
       <ReportProblem />
       <ImportUnsynced />

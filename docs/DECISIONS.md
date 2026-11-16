@@ -2,6 +2,13 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-11-17: CSV and JSON export (#62)
+
+- **Settings has an Export section with four downloads:** Everything (JSON), Sets (CSV), Runs (CSV) and Climbs (CSV). They read IndexedDB, so they work offline and include changes not yet synced. Nothing on the server changed. (§8)
+- **The JSON file is every live row on the device, by entity.** `{ format: "workout-app/export", version: 1, exportedAt, entities }`, checked by `dataExportSchema` in `packages/shared` against each entity's schema. Deleted rows are left out. It's a readable copy of your data; the nightly SQLite backup is still what restores the server. (§8)
+- **`importData` writes an export back into a device's IndexedDB**, keeping any row the device has that's as new or newer, and queues nothing for sync. Tests use it to check the round trip. There's no import button: restoring through the app would need the server to accept rows it owns, like plan rows. "Import unsynced data" is unchanged.
+- **The CSVs are flat tables for a spreadsheet, oldest first:** one line per set (date, session, exercise, set number, warm-up, load, unit, band, reps, RIR), per run (date, workout, distance, unit, duration, heart rate, elevation, RPE, notes) and per climb (date, session, grade, style, attempts, project, tags). Units stay as logged. Fields are quoted per RFC 4180.
+
 ## 2026-11-17: Log grid (#61)
 
 - **The grid shares the Log tab.** History and Grid chips switch between them (`?view=grid`), and the All, Lifting, Running and Climbing chips filter both. Lifting has an exercise picker (`?exercise=`). (§6.7)

@@ -1,4 +1,5 @@
 import { useState, useSyncExternalStore, type ChangeEvent } from "react";
+import { download } from "./download";
 import { localDb, syncEngine, syncSoon } from "./sync";
 import {
   exportFileName,
@@ -16,24 +17,13 @@ const none: UnsyncedSummary = { sessions: 0, pending: 0, rejected: 0 };
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
-function download(name: string, value: unknown) {
-  const blob = new Blob([JSON.stringify(value, null, 2)], {
-    type: "application/json",
-  });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = name;
-  document.body.append(a);
-  a.click();
-  a.remove();
-  // Safari may still be reading the blob when click() returns.
-  setTimeout(() => URL.revokeObjectURL(url), 60_000);
-}
-
 async function exportToFile() {
   const now = Date.now();
-  download(exportFileName(now), await exportUnsynced(localDb, now));
+  download(
+    exportFileName(now),
+    JSON.stringify(await exportUnsynced(localDb, now), null, 2),
+    "application/json",
+  );
 }
 
 /**

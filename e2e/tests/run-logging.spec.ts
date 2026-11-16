@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 import { E2E_PASSWORD } from "../credentials";
 
@@ -113,6 +114,18 @@ test("a run logs offline with its pace and syncs", async ({
   await page.screenshot({
     path: testInfo.outputPath("run-history-390x844.png"),
   });
+
+  // Export reads the device too.
+  await page.getByRole("link", { name: "Settings", exact: true }).click();
+  const exports = page.getByRole("region", { name: "Export" });
+  const downloading = page.waitForEvent("download");
+  await exports.getByRole("button", { name: "Runs (CSV)" }).click();
+  const download = await downloading;
+  expect(download.suggestedFilename()).toMatch(/^workout-app-runs-.*\.csv$/);
+  const csv = await readFile(await download.path(), "utf8");
+  expect(csv.split("\r\n")[1]).toMatch(
+    /^\d{4}-\d{2}-\d{2},threshold,3\.1,mi,1581,/,
+  );
   await context.setOffline(false);
 
   await page.goto("/week?show=run");
