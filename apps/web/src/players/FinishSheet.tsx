@@ -18,10 +18,15 @@ export function FinishSheet({
   view,
   title,
   modality,
+  disabled = false,
+  prominent = false,
 }: {
   view: SessionView;
   title: string;
   modality: Modality;
+  disabled?: boolean;
+  /** Fill the button in the modality's color, e.g. once everything is done. */
+  prominent?: boolean;
 }) {
   const notesId = useId();
   const [open, setOpen] = useState(false);
@@ -45,7 +50,15 @@ export function FinishSheet({
       open={open}
       onOpenChange={setOpen}
       trigger={
-        <button type="button" className={`${button} min-h-tap w-full`}>
+        <button
+          type="button"
+          disabled={disabled}
+          className={
+            prominent
+              ? `${buttonBase} min-h-tap w-full ${modalityStyles[modality].fill}`
+              : `${button} min-h-tap w-full`
+          }
+        >
           {title}
         </button>
       }
@@ -53,6 +66,7 @@ export function FinishSheet({
       <ChipGroup
         type="single"
         label="Session RPE"
+        showLabel
         modality={modality}
         options={RPE_OPTIONS}
         value={rpe === null ? undefined : String(rpe)}

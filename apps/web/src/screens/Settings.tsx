@@ -13,7 +13,7 @@ import {
 import { liftTemplates } from "../templates/templates";
 import { ImportUnsynced } from "../UnsyncedData";
 import { useAppUpdate, type UpdateStatus } from "../update/update-context";
-import { button, buttonBase, toggle } from "../ui";
+import { button, buttonBase, rowButton, toggle } from "../ui";
 import { useLiveQuery } from "../use-live-query";
 import { Screen } from "./Screen";
 
@@ -173,10 +173,7 @@ function Templates() {
         <ul aria-label="Lifting templates" className="flex flex-col gap-2">
           {templates.map((t) => (
             <li key={t.id}>
-              <Link
-                to={`/settings/templates/${t.id}`}
-                className={`${button} min-h-tap w-full justify-between`}
-              >
+              <Link to={`/settings/templates/${t.id}`} className={rowButton}>
                 <span>{t.name}</span>
                 <span className="text-sm text-fg-muted">
                   {t.slots.length}{" "}

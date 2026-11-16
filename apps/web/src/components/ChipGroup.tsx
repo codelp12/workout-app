@@ -1,6 +1,6 @@
 import * as ToggleGroup from "@radix-ui/react-toggle-group";
 import type { Modality } from "@workout-app/shared";
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { modalityStyles } from "../modality";
 
 type ChipOption<T extends string> = { value: T; label: ReactNode };
@@ -8,6 +8,8 @@ type ChipOption<T extends string> = { value: T; label: ReactNode };
 type Common<T extends string> = {
   /** Accessible name of the group, e.g. "Reps in reserve". */
   label: string;
+  /** Show the label above the chips, for groups with no heading of their own. */
+  showLabel?: boolean;
   options: readonly ChipOption<T>[];
   /** Color selected chips in this modality's color instead of the accent. */
   modality?: Modality;
@@ -37,7 +39,11 @@ const chip =
  * selected. Multiple mode toggles each chip on and off.
  */
 export function ChipGroup<T extends string>(props: ChipGroupProps<T>) {
-  const { label, options, modality, disabled } = props;
+  const { label, showLabel, options, modality, disabled } = props;
+  const labelId = useId();
+  const name = showLabel
+    ? { "aria-labelledby": labelId }
+    : { "aria-label": label };
   const items = options.map((option) => (
     <ToggleGroup.Item
       key={option.value}
@@ -51,11 +57,23 @@ export function ChipGroup<T extends string>(props: ChipGroupProps<T>) {
   ));
   const rootClass = "flex flex-wrap gap-2";
 
+  const labelled = (group: ReactNode) =>
+    showLabel ? (
+      <div className="flex flex-col gap-1">
+        <span id={labelId} className="text-sm text-fg-muted">
+          {label}
+        </span>
+        {group}
+      </div>
+    ) : (
+      group
+    );
+
   if (props.type === "single") {
-    return (
+    return labelled(
       <ToggleGroup.Root
         type="single"
-        aria-label={label}
+        {...name}
         className={rootClass}
         disabled={disabled}
         value={props.value ?? ""}
@@ -65,19 +83,19 @@ export function ChipGroup<T extends string>(props: ChipGroupProps<T>) {
         }}
       >
         {items}
-      </ToggleGroup.Root>
+      </ToggleGroup.Root>,
     );
   }
-  return (
+  return labelled(
     <ToggleGroup.Root
       type="multiple"
-      aria-label={label}
+      {...name}
       className={rootClass}
       disabled={disabled}
       value={[...props.value]}
       onValueChange={(next) => props.onValueChange(next as T[])}
     >
       {items}
-    </ToggleGroup.Root>
+    </ToggleGroup.Root>,
   );
 }
