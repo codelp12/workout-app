@@ -175,6 +175,11 @@ describe("readGrid", () => {
     const run = rows.log({ modality: "run", localDate: "2026-11-04" });
     const kmRun = rows.log({ modality: "run", localDate: "2026-11-06" });
     const climb = rows.log({ modality: "climb", localDate: "2026-11-12" });
+    const started = rows.log({
+      modality: "climb",
+      localDate: "2026-11-13",
+      endedAt: null,
+    });
     await db.rows("planned_session").bulkPut([plannedRun, plannedClimb]);
     await db
       .rows("planned_item")
@@ -185,7 +190,7 @@ describe("readGrid", () => {
           { kind: "run_segment" },
         ),
       );
-    await db.rows("session_log").bulkPut([run, kmRun, climb]);
+    await db.rows("session_log").bulkPut([run, kmRun, climb, started]);
     await db.rows("run_log").bulkPut([
       rows.run(run),
       rows.run(kmRun, {

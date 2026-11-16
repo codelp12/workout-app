@@ -54,7 +54,7 @@ export type ClimbWeek = {
   planned: number;
   sends: number;
   attempts: number;
-  /** Hardest send on each grade scale, boulders first. */
+  /** Hardest send on each grade scale, boulders first. Sends and attempts include unfinished sessions; `sessions` counts finished ones. */
   hardest: string[];
 };
 
@@ -220,7 +220,7 @@ export async function readGrid(
         ids.has(a.sessionLogId),
       );
       return {
-        sessions: done.length,
+        sessions: done.filter((l) => l.endedAt !== null).length,
         planned: planned.filter(
           (s) => s.modality === "climb" && weekOf(s.date) === w,
         ).length,

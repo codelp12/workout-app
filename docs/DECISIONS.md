@@ -7,7 +7,7 @@ Newest first. Each entry gives the decision, why it was made, and the spec secti
 - **The grid shares the Log tab.** History and Grid chips switch between them (`?view=grid`), and the All, Lifting, Running and Climbing chips filter both. Lifting has an exercise picker (`?exercise=`). (§6.7)
 - **It shows one block at a time:** the block today falls in, else the latest one started. Earlier block and Later block page through the others (`?block=`). With no blocks yet, it shows the last four weeks. Deload, taper and test weeks are labelled.
 - **Lifting is exercise × week.** Each cell has the week's top working set (heaviest load, converted to the settings' unit, then most reps; warm-ups left out) and the planned target (sets × reps and load or band). Exercises the plan names come first, in plan order, then any that were only logged. A swapped-in exercise gets its own row; the target stays on the planned one.
-- **Running and climbing are weekly tables.** Running: runs done of planned, distance done of planned (in the settings' unit), longest run and total time. Climbing: sessions done of planned, sends, attempts and the hardest send on each grade scale.
+- **Running and climbing are weekly tables.** Running: runs done of planned, distance done of planned (in the settings' unit), longest run and total time. Climbing: finished sessions of planned (a session started but not finished doesn't count, as on Week), sends, attempts and the hardest send on each grade scale.
 - **It reads one block's rows from IndexedDB in a single pass**, so it works offline and a full block renders at once on the phone. CSV export is #62.
 
 ## 2026-11-16: Session history (#60)
