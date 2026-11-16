@@ -6,6 +6,7 @@ Newest first. Each entry gives the decision, why it was made, and the spec secti
 
 - **The owner accepted the week of 2026-11-09 with 6 of 11 sessions logged.** The 5 the server lists as not logged (Push B, threshold, limit, Pull B, Legs B) weren't trained, so nothing was lost, and the owner called it valid data. SPEC §9 asks for all 11; the owner waived that for this week rather than repeat it. (§9)
 - **No duplicates, and nothing missing.** `week-check` found no duplicate sets, and the owner confirmed that every gap is a session he didn't train. (§9)
+- **The owner signed off on the on-device checklist from a week of real use** instead of filling in the template item by item. Anything that later misbehaves on the phone gets filed as a bug. (§10)
 
 ## 2026-11-17: Phase 1 acceptance checklist (#63)
 
