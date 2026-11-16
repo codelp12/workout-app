@@ -24,6 +24,12 @@ describe("toCsv", () => {
       ),
     ).toBe('a,b,c\r\n"x, y","say ""hi""",\r\n"line\nbreak",3,true\r\n');
   });
+
+  it("keeps text that looks like a formula from being run", () => {
+    expect(toCsv(["a"], [["=1+1"], ["@SUM(A1)"], ["-x"], [-5]])).toBe(
+      "a\r\n'=1+1\r\n'@SUM(A1)\r\n'-x\r\n-5\r\n",
+    );
+  });
 });
 
 describe("CSV exports", () => {
