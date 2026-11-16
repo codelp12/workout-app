@@ -2,6 +2,12 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-11-17: Phase 1 acceptance week results (#63)
+
+- **The owner accepted the week of 2026-11-09 with 6 of 11 sessions logged.** The 5 the server lists as not logged (Push B, threshold, limit, Pull B, Legs B) weren't trained, so nothing was lost, and the owner called it valid data. SPEC §9 asks for all 11; the owner waived that for this week rather than repeat it. (§9)
+- **No duplicates, and nothing missing.** `week-check` found no duplicate sets, and the owner confirmed that every gap is a session he didn't train. (§9)
+- **The owner signed off on the on-device checklist from a week of real use** instead of filling in the template item by item. Anything that later misbehaves on the phone gets filed as a bug. (§10)
+
 ## 2026-11-17: Phase 1 acceptance checklist (#63)
 
 - **The checklist is a new section of `docs/IPHONE-CHECKLIST.md`.** It covers SPEC §10's per-release items (install, offline launch, log a set, kill and resume, sync, rest timer after a lock, wake lock), the two-tap set from §9, and the end-of-week checks for loss and duplicates. (§9, §10)
