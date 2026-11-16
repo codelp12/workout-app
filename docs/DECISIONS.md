@@ -2,6 +2,15 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-11-16: Session history (#60)
+
+- **History lives in the Log tab.** It lists every `session_log` on the device, newest first, grouped by week (Monday to Sunday), with All, Lifting, Running and Climbing filter chips (`?show=`, as on Week). The log grid (#61) will share the tab. (§6.7)
+- **A session shows up as soon as it has a log, finished or not.** Unfinished ones are marked "Not finished", so sets logged without tapping Finish aren't hidden.
+- **Tapping a session opens `/log/:id`, a read-only view.** Lifts show working sets per exercise in the order they were done, with a count of warm-up sets. Runs show distance, time, pace, RPE, heart rate, elevation and splits. Climbs show the pyramid and every climb. Editing a past session isn't in scope.
+- **Titles come from the planned session** (template name or workout type), else "Lifting session" and so on. A run logged as a different workout than planned is titled by the workout actually run.
+- **A climb's grade scale comes from the grade itself.** V grades are bouldering and YDS grades are routes. Each scale gets its own pyramid and hardest send, so mixed sessions (#119) don't mix grades. (§5.3)
+- **It reads only IndexedDB**, so it works offline. It shows whatever is on the device.
+
 ## 2026-11-10: Climb logging (#58)
 
 - **The climb player has the planned session, grade chips, a session clock, a live pyramid and a project tracker.** Grade chips cover the whole scale for the session's discipline (V0–V12, or YDS 5.6–5.13d for routes), taken from the planned item, then onboarding, defaulting to boulder. (§5.3, §6.5)

@@ -10,6 +10,7 @@ import {
 import { ExerciseDetail } from "./screens/ExerciseDetail";
 import { Library } from "./screens/Library";
 import { Log } from "./screens/Log";
+import { LoggedSession } from "./screens/LoggedSession";
 import { Onboarding } from "./screens/Onboarding";
 import { Session } from "./screens/Session";
 import { Settings } from "./screens/Settings";
@@ -93,7 +94,7 @@ function TabBar() {
           <li key={tab.path}>
             <NavLink
               to={tab.path}
-              // Library and Settings stay highlighted on their detail pages.
+              // Log, Library and Settings stay highlighted on their detail pages.
               end={tab.path === "/"}
               className={({ isActive }) =>
                 `flex min-h-tab-bar flex-col items-center justify-center gap-1 pt-2 text-sm font-medium ${
@@ -162,6 +163,7 @@ export function Navigation({ header }: { header?: ReactNode }) {
           <Route key={tab.path} path={tab.path} element={tab.screen} />
         ))}
         <Route path="/library/:id" element={<ExerciseDetail />} />
+        <Route path="/log/:id" element={<LoggedSession />} />
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/session/:id" element={<Session />} />
         <Route path="/settings/templates/:id" element={<TemplateEditor />} />

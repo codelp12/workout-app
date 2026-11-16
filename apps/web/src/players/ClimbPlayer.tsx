@@ -21,14 +21,17 @@ import { button, buttonBase, card, input } from "../ui";
 import { useLiveQuery } from "../use-live-query";
 import {
   CLIMB_TAGS,
+  describeAscent,
   editAscent,
   hardestSend,
   isSend,
   logAscent,
+  plural,
   pyramid,
   readClimbSession,
   removeAscent,
   startClimb,
+  STYLE_LABELS,
   type AscentEntry,
   type ClimbSession,
   type ProjectView,
@@ -38,32 +41,11 @@ import { formatDuration } from "./run-log";
 
 const HOLD_MS = 500;
 
-const STYLE_LABELS: Record<AscentStyle, string> = {
-  flash: "Flash",
-  onsight: "Onsight",
-  send: "Send",
-  attempt: "Attempt",
-};
 const STYLE_OPTIONS = ASCENT_STYLES.map((style) => ({
   value: style,
   label: STYLE_LABELS[style],
 }));
 const TAG_OPTIONS = CLIMB_TAGS.map((tag) => ({ value: tag, label: tag }));
-
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
-
-function describe(ascent: Ascent, projects: readonly ProjectView[]): string {
-  const project = projects.find((p) => p.project.id === ascent.projectId);
-  return [
-    ascent.grade,
-    STYLE_LABELS[ascent.style],
-    ascent.attempts > 1 && plural(ascent.attempts, "attempt"),
-    ascent.tags.length > 0 && ascent.tags.join(", "),
-    project?.project.name,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-}
 
 function PlannedClimb({ view }: { view: SessionView }) {
   if (view.items.length === 0) {
@@ -313,7 +295,8 @@ function AscentSheet({
   );
 }
 
-function Pyramid({
+/** Sends per grade as bars, with totals and the hardest send. */
+export function Pyramid({
   ascents,
   discipline,
 }: {
@@ -402,7 +385,10 @@ function AscentList({
   return (
     <ol aria-label="This session" className="flex flex-col gap-1">
       {data.ascents.map((ascent) => {
-        const text = describe(ascent, data.projects);
+        const project = data.projects.find(
+          (p) => p.project.id === ascent.projectId,
+        );
+        const text = describeAscent(ascent, project?.project.name ?? null);
         return (
           <li key={ascent.id}>
             {onEdit ? (

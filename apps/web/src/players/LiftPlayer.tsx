@@ -1,8 +1,4 @@
-import {
-  formatAmount,
-  toWeightUnit,
-  type WeightImplement,
-} from "@workout-app/engine";
+import { toWeightUnit, type WeightImplement } from "@workout-app/engine";
 import type { SetLog } from "@workout-app/shared";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Link } from "react-router";
@@ -21,6 +17,7 @@ import { useLiveQuery } from "../use-live-query";
 import { FinishSheet } from "./FinishSheet";
 import {
   bandChoices,
+  describeSet,
   implementOf,
   isWeighted,
   loadChoices,
@@ -59,16 +56,6 @@ const RIR_OPTIONS = ["0", "1", "2", "3", "4"].map((value) => ({
 
 // A horizontal drag this far (px) flips to the next or previous card.
 const SWIPE = 60;
-
-function describeSet(
-  set: Pick<SetLog, "loadValue" | "loadUnit" | "band" | "reps" | "rir">,
-) {
-  const what =
-    set.loadValue !== null && set.loadUnit
-      ? formatAmount(set.loadValue, set.loadUnit)
-      : (set.band ?? "Bodyweight");
-  return `${what} × ${set.reps}${set.rir === null ? "" : ` · RIR ${set.rir}`}`;
-}
 
 function lastTimeLine(sets: SetLog[]): string {
   if (sets.length === 0) return "First time";
