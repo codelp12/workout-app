@@ -68,7 +68,12 @@ describe("CSV exports", () => {
     const climb = rows.log({ modality: "climb" });
     const projectId = newId();
     await db.rows("session_log").bulkPut([run, climb]);
-    await db.rows("run_log").put(rows.run(run));
+    await db
+      .rows("run_log")
+      .bulkPut([
+        rows.run(run, { distanceValue: 9, updatedAt: 1 }),
+        rows.run(run, { updatedAt: 2 }),
+      ]);
     await db.rows("project").put({
       id: projectId,
       userId: 1,
@@ -93,9 +98,10 @@ describe("CSV exports", () => {
         tags: ["crimp", "overhang"],
       }),
     ]);
-    expect((await runsCsv(db)).split("\r\n").slice(0, 2)).toEqual([
+    expect((await runsCsv(db)).split("\r\n")).toEqual([
       "date,workout,distance,unit,duration_sec,avg_hr,elevation,elevation_unit,rpe,notes",
       '2026-11-09,easy,3.1,mi,1581,,,,4,"Windy, hilly"',
+      "",
     ]);
     expect((await climbsCsv(db)).split("\r\n").slice(0, 3)).toEqual([
       "date,session,grade,style,attempts,project,tags",

@@ -1,5 +1,5 @@
 import type { SessionLog } from "@workout-app/shared";
-import { readHistory } from "../history/history";
+import { latestRun, readHistory } from "../history/history";
 import type { LocalDb } from "../sync/local-db";
 
 type Cell = string | number | boolean | null;
@@ -79,11 +79,13 @@ export async function setsCsv(db: LocalDb): Promise<string> {
   );
 }
 
-/** One line per run. */
+/** One line per session run: its latest log, as history shows it. */
 export async function runsCsv(db: LocalDb): Promise<string> {
   const { order, byId } = await sessions(db);
-  const runs = live(await db.rows("run_log").toArray())
-    .filter((r) => byId.has(r.sessionLogId))
+  const all = live(await db.rows("run_log").toArray());
+  const runs = [...byId.keys()]
+    .map((id) => latestRun(all, id))
+    .filter((r) => r !== null)
     .sort((a, b) => order.get(a.sessionLogId)! - order.get(b.sessionLogId)!);
   return toCsv(
     [
