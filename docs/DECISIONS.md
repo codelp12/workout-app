@@ -2,6 +2,12 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-11-17: Phase 1 acceptance checklist (#63)
+
+- **The checklist is a new section of `docs/IPHONE-CHECKLIST.md`.** It covers SPEC §10's per-release items (install, offline launch, log a set, kill and resume, sync, rest timer after a lock, wake lock), the two-tap set from §9, and the end-of-week checks for loss and duplicates. (§9, §10)
+- **`node dist/week-check.js <date>` prints the server's record of a week** as Markdown to paste on the issue: each planned session with its status (finished, unfinished, not logged, skipped) and how many sets, runs and climbs it has, plus logs with no plan. A session moved into or out of the week is listed under the date it was logged. (§9)
+- **"Duplicate" means two live sets with the same session, exercise, set number and kind (warm-up or working).** Session logs can't be duplicated, since a session's log id comes from its planned session's id, and a second run log for one session is a re-log, not a duplicate. "Lost" can't be seen from the server alone, so the checklist covers it with the phone's unsynced warning and a comparison with phone history.
+
 ## 2026-11-17: CSV and JSON export (#62)
 
 - **Settings has an Export section with four downloads:** Everything (JSON), Sets (CSV), Runs (CSV) and Climbs (CSV). They read IndexedDB, so they work offline and include changes not yet synced. Nothing on the server changed. (§8)
