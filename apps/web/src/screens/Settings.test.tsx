@@ -237,6 +237,33 @@ describe("App updates", () => {
   });
 });
 
+describe("Export", () => {
+  it("downloads everything as JSON and runs as CSV", async () => {
+    const user = userEvent.setup();
+    const blobs: Blob[] = [];
+    Object.assign(URL, {
+      createObjectURL: (blob: Blob) => {
+        blobs.push(blob);
+        return "blob:test";
+      },
+      revokeObjectURL: () => {},
+    });
+    renderSettings();
+    const section = await screen.findByRole("region", { name: "Export" });
+    await user.click(
+      within(section).getByRole("button", { name: "Everything (JSON)" }),
+    );
+    await user.click(
+      within(section).getByRole("button", { name: "Runs (CSV)" }),
+    );
+    await vi.waitFor(() => expect(blobs).toHaveLength(2));
+    const json = JSON.parse(await blobs[0]!.text()) as { format: string };
+    expect(json.format).toBe("workout-app/export");
+    expect(blobs[1]!.type).toBe("text/csv");
+    expect(await blobs[1]!.text()).toMatch(/^date,workout,distance/);
+  });
+});
+
 describe("Report a problem", () => {
   const reports = () => localDb.rows("problem_report");
   const section = () =>
