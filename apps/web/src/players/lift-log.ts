@@ -21,7 +21,7 @@ import {
 import { itemOverrides } from "../plan/item-overrides";
 import type { LiftTargets, SessionView } from "../plan/sessions";
 import type { LocalDb } from "../sync/local-db";
-import { saveRow } from "../sync/writes";
+import { deleteRow, saveRow } from "../sync/writes";
 
 /** What the owner has dialled in for the next set. */
 export type SetValues = {
@@ -478,9 +478,33 @@ export async function finishSession(
     },
     now,
   );
+  forgetPlayer(view.session.id);
+}
+
+/**
+ * Throws away a started session: its sets and log are deleted (and synced as
+ * deletes), so the planned session reads as not started again. Swaps and
+ * skips are plan changes and stay.
+ */
+export async function discardLift(
+  db: LocalDb,
+  sessionId: string,
+  now = Date.now(),
+): Promise<void> {
+  const logId = sessionLogId(sessionId);
+  const sets = live(await db.rows("set_log").toArray()).filter(
+    (s) => s.sessionLogId === logId,
+  );
+  for (const set of sets) await deleteRow(db, "set_log", set.id, now);
+  await deleteRow(db, "session_log", logId, now);
+  forgetPlayer(sessionId);
+}
+
+/** Clears the player's saved position and this device's active-workout pointer. */
+function forgetPlayer(sessionId: string): void {
   try {
-    localStorage.removeItem(positionKey(view.session.id));
-    if (localStorage.getItem(ACTIVE_KEY) === view.session.id) {
+    localStorage.removeItem(positionKey(sessionId));
+    if (localStorage.getItem(ACTIVE_KEY) === sessionId) {
       localStorage.removeItem(ACTIVE_KEY);
     }
   } catch {

@@ -22,6 +22,7 @@ import { useLiveQuery } from "../use-live-query";
 import {
   CLIMB_TAGS,
   describeAscent,
+  discardClimb,
   editAscent,
   hardestSend,
   isSend,
@@ -36,6 +37,7 @@ import {
   type ClimbSession,
   type ProjectView,
 } from "./climb-log";
+import { DiscardSheet } from "./DiscardSheet";
 import { FinishSheet } from "./FinishSheet";
 import { formatDuration } from "./run-log";
 
@@ -511,6 +513,15 @@ function ClimbLogger({
         />
         {data.ascents.length > 0 && (
           <FinishSheet view={view} title="Finish session" modality="climb" />
+        )}
+        {data.log && (
+          <DiscardSheet
+            title="Discard session"
+            onDiscard={async () => {
+              await discardClimb(localDb, view.session.id);
+              syncSoon();
+            }}
+          />
         )}
       </section>
       {sheet && (

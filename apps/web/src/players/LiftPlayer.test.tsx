@@ -715,6 +715,69 @@ describe("swap, skip, add set and warm-ups", () => {
   });
 });
 
+describe("discarding", () => {
+  it("deletes the sets and log after confirming, so the session starts over", async () => {
+    const user = userEvent.setup();
+    renderPlayer();
+    const card = await screen.findByRole("article", { name: "Dumbbell Squat" });
+    expect(
+      screen.queryByRole("button", { name: "Discard workout" }),
+    ).toBeNull();
+    await user.click(within(card).getByRole("radio", { name: "2" }));
+    await user.click(within(card).getByRole("button", { name: "Log set" }));
+    expect(await within(card).findByText("Set 2 of 2")).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: "Discard workout" }));
+    const sheet = await screen.findByRole("dialog", {
+      name: "Discard workout?",
+    });
+    await user.click(within(sheet).getByRole("button", { name: "Keep going" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(within(card).getByText("Set 2 of 2")).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: "Discard workout" }));
+    await user.click(
+      within(
+        await screen.findByRole("dialog", { name: "Discard workout?" }),
+      ).getByRole("button", { name: "Discard workout" }),
+    );
+
+    const fresh = await screen.findByRole("article", {
+      name: "Dumbbell Squat",
+    });
+    expect(await within(fresh).findByText("Set 1 of 2")).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: "Discard workout" }),
+    ).toBeNull();
+    const log = await localDb.rows("session_log").get(sessionLogId(legs.id));
+    expect(log!.deletedAt).not.toBeNull();
+    const sets = (await localDb.rows("set_log").toArray()).filter(
+      (s) => s.sessionLogId === sessionLogId(legs.id),
+    );
+    expect(sets.length).toBe(1);
+    expect(sets.every((s) => s.deletedAt !== null)).toBe(true);
+    const history = (await localDb.rows("set_log").toArray()).filter(
+      (s) => s.sessionLogId === lastWeek.id,
+    );
+    expect(history.map((s) => s.deletedAt)).toEqual([null, null]);
+    const deletes = (await localDb.outbox.toArray()).filter(
+      (op) => op.action === "delete",
+    );
+    expect(deletes.map((op) => op.entity).sort()).toEqual([
+      "session_log",
+      "set_log",
+    ]);
+    expect(await openWorkout(localDb, today)).toBeNull();
+
+    // Logging again starts a new log under the same id.
+    await user.click(within(fresh).getByRole("radio", { name: "2" }));
+    await user.click(within(fresh).getByRole("button", { name: "Log set" }));
+    expect(await within(fresh).findByText("Set 2 of 2")).toBeTruthy();
+    const again = await localDb.rows("session_log").get(sessionLogId(legs.id));
+    expect(again!.deletedAt).toBeNull();
+  });
+});
+
 describe("finishing", () => {
   it("finishes with RPE and notes, marks the session done and queues it for sync", async () => {
     const user = userEvent.setup();

@@ -14,10 +14,12 @@ import { readSettings, type SettingsData } from "../settings/settings";
 import { localDb, syncSoon } from "../sync";
 import { button, buttonBase, card as cardClass } from "../ui";
 import { useLiveQuery } from "../use-live-query";
+import { DiscardSheet } from "./DiscardSheet";
 import { FinishSheet } from "./FinishSheet";
 import {
   bandChoices,
   describeSet,
+  discardLift,
   implementOf,
   isWeighted,
   loadChoices,
@@ -613,6 +615,16 @@ export function LiftPlayer({ view }: { view: SessionView }) {
         <p className="text-center text-sm text-fg-muted">
           Log a set to finish the workout.
         </p>
+      )}
+      {data.log && (
+        <DiscardSheet
+          title="Discard workout"
+          onDiscard={async () => {
+            await discardLift(localDb, sessionId);
+            syncSoon();
+            setPosition({ card: 0, drafts: {} });
+          }}
+        />
       )}
     </section>
   );
