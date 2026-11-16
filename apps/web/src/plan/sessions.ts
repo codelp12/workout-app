@@ -183,15 +183,19 @@ export function formatShortDay(date: string): string {
   return `${part("weekday")} ${part("day")}`;
 }
 
-/** "Nov 9 – Nov 15" for the week starting `weekStart`. */
-export function formatWeekRange(weekStart: string): string {
+/** "Nov 9 – Dec 6" from `from` to `to`, inclusive. */
+export function formatDateRange(from: string, to: string): string {
   const format = new Intl.DateTimeFormat(undefined, {
     month: "short",
     day: "numeric",
     timeZone: "UTC",
   });
-  return `${format.format(utc(weekStart))} – ${format.format(utc(addDays(weekStart, 6)))}`;
+  return `${format.format(utc(from))} – ${format.format(utc(to))}`;
 }
+
+/** "Nov 9 – Nov 15" for the week starting `weekStart`. */
+export const formatWeekRange = (weekStart: string) =>
+  formatDateRange(weekStart, addDays(weekStart, 6));
 
 async function views(placed: Placed[]): Promise<SessionView[]> {
   const sessions = placed.map((p) => p.session);

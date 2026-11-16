@@ -69,7 +69,7 @@ async function readLogged(db: LocalDb, logIds: Set<string>): Promise<Logged> {
 }
 
 /** The latest run logged for a session; re-logging a run adds a newer row. */
-const latestRun = (runs: RunLog[], logId: string) =>
+export const latestRun = (runs: RunLog[], logId: string) =>
   runs
     .filter((r) => r.sessionLogId === logId)
     .sort((a, b) => b.updatedAt - a.updatedAt)[0] ?? null;

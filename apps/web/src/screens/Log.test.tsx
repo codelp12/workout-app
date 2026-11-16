@@ -2,6 +2,7 @@
 import "fake-indexeddb/auto";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { blockId } from "@workout-app/shared";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { rows } from "../history/test-rows";
@@ -84,6 +85,79 @@ describe("Log", () => {
     expect(
       await screen.findByText("No running sessions logged yet."),
     ).toBeTruthy();
+  });
+});
+
+describe("Log grid", () => {
+  const curl = testExercise({ name: "Curl" });
+  beforeEach(async () => {
+    const later = rows.log({ localDate: "2026-11-16" });
+    await localDb.rows("exercise").put(curl);
+    await localDb.rows("block").put({
+      id: blockId("2026-11-02"),
+      userId: 1,
+      createdAt: 0,
+      updatedAt: 0,
+      deletedAt: null,
+      serverSeq: 1,
+      name: null,
+      startDate: "2026-11-02",
+      weekCount: 3,
+      engineVersion: "stub-1",
+    });
+    await localDb.rows("session_log").put(later);
+    await localDb
+      .rows("set_log")
+      .bulkPut([
+        rows.set(later, { exerciseId: bench.id, loadValue: 65, reps: 6 }),
+        rows.set(later, { exerciseId: curl.id, loadValue: 20, reps: 12 }),
+      ]);
+  });
+
+  it("shows each exercise's top set per week and weekly run and climb tables", async () => {
+    renderAt("/log?view=grid&block=2026-11-02");
+    const lifting = await screen.findByRole("table", {
+      name: "Lifting by week",
+    });
+    const bench = within(lifting).getByRole("row", {
+      name: /Dumbbell Bench Press/,
+    });
+    expect(
+      within(bench)
+        .getAllByRole("cell")
+        .map((c) => c.textContent),
+    ).toEqual(["–", "60 lb × 8", "65 lb × 6"]);
+    const running = screen.getByRole("table", { name: "Running by week" });
+    expect(
+      within(running).getByRole("row", { name: /Week 2/ }).textContent,
+    ).toContain("3.1 mi");
+    const climbing = screen.getByRole("table", { name: "Climbing by week" });
+    expect(
+      within(climbing).getByRole("row", { name: /Week 1/ }).textContent,
+    ).toContain("V3");
+  });
+
+  it("filters by modality and exercise", async () => {
+    const user = userEvent.setup();
+    renderAt("/log?view=grid&block=2026-11-02");
+    const lifting = await screen.findByRole("table", {
+      name: "Lifting by week",
+    });
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Exercise" }),
+      "Curl",
+    );
+    expect(
+      within(lifting)
+        .getAllByRole("rowheader")
+        .map((r) => r.textContent),
+    ).toEqual(["Curl"]);
+    await user.click(screen.getByRole("radio", { name: "Running" }));
+    expect(screen.getByRole("table", { name: "Running by week" })).toBeTruthy();
+    expect(screen.queryByRole("table", { name: "Lifting by week" })).toBeNull();
+    expect(
+      screen.queryByRole("table", { name: "Climbing by week" }),
+    ).toBeNull();
   });
 });
 

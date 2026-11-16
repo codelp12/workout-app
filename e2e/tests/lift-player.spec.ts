@@ -222,6 +222,19 @@ test("a finished session shows as done and syncs", async ({
     path: testInfo.outputPath("lift-history-390x844.png"),
     fullPage: true,
   });
+
+  await page.getByRole("link", { name: "Log", exact: true }).click();
+  await page.getByRole("radio", { name: "Grid" }).click();
+  const grid = page.getByRole("table", { name: "Lifting by week" });
+  await expect(grid.getByRole("rowheader").first()).toBeVisible();
+  await expect(grid).toContainText("Target");
+  await expect(
+    page.getByRole("table", { name: "Running by week" }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("log-grid-390x844.png"),
+    fullPage: true,
+  });
   await context.setOffline(false);
 
   await page.goto("/week?show=lift");
