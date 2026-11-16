@@ -67,6 +67,16 @@ describe("readHistory", () => {
     ]);
   });
 
+  it("titles a run by the workout logged, not the one planned", async () => {
+    const planned = rows.planned({ modality: "run", workoutType: "threshold" });
+    const changed = rows.log({ modality: "run", plannedSessionId: planned.id });
+    await db.rows("planned_session").put(planned);
+    await db.rows("session_log").put(changed);
+    await db.rows("run_log").put(rows.run(changed, { workoutType: "easy" }));
+    const [entry] = await readHistory(db);
+    expect(entry?.title).toBe("Easy run");
+  });
+
   it("keeps an unfinished session, without a duration", async () => {
     const log = rows.log({ endedAt: null });
     await db.rows("session_log").put(log);

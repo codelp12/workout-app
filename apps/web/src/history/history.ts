@@ -152,15 +152,17 @@ async function titles(
         ? sessions.get(log.plannedSessionId)
         : undefined;
       const run = latestRun(runs, log.id);
-      const title = session
-        ? sessionTitle(
-            session,
-            (session.templateId && templateNames.get(session.templateId)) ||
-              null,
-          )
-        : run
+      // A run logged as a different workout than planned is titled by what was run.
+      const title =
+        run && run.workoutType !== session?.workoutType
           ? sessionTitle(run, null)
-          : `${modalityStyles[log.modality].label} session`;
+          : session
+            ? sessionTitle(
+                session,
+                (session.templateId && templateNames.get(session.templateId)) ||
+                  null,
+              )
+            : `${modalityStyles[log.modality].label} session`;
       return [log.id, title];
     }),
   );
