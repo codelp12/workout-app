@@ -577,6 +577,9 @@ export function LiftPlayer({ view }: { view: SessionView }) {
       c.skipped ||
       c.sets.length >= c.targets.sets + (position.extra?.[c.itemId] ?? 0),
   );
+  // Sets are logged by exercise, so a session can't hold one exercise twice.
+  const inSession = new Set(cards.map((c) => c.exercise?.id));
+  const addable = data.library.filter((e) => !inSession.has(e.id));
   const dropDraft = (p: PlayerPosition) => {
     const drafts = { ...p.drafts };
     delete drafts[current.itemId];
@@ -653,12 +656,12 @@ export function LiftPlayer({ view }: { view: SessionView }) {
         onSkipped={(skipped) => {
           if (skipped && index < cards.length - 1) go(index + 1);
         }}
-        library={data.library}
+        library={addable}
         onSwapped={() => setPosition((p) => ({ ...p, drafts: dropDraft(p) }))}
       />
       <AddExerciseSheet
         view={view}
-        library={data.library}
+        library={addable}
         onAdded={() => setPosition((p) => ({ ...p, card: cards.length }))}
       />
       <FinishSheet

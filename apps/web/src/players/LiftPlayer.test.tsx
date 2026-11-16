@@ -666,6 +666,9 @@ describe("swap, skip, add set and warm-ups", () => {
     const sheet = await screen.findByRole("dialog", {
       name: "Add an exercise",
     });
+    expect(
+      within(sheet).queryByRole("button", { name: "Dumbbell Squat" }),
+    ).toBeNull();
     await user.type(
       within(sheet).getByRole("searchbox", { name: "Search exercises" }),
       "curl",
