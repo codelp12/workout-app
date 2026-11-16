@@ -317,3 +317,20 @@ export async function removeAscent(
   await deleteRow(db, "ascent", ascent.id, now);
   await refreshProject(db, ascent.projectId, now);
 }
+
+/**
+ * Throws away a started session: its climbs and log are deleted (and synced
+ * as deletes), and projects it touched are recounted.
+ */
+export async function discardClimb(
+  db: LocalDb,
+  sessionId: string,
+  now = Date.now(),
+): Promise<void> {
+  const logId = sessionLogId(sessionId);
+  const ascents = (await db.rows("ascent").toArray()).filter(
+    (a) => a.deletedAt === null && a.sessionLogId === logId,
+  );
+  for (const ascent of ascents) await removeAscent(db, ascent, now);
+  await deleteRow(db, "session_log", logId, now);
+}

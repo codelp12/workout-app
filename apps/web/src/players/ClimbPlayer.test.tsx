@@ -225,6 +225,40 @@ describe("ClimbPlayer", () => {
     expect(screen.queryByRole("list", { name: "This session" })).toBeNull();
   });
 
+  it("discards a started session and its climbs after confirming", async () => {
+    const user = userEvent.setup();
+    renderPlayer();
+    expect(
+      screen.queryByRole("button", { name: "Discard session" }),
+    ).toBeNull();
+    const grades = await screen.findByRole("group", { name: "Grades" });
+    await user.click(within(grades).getByRole("button", { name: "V3" }));
+    await pyramidRow("V3: 1 send");
+
+    await user.click(
+      await screen.findByRole("button", { name: "Discard session" }),
+    );
+    const sheet = await screen.findByRole("dialog", {
+      name: "Discard session?",
+    });
+    await user.click(
+      within(sheet).getByRole("button", { name: "Discard session" }),
+    );
+
+    expect(
+      await screen.findByRole("button", { name: "Start session" }),
+    ).toBeTruthy();
+    const ascents = await localDb.rows("ascent").toArray();
+    expect(ascents.every((a) => a.deletedAt !== null)).toBe(true);
+    const deletes = (await localDb.outbox.toArray()).filter(
+      (op) => op.action === "delete",
+    );
+    expect(deletes.map((op) => op.entity).sort()).toEqual([
+      "ascent",
+      "session_log",
+    ]);
+  });
+
   it("finishes with an RPE into a read-only summary and marks the session done", async () => {
     const user = userEvent.setup();
     renderPlayer();

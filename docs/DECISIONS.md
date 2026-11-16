@@ -379,3 +379,9 @@ Options considered:
 - **Mobility exercises can sit in lift templates.** The planner, lift player and template editor accept `lift` and `mobility` exercises.
 - **Unedited default templates are upgraded.** On startup the server replaces a default template that exactly matches an earlier default version (`PREVIOUS_DEFAULT_TEMPLATES`) and gives it a new `serverSeq`. Edited or deleted templates are left alone. Already-generated weeks keep their plan.
 - **Follow-ups.** Mixed V-scale and YDS climbing (#119), warm-ups (#121) and stretches (#122).
+
+## 2026-11-16: Discarding a started session (#114)
+
+- **Discard deletes what was logged.** Discard workout (lift) and Discard session (climb) tombstone the session's `session_log` and its `set_log`s or ascents, and sync the deletes. The planned session reads as not started again, and logging again revives the same log id (deletes follow last-write-wins). Climb projects the discarded ascents touched are recounted.
+- **Plan changes stay.** Swaps and skips are plan overrides, not logs, so discarding leaves them. Extra sets and in-progress drafts live in the player's saved position, which is cleared.
+- **It asks first.** The button only shows once something is logged, and opens a confirm sheet, since it can't be undone.
