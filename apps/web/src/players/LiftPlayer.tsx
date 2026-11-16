@@ -424,6 +424,7 @@ function ExerciseCard({
             <ChipGroup
               type="single"
               label="Band"
+              showLabel
               modality="lift"
               options={bands.map((band) => ({ value: band, label: band }))}
               value={values.band ?? undefined}
@@ -441,6 +442,7 @@ function ExerciseCard({
           <ChipGroup
             type="single"
             label="Reps in reserve"
+            showLabel
             modality="lift"
             options={RIR_OPTIONS}
             value={values.rir === null ? undefined : String(values.rir)}
@@ -517,6 +519,11 @@ export function LiftPlayer({ view }: { view: SessionView }) {
     : prefill(current, settings);
   const extra = position.extra?.[current.itemId] ?? 0;
   const warmed = warmupCards(cards);
+  const allDone = cards.every(
+    (c) =>
+      c.skipped ||
+      c.sets.length >= c.targets.sets + (position.extra?.[c.itemId] ?? 0),
+  );
   const dropDraft = (p: PlayerPosition) => {
     const drafts = { ...p.drafts };
     delete drafts[current.itemId];
@@ -595,8 +602,17 @@ export function LiftPlayer({ view }: { view: SessionView }) {
         }}
         onSwapped={() => setPosition((p) => ({ ...p, drafts: dropDraft(p) }))}
       />
-      {data.log && (
-        <FinishSheet view={view} title="Finish workout" modality="lift" />
+      <FinishSheet
+        view={view}
+        title="Finish workout"
+        modality="lift"
+        disabled={!data.log}
+        prominent={allDone}
+      />
+      {!data.log && (
+        <p className="text-center text-sm text-fg-muted">
+          Log a set to finish the workout.
+        </p>
       )}
     </section>
   );

@@ -298,8 +298,8 @@ export function settle(
 
 /**
  * The next set prefilled: the last set logged this session if there is one,
- * else the target (top of the rep range), snapped to the inventory. RIR is
- * left for the owner to pick.
+ * RIR included, else the target (top of the rep range), snapped to the
+ * inventory. The first set's RIR is left for the owner to pick.
  */
 export function prefill(card: LiftCard, settings: PlayerSettings): SetValues {
   const unit = unitOf(card, settings);
@@ -315,7 +315,7 @@ export function prefill(card: LiftCard, settings: PlayerSettings): SetValues {
               ),
         band: last.band,
         reps: last.reps,
-        rir: null,
+        rir: last.rir,
       }
     : {
         load: isWeighted(card)

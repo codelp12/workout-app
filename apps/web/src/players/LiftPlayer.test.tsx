@@ -206,6 +206,27 @@ describe("LiftPlayer", () => {
     expect(await openWorkout(localDb, today)).toBe(legs.id);
   });
 
+  it("carries the RIR over to the next set under a visible label", async () => {
+    const user = userEvent.setup();
+    renderPlayer();
+    const card = await screen.findByRole("article", { name: "Dumbbell Squat" });
+    const rir = within(card).getByRole("radiogroup", {
+      name: "Reps in reserve",
+    });
+    expect(within(card).getByText("Reps in reserve")).toBeTruthy();
+    await user.click(within(rir).getByRole("radio", { name: "3" }));
+    await user.click(within(card).getByRole("button", { name: "Log set" }));
+    expect(await within(card).findByText("Set 2 of 2")).toBeTruthy();
+
+    expect(
+      within(card)
+        .getByRole("radio", { name: "3" })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
+    const log = within(card).getByRole("button", { name: "Log set" });
+    expect((log as HTMLButtonElement).disabled).toBe(false);
+  });
+
   it("moves to the next exercise after the last set and logs bodyweight sets", async () => {
     const user = userEvent.setup();
     renderPlayer();
@@ -698,8 +719,10 @@ describe("finishing", () => {
   it("finishes with RPE and notes, marks the session done and queues it for sync", async () => {
     const user = userEvent.setup();
     const { unmount } = renderPlayer();
-    expect(screen.queryByRole("button", { name: "Finish workout" })).toBeNull();
     const card = await screen.findByRole("article", { name: "Dumbbell Squat" });
+    const trigger = screen.getByRole("button", { name: "Finish workout" });
+    expect((trigger as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText("Log a set to finish the workout.")).toBeTruthy();
     await user.click(within(card).getByRole("radio", { name: "2" }));
     await user.click(within(card).getByRole("button", { name: "Log set" }));
     expect(await within(card).findByText("Set 2 of 2")).toBeTruthy();

@@ -81,6 +81,22 @@ describe("ChipGroup", () => {
     expect(checked("2")).toBe("true");
   });
 
+  it("shows the label when asked and names the group with it", () => {
+    render(
+      <ChipGroup
+        type="single"
+        label="Reps in reserve"
+        showLabel
+        options={rir}
+        value={undefined}
+        onValueChange={() => {}}
+      />,
+    );
+    const label = screen.getByText("Reps in reserve");
+    const group = screen.getByRole("radiogroup", { name: "Reps in reserve" });
+    expect(group.getAttribute("aria-labelledby")).toBe(label.id);
+  });
+
   it("colors selected chips in the modality's color", () => {
     render(<Single initial="1" />);
     expect(screen.getByRole("radio", { name: "1" }).className).toContain(

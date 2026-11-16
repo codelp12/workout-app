@@ -3,6 +3,9 @@
 export const buttonBase =
   "inline-flex min-w-tap items-center justify-center rounded-lg px-4 font-medium active:opacity-80 disabled:opacity-50";
 export const button = `${buttonBase} bg-surface-raised text-fg`;
+/** A full-width list row that links somewhere: label on the left, detail on the right. */
+export const rowButton =
+  "flex min-h-tap w-full items-center justify-between gap-3 rounded-lg bg-surface-raised px-4 font-medium text-fg active:opacity-80";
 export const input =
   "w-full rounded-lg border border-border bg-surface px-3 text-fg placeholder:text-fg-muted";
 export const card = "rounded-xl bg-surface p-4";
