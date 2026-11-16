@@ -549,6 +549,11 @@ export function LiftPlayer({ view }: { view: SessionView }) {
         <p className={`${cardClass} text-fg-muted`}>
           Nothing is planned for this session yet.
         </p>
+        <AddExerciseSheet
+          view={view}
+          library={data.library}
+          onAdded={() => setPosition((p) => ({ ...p, card: 0 }))}
+        />
       </section>
     );
   }

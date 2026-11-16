@@ -635,6 +635,22 @@ describe("swap, skip, add set and warm-ups", () => {
     });
   });
 
+  it("adds the first exercise to an empty session", async () => {
+    const user = userEvent.setup();
+    await localDb.rows("planned_item").clear();
+    renderPlayer();
+    expect(
+      await screen.findByText("Nothing is planned for this session yet."),
+    ).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Add exercise" }));
+    await user.click(
+      within(
+        await screen.findByRole("dialog", { name: "Add an exercise" }),
+      ).getByRole("button", { name: "Plank" }),
+    );
+    expect(await screen.findByRole("article", { name: "Plank" })).toBeTruthy();
+  });
+
   it("adds an exercise to the end, queues it for sync and logs it", async () => {
     const user = userEvent.setup();
     const curl = testExercise({
