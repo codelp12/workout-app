@@ -823,9 +823,11 @@ describe("discarding", () => {
       name: "Dumbbell Squat",
     });
     expect(await within(fresh).findByText("Set 1 of 2")).toBeTruthy();
-    expect(
-      screen.queryByRole("button", { name: "Discard workout" }),
-    ).toBeNull();
+    await vi.waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "Discard workout" }),
+      ).toBeNull(),
+    );
     const log = await localDb.rows("session_log").get(sessionLogId(legs.id));
     expect(log!.deletedAt).not.toBeNull();
     const sets = (await localDb.rows("set_log").toArray()).filter(
