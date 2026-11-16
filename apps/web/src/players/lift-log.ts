@@ -1,5 +1,6 @@
 import {
   availableLoads,
+  formatAmount,
   equipmentRank,
   roundToLoadable,
   toWeightUnit,
@@ -145,6 +146,17 @@ export async function readLiftSession(
       };
     }),
   };
+}
+
+/** "60 lb × 8 · RIR 2", "Red band × 12" or "Bodyweight × 10". */
+export function describeSet(
+  set: Pick<SetLog, "loadValue" | "loadUnit" | "band" | "reps" | "rir">,
+): string {
+  const what =
+    set.loadValue !== null && set.loadUnit
+      ? formatAmount(set.loadValue, set.loadUnit)
+      : (set.band ?? "Bodyweight");
+  return `${what} × ${set.reps}${set.rir === null ? "" : ` · RIR ${set.rir}`}`;
 }
 
 /** The implement an exercise is loaded on, if it's loaded by weight. */

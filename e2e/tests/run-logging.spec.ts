@@ -73,9 +73,9 @@ test("a run logs offline with its pace and syncs", async ({
   });
 
   await context.setOffline(false);
+  let logId: string | null = null;
   await expect
     .poll(async () => {
-      let logId: string | null = null;
       const rows: PullPage["changes"][number]["row"][] = [];
       for (let since = 0, more = true; more;) {
         const res = await page.request.get(`/api/sync/pull?since=${since}`);
@@ -99,6 +99,21 @@ test("a run logs offline with its pace and syncs", async ({
       );
     })
     .toEqual({ distance: 3.1, durationSec: 1581, rpe: 4 });
+
+  // The Log reads from the device, so it works offline.
+  await context.setOffline(true);
+  await page.getByRole("link", { name: "Log", exact: true }).click();
+  const entry = page.locator(`a[href="/log/${logId}"]`);
+  await expect(entry).toContainText(title);
+  await expect(entry).toContainText("3.1 mi · 26:21 · 8:30 /mi · RPE 4");
+  await entry.click();
+  await expect(
+    page.getByRole("region", { name: "Run", exact: true }),
+  ).toContainText("3.1 mi · 26:21 · 8:30 /mi · RPE 4");
+  await page.screenshot({
+    path: testInfo.outputPath("run-history-390x844.png"),
+  });
+  await context.setOffline(false);
 
   await page.goto("/week?show=run");
   await expect(

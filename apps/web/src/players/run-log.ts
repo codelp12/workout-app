@@ -8,7 +8,8 @@ import {
   type SessionLog,
   type Settings,
 } from "@workout-app/shared";
-import type { SessionView } from "../plan/sessions";
+import { formatAmount } from "@workout-app/engine";
+import { sessionTitle, type SessionView } from "../plan/sessions";
 import type { LocalDb } from "../sync/local-db";
 import { saveRow } from "../sync/writes";
 
@@ -67,6 +68,35 @@ export function formatDuration(totalSec: number): string {
 /** "8:30 /mi". */
 export const formatPace = (sec: number, unit: DistanceUnit) =>
   `${formatDuration(sec)} /${unit}`;
+
+/** "Easy run", from a run's workout type. */
+export const workoutName = (workoutType: string) =>
+  sessionTitle({ workoutType }, null);
+
+/**
+ * A logged run in two lines: the main facts ("Easy run · 3.1 mi · 26:21 ·
+ * 8:30 /mi · RPE 4") and the extras (heart rate, elevation gain).
+ */
+export function runFacts(run: RunLog): { facts: string[]; extras: string[] } {
+  const unit = run.distanceUnit;
+  const pace = paceSec(run.distanceValue, run.durationSec);
+  const facts = [
+    workoutName(run.workoutType),
+    run.distanceValue !== null && formatAmount(run.distanceValue, unit),
+    run.durationSec !== null && formatDuration(run.durationSec),
+    pace !== null && formatPace(pace, unit),
+    run.rpe !== null && `RPE ${run.rpe}`,
+  ].filter((f) => typeof f === "string");
+  const extras = [
+    run.avgHr !== null && `${run.avgHr} bpm`,
+    run.elevationValue !== null &&
+      `${run.elevationValue} ${run.elevationUnit ?? ""} gain`.replace(
+        "  ",
+        " ",
+      ),
+  ].filter((f) => typeof f === "string");
+  return { facts, extras };
+}
 
 export const elevationUnitFor = (unit: DistanceUnit) =>
   unit === "mi" ? "ft" : "m";

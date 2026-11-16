@@ -28,6 +28,39 @@ export const CLIMB_TAGS = [
 
 export const isSend = (style: AscentStyle) => style !== "attempt";
 
+export const STYLE_LABELS: Record<AscentStyle, string> = {
+  flash: "Flash",
+  onsight: "Onsight",
+  send: "Send",
+  attempt: "Attempt",
+};
+
+export const plural = (n: number, word: string) =>
+  `${n} ${word}${n === 1 ? "" : "s"}`;
+
+/** "V5 · Attempt · 3 attempts · crimp · Roof", given the project's name. */
+export function describeAscent(
+  ascent: Pick<Ascent, "grade" | "style" | "attempts" | "tags">,
+  projectName: string | null,
+): string {
+  return [
+    ascent.grade,
+    STYLE_LABELS[ascent.style],
+    ascent.attempts > 1 && plural(ascent.attempts, "attempt"),
+    ascent.tags.length > 0 && ascent.tags.join(", "),
+    projectName,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+/** The scale a grade belongs to: V-scale for boulders, YDS for routes. */
+export function disciplineOf(grade: string): ClimbDiscipline | null {
+  if (gradeIndex("boulder", grade) !== null) return "boulder";
+  if (gradeIndex("route", grade) !== null) return "route";
+  return null;
+}
+
 /** A project with its attempts summed over every session. */
 export type ProjectView = {
   project: Project;
