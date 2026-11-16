@@ -133,3 +133,41 @@ Later phases add items to this list per SPEC §10: logging a set offline, killin
 - 4 Clock right after a lock and a kill: pass / fail
 - Anything odd:
 ```
+
+## Phase 1 acceptance week (#63)
+
+SPEC §9's Phase 1 acceptance: a full week of all 11 sessions logged offline on the iPhone and synced with no loss or duplicates, and a typical set takes two taps. It also covers SPEC §10's per-release list. Items 1–7 can be answered from the week you logged if you remember; redo any you're not sure of.
+
+**Before you start:** the latest build is deployed (`git pull`, then `docker compose up -d --build` on the host) and installed on the iPhone.
+
+1. **Install.** If the app is already on the home screen, delete it and add it again from Safari (Share → **Add to Home Screen**). It should open full-screen and ask you to sign in.
+2. **Offline launch.** Airplane Mode on, Wi-Fi off, swipe the app away and open it. Today should load and the chip should say **Offline**.
+3. **Log a set.** Start a lift session and log a working set as prescribed. Count the taps from the exercise card to the set being saved; the target is two.
+4. **Kill mid-workout and resume.** Log a set, swipe the app away and reopen it. You should be back in the same session with the set still there.
+5. **Rest timer after a screen lock.** Log a set, lock the phone for a minute and unlock. The timer should be about a minute lower.
+6. **Wake lock.** During a session, leave the phone untouched past your Auto-Lock time. The screen should stay on.
+7. **Sync.** Reconnect and bring the app to the foreground. The chip should say **Synced** without tapping it.
+8. **Nothing left on the phone.** With the chip on **Synced**, there should be no yellow warning about unsynced sessions or changes, or changes the server couldn't accept.
+9. **The server's copy.** On the host, run `docker compose exec app node dist/week-check.js <monday>` with the Monday of your week, e.g. `2026-11-09`. It lists each planned session with what the server has for it. Check:
+   - Every session you did shows **finished**, with about the number of sets, runs or climbs you logged.
+   - Nothing you did shows **not logged** or **unfinished**.
+   - It says **Duplicate sets: none.**
+10. **The phone's copy.** On the phone, open Log → History and look at the same week. It should match the server's list, with no session listed twice.
+
+### Results to post on #63
+
+```md
+- iPhone model / iOS version:
+- 1 Install: pass / fail
+- 2 Offline launch: pass / fail
+- 3 Taps to log a typical set:
+- 4 Resume after kill: pass / fail
+- 5 Rest timer after a lock: pass / fail
+- 6 Wake lock: pass / fail
+- 7 Syncs without tapping the chip: yes / needed a tap / fail
+- 8 Nothing unsynced or rejected: pass / fail
+- 9 week-check output (paste it):
+- 10 Phone history matches the server: pass / fail
+- Sessions done that week (of 11):
+- Anything odd:
+```
