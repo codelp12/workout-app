@@ -14,6 +14,7 @@ import {
   type WeightUnit,
 } from "@workout-app/shared";
 import { hardestSend, isSend } from "../players/climb-log";
+import { isBodyweight } from "../players/lift-log";
 import type { LiftTargets, RunTargets } from "../plan/sessions";
 import type { LocalDb } from "../sync/local-db";
 import { latestRun } from "./history";
@@ -37,7 +38,13 @@ export type GridSpan = {
 };
 
 export type LiftCell = { target: LiftTargets | null; top: SetLog | null };
-export type LiftRow = { exerciseId: string; name: string; cells: LiftCell[] };
+export type LiftRow = {
+  exerciseId: string;
+  name: string;
+  /** Whether weight logged on it is added to bodyweight. */
+  bodyweight: boolean;
+  cells: LiftCell[];
+};
 
 export type RunWeek = {
   runs: number;
@@ -284,6 +291,7 @@ async function liftRows(
   return [...rows].map(([exerciseId, row], i) => ({
     exerciseId,
     name: exercises[i]?.name ?? "Unknown exercise",
+    bodyweight: isBodyweight(exercises[i] ?? null),
     cells: row,
   }));
 }

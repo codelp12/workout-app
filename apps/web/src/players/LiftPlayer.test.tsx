@@ -144,6 +144,12 @@ beforeEach(async () => {
 
 afterEach(cleanup);
 
+/** Waits until every set row on the card is logged. */
+const logged = (card: HTMLElement) =>
+  vi.waitFor(() =>
+    expect(within(card).queryByRole("button", { name: "Log set" })).toBeNull(),
+  );
+
 describe("LiftPlayer", () => {
   it("shows the target, last time and cues, prefilled from the target", async () => {
     renderPlayer();
@@ -177,7 +183,7 @@ describe("LiftPlayer", () => {
     await user.click(within(card).getByRole("radio", { name: "2" }));
     await user.click(log);
 
-    expect(await within(card).findByText("Set 2 of 2")).toBeTruthy();
+    await logged(card);
     const session = await localDb
       .rows("session_log")
       .get(sessionLogId(legs.id));
@@ -216,7 +222,9 @@ describe("LiftPlayer", () => {
     expect(within(card).getByText("Reps in reserve")).toBeTruthy();
     await user.click(within(rir).getByRole("radio", { name: "3" }));
     await user.click(within(card).getByRole("button", { name: "Log set" }));
-    expect(await within(card).findByText("Set 2 of 2")).toBeTruthy();
+    await logged(card);
+    await user.click(within(card).getByRole("button", { name: "Add set" }));
+    expect(within(card).getByRole("heading", { name: "Set 2" })).toBeTruthy();
 
     expect(
       within(card)
@@ -227,37 +235,60 @@ describe("LiftPlayer", () => {
     expect((log as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it("moves to the next exercise after the last set and logs bodyweight sets", async () => {
+  it("moves on with Next exercise and adds weight to bodyweight sets", async () => {
     const user = userEvent.setup();
     renderPlayer();
     const squatCard = await screen.findByRole("article", {
       name: "Dumbbell Squat",
     });
-    for (let set = 0; set < 2; set++) {
-      await user.click(within(squatCard).getByRole("radio", { name: "1" }));
-      await user.click(
-        within(squatCard).getByRole("button", { name: "Log set" }),
-      );
-      await within(squatCard).findByText(/^(Set 2 of 2|All 2 sets done\.)$/);
-    }
+    expect(
+      within(squatCard).queryByRole("button", { name: "Next exercise" }),
+    ).toBeNull();
+    await user.click(within(squatCard).getByRole("radio", { name: "1" }));
+    await user.click(
+      within(squatCard).getByRole("button", { name: "Log set" }),
+    );
+    await user.click(
+      await within(squatCard).findByRole("button", { name: "Next exercise" }),
+    );
     const plankCard = await screen.findByRole("article", { name: "Plank" });
     expect(screen.getByText("Exercise 2 of 2")).toBeTruthy();
     expect(
-      within(plankCard).queryByRole("group", { name: "Weight" }),
-    ).toBeNull();
+      within(plankCard).getByRole("group", { name: "Added weight" }),
+    ).toBeTruthy();
     // No target RIR, so one tap logs it.
     await user.click(
       within(plankCard).getByRole("button", { name: "Log set" }),
     );
     expect(await within(plankCard).findByText("Bodyweight × 60")).toBeTruthy();
-    const plankSet = (await localDb.rows("set_log").toArray()).find(
-      (s) => s.exerciseId === plank.id,
+    // The last card has nowhere to go next.
+    expect(
+      within(plankCard).queryByRole("button", { name: "Next exercise" }),
+    ).toBeNull();
+    await user.click(
+      within(plankCard).getByRole("button", { name: "Add set" }),
     );
-    expect(plankSet).toMatchObject({
-      loadValue: null,
-      loadUnit: null,
-      rir: null,
-    });
+    await user.click(
+      within(plankCard).getByRole("button", { name: "Increase Added weight" }),
+    );
+    await user.click(
+      within(plankCard).getByRole("button", { name: "Log set" }),
+    );
+    expect(
+      await within(plankCard).findByText("Bodyweight + 5 lb × 60"),
+    ).toBeTruthy();
+    const plankSets = (await localDb.rows("set_log").toArray())
+      .filter((s) => s.exerciseId === plank.id)
+      .sort((x, y) => x.index - y.index);
+    expect(plankSets).toEqual([
+      expect.objectContaining({
+        index: 0,
+        loadValue: null,
+        loadUnit: null,
+        rir: null,
+      }),
+      expect.objectContaining({ index: 1, loadValue: 5, loadUnit: "lb" }),
+    ]);
   });
 
   it("swipes between exercises", async () => {
@@ -280,7 +311,8 @@ describe("LiftPlayer", () => {
     const card = await screen.findByRole("article", { name: "Dumbbell Squat" });
     await user.click(within(card).getByRole("radio", { name: "2" }));
     await user.click(within(card).getByRole("button", { name: "Log set" }));
-    await within(card).findByText("Set 2 of 2");
+    await logged(card);
+    await user.click(within(card).getByRole("button", { name: "Add set" }));
     await user.click(
       within(card).getByRole("button", { name: "Decrease Reps" }),
     );
@@ -297,7 +329,7 @@ describe("LiftPlayer", () => {
       name: "Dumbbell Squat",
     });
     expect(within(again).getByText("50 lb × 10 · RIR 2")).toBeTruthy();
-    expect(within(again).getByText("Set 2 of 2")).toBeTruthy();
+    expect(within(again).getByRole("heading", { name: "Set 2" })).toBeTruthy();
     expect(
       within(again)
         .getByRole("spinbutton", { name: "Reps" })
@@ -468,7 +500,7 @@ describe("LiftPlayer", () => {
       savePosition(legs.id, {
         card: 0,
         drafts: {
-          [items[0]!.id]: { load: 45, band: null, reps: 8, rir: null },
+          [items[0]!.id]: [{ load: 45, band: null, reps: 8, rir: null }],
         },
       });
       renderPlayer();
@@ -592,7 +624,7 @@ describe("swap, skip, add set and warm-ups", () => {
 
     await user.click(within(swapped).getByRole("radio", { name: "2" }));
     await user.click(within(swapped).getByRole("button", { name: "Log set" }));
-    await within(swapped).findByText("Set 2 of 2");
+    await logged(swapped);
     expect((await sessionSets()).map((s) => s.exerciseId)).toEqual([
       barbell.id,
     ]);
@@ -692,7 +724,7 @@ describe("swap, skip, add set and warm-ups", () => {
 
     await user.click(within(card).getByRole("radio", { name: "2" }));
     await user.click(within(card).getByRole("button", { name: "Log set" }));
-    await within(card).findByText("Set 2 of 3");
+    await logged(card);
     expect((await sessionSets()).map((s) => s.exerciseId)).toEqual([curl.id]);
   });
 
@@ -725,31 +757,66 @@ describe("swap, skip, add set and warm-ups", () => {
     await user.click(
       within(skipped).getByRole("button", { name: "Undo skip" }),
     );
-    expect(await within(skipped).findByText("Set 1 of 2")).toBeTruthy();
+    expect(
+      await within(skipped).findByRole("heading", { name: "Set 1" }),
+    ).toBeTruthy();
     const undone = await localDb
       .rows("plan_override")
       .get(skipOverrideId(items[0]!.id));
     expect(undone?.deletedAt).not.toBeNull();
   });
 
-  it("adds a set past the plan", async () => {
+  it("starts with one set row, adds copies of the last and removes unlogged ones", async () => {
     const user = userEvent.setup();
     renderPlayer();
-    let card = await screen.findByRole("article", { name: "Dumbbell Squat" });
-    for (let i = 0; i < 2; i++) {
-      await user.click(within(card).getByRole("radio", { name: "2" }));
-      await user.click(within(card).getByRole("button", { name: "Log set" }));
-      await screen.findByText(i === 0 ? "Set 2 of 2" : "Exercise 2 of 2");
-    }
-    await user.click(screen.getByRole("button", { name: "Previous" }));
-    card = await screen.findByRole("article", { name: "Dumbbell Squat" });
-    expect(within(card).getByText("All 2 sets done.")).toBeTruthy();
+    const card = await screen.findByRole("article", { name: "Dumbbell Squat" });
+    const rows = () =>
+      within(card)
+        .queryAllByRole("region", { name: /^Set \d$/ })
+        .map((r) => r.getAttribute("aria-label"));
+    const row = (name: string) =>
+      within(within(card).getByRole("region", { name }));
+    expect(rows()).toEqual(["Set 1"]);
+    expect(
+      within(card).queryByRole("button", { name: "Remove set 1" }),
+    ).toBeNull();
+
+    await user.click(
+      row("Set 1").getByRole("button", { name: "Decrease Reps" }),
+    );
     await user.click(within(card).getByRole("button", { name: "Add set" }));
-    expect(within(card).getByText("Set 3 of 3")).toBeTruthy();
-    await user.click(within(card).getByRole("radio", { name: "1" }));
-    await user.click(within(card).getByRole("button", { name: "Log set" }));
-    expect(await screen.findByRole("article", { name: "Plank" })).toBeTruthy();
-    expect((await sessionSets()).map((s) => s.index)).toEqual([0, 1, 2]);
+    await user.click(within(card).getByRole("button", { name: "Add set" }));
+    expect(rows()).toEqual(["Set 1", "Set 2", "Set 3"]);
+    expect(
+      row("Set 3")
+        .getByRole("spinbutton", { name: "Reps" })
+        .getAttribute("aria-valuenow"),
+    ).toBe("9");
+    await user.click(
+      within(card).getByRole("button", { name: "Remove set 3" }),
+    );
+    expect(rows()).toEqual(["Set 1", "Set 2"]);
+
+    for (const name of ["Set 1", "Set 2"]) {
+      const set = within(await within(card).findByRole("region", { name }));
+      await user.click(set.getByRole("radio", { name: "2" }));
+      await user.click(set.getByRole("button", { name: "Log set" }));
+      await within(within(card).getByRole("list", { name: "Sets" })).findByText(
+        name,
+      );
+    }
+    await logged(card);
+    expect(rows()).toEqual([]);
+    await user.click(within(card).getByRole("button", { name: "Add set" }));
+    expect(rows()).toEqual(["Set 3"]);
+    await user.click(row("Set 3").getByRole("radio", { name: "1" }));
+    await user.click(row("Set 3").getByRole("button", { name: "Log set" }));
+    await logged(card);
+    expect((await sessionSets()).map((s) => [s.index, s.reps])).toEqual([
+      [0, 9],
+      [1, 9],
+      [2, 9],
+    ]);
   });
 
   it("collapses the warm-ups and logs them flagged, outside the working sets", async () => {
@@ -783,7 +850,7 @@ describe("swap, skip, add set and warm-ups", () => {
       within(list).getByRole("button", { name: "Log warm-up 1" }),
     );
     expect(await within(card).findByText("Warm-up · 1 of 3")).toBeTruthy();
-    expect(within(card).getByText("Set 1 of 2")).toBeTruthy();
+    expect(within(card).getByRole("heading", { name: "Set 1" })).toBeTruthy();
     expect(screen.queryByRole("timer")).toBeNull();
     expect(await sessionSets()).toEqual([
       expect.objectContaining({
@@ -798,7 +865,7 @@ describe("swap, skip, add set and warm-ups", () => {
 
     await user.click(within(card).getByRole("radio", { name: "2" }));
     await user.click(within(card).getByRole("button", { name: "Log set" }));
-    await within(card).findByText("Set 2 of 2");
+    await logged(card);
     const [, working] = await sessionSets();
     expect(working).toMatchObject({ index: 0, loadValue: 50, isWarmup: false });
   });
@@ -821,7 +888,7 @@ describe("discarding", () => {
     ).toBeNull();
     await user.click(within(card).getByRole("radio", { name: "2" }));
     await user.click(within(card).getByRole("button", { name: "Log set" }));
-    expect(await within(card).findByText("Set 2 of 2")).toBeTruthy();
+    await logged(card);
 
     await user.click(screen.getByRole("button", { name: "Discard workout" }));
     const sheet = await screen.findByRole("dialog", {
@@ -829,7 +896,7 @@ describe("discarding", () => {
     });
     await user.click(within(sheet).getByRole("button", { name: "Keep going" }));
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(within(card).getByText("Set 2 of 2")).toBeTruthy();
+    expect(within(card).getByText("50 lb × 10 · RIR 2")).toBeTruthy();
 
     await user.click(screen.getByRole("button", { name: "Discard workout" }));
     await user.click(
@@ -841,7 +908,9 @@ describe("discarding", () => {
     const fresh = await screen.findByRole("article", {
       name: "Dumbbell Squat",
     });
-    expect(await within(fresh).findByText("Set 1 of 2")).toBeTruthy();
+    expect(
+      await within(fresh).findByRole("heading", { name: "Set 1" }),
+    ).toBeTruthy();
     await vi.waitFor(() =>
       expect(
         screen.queryByRole("button", { name: "Discard workout" }),
@@ -870,7 +939,7 @@ describe("discarding", () => {
     // Logging again starts a new log under the same id.
     await user.click(within(fresh).getByRole("radio", { name: "2" }));
     await user.click(within(fresh).getByRole("button", { name: "Log set" }));
-    expect(await within(fresh).findByText("Set 2 of 2")).toBeTruthy();
+    await logged(fresh);
     const again = await localDb.rows("session_log").get(sessionLogId(legs.id));
     expect(again!.deletedAt).toBeNull();
   });
@@ -886,7 +955,7 @@ describe("finishing", () => {
     expect(screen.getByText("Log a set to finish the workout.")).toBeTruthy();
     await user.click(within(card).getByRole("radio", { name: "2" }));
     await user.click(within(card).getByRole("button", { name: "Log set" }));
-    expect(await within(card).findByText("Set 2 of 2")).toBeTruthy();
+    await logged(card);
 
     await user.click(
       await screen.findByRole("button", { name: "Finish workout" }),

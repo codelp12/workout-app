@@ -19,18 +19,21 @@ import { DiscardSheet } from "./DiscardSheet";
 import { FinishSheet } from "./FinishSheet";
 import {
   bandChoices,
+  cardDone,
   describeSet,
   discardLift,
   implementOf,
+  isBodyweight,
   isWeighted,
   loadChoices,
   loadPosition,
   logSet,
   markActive,
+  openRows,
   prefill,
   readLiftSession,
   savePosition,
-  settle,
+  takesAddedLoad,
   unitOf,
   warmupCards,
   warmupPlan,
@@ -60,9 +63,9 @@ const RIR_OPTIONS = ["0", "1", "2", "3", "4"].map((value) => ({
 // A horizontal drag this far (px) flips to the next or previous card.
 const SWIPE = 60;
 
-function lastTimeLine(sets: SetLog[]): string {
+function lastTimeLine(sets: SetLog[], bodyweight: boolean): string {
   if (sets.length === 0) return "First time";
-  return sets.map(describeSet).join(", ");
+  return sets.map((s) => describeSet(s, bodyweight)).join(", ");
 }
 
 function Finished({ data }: { data: LiftSession }) {
@@ -258,16 +261,141 @@ function Warmups({
   );
 }
 
+/** One set not yet logged: its weight, band, reps and RIR, and its Log button. */
+function SetRow({
+  card,
+  settings,
+  number,
+  values,
+  saving,
+  onValues,
+  onLog,
+  onRemove,
+}: {
+  card: LiftCard;
+  settings: SettingsData;
+  /** The set's number on the card, counting the ones logged. */
+  number: number;
+  values: SetValues;
+  saving: boolean;
+  onValues: (values: SetValues) => void;
+  onLog: () => void;
+  /** Missing when this is the card's only set. */
+  onRemove?: () => void;
+}) {
+  const { exercise, targets } = card;
+  const needsRir = targets.targetRir !== null;
+  const unit = unitOf(card, settings);
+  const weighted = isWeighted(card);
+  const loads = weighted ? loadChoices(card, settings, values.load) : null;
+  const bands = bandChoices(card, settings);
+  const implement = implementOf(exercise);
+  const unloadable = loads !== null && loads.length === 0;
+  const label = `Set ${number}`;
+  return (
+    <section aria-label={label} className="flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="font-semibold">{label}</h3>
+        {onRemove && (
+          <button
+            type="button"
+            className={`${button} min-h-tap`}
+            aria-label={`Remove set ${number}`}
+            disabled={saving}
+            onClick={onRemove}
+          >
+            Remove
+          </button>
+        )}
+      </div>
+      {loads && values.load !== null && loads.length > 0 && (
+        <LoadPicker
+          label="Weight"
+          value={values.load}
+          options={loads}
+          unit={unit}
+          onValueChange={(load) => onValues({ ...values, load })}
+        />
+      )}
+      {unloadable && implement && (
+        <p className="text-fg-muted">
+          No {IMPLEMENT_NAMES[implement]} in your equipment.{" "}
+          <Link to="/settings" className="text-accent underline">
+            Add them in Settings
+          </Link>{" "}
+          to log this set.
+        </p>
+      )}
+      {weighted && !loads && values.load !== null && (
+        <Stepper
+          label="Weight"
+          value={values.load}
+          step={weightStep(settings)}
+          unit={unit}
+          onValueChange={(load) => onValues({ ...values, load })}
+        />
+      )}
+      {takesAddedLoad(card) && (
+        <Stepper
+          label={isBodyweight(exercise) ? "Added weight" : "Weight"}
+          value={values.load ?? 0}
+          step={weightStep(settings)}
+          unit={unit}
+          onValueChange={(load) =>
+            onValues({ ...values, load: load > 0 ? load : null })
+          }
+        />
+      )}
+      {bands && bands.length > 0 && (
+        <ChipGroup
+          type="single"
+          label="Band"
+          showLabel
+          modality="lift"
+          options={bands.map((band) => ({ value: band, label: band }))}
+          value={values.band ?? undefined}
+          onValueChange={(band) => onValues({ ...values, band })}
+        />
+      )}
+      {bands && bands.length === 0 && values.band && (
+        <p className="text-fg-muted">Band: {values.band}</p>
+      )}
+      <Stepper
+        label="Reps"
+        value={values.reps}
+        onValueChange={(reps) => onValues({ ...values, reps })}
+      />
+      <ChipGroup
+        type="single"
+        label="Reps in reserve"
+        showLabel
+        modality="lift"
+        options={RIR_OPTIONS}
+        value={values.rir === null ? undefined : String(values.rir)}
+        onValueChange={(rir) => onValues({ ...values, rir: Number(rir) })}
+      />
+      <button
+        type="button"
+        className={`${buttonBase} min-h-tap bg-lift text-bg`}
+        disabled={
+          saving || !exercise || unloadable || (needsRir && values.rir === null)
+        }
+        onClick={onLog}
+      >
+        Log set
+      </button>
+    </section>
+  );
+}
+
 function ExerciseCard({
   view,
   card,
   settings,
-  values,
-  planned,
+  rows,
   warmups,
-  onValues,
-  onLogged,
-  onAddSet,
+  onRows,
+  onNext,
   onSkipped,
   library,
   onSwapped,
@@ -275,14 +403,13 @@ function ExerciseCard({
   view: SessionView;
   card: LiftCard;
   settings: SettingsData;
-  values: SetValues;
-  /** The planned sets plus any added. */
-  planned: number;
+  /** The set rows not yet logged. */
+  rows: SetValues[];
   /** Whether the card ramps up with warm-ups. */
   warmups: boolean;
-  onValues: (values: SetValues) => void;
-  onLogged: (done: boolean) => void;
-  onAddSet: () => void;
+  onRows: (update: (rows: SetValues[]) => SetValues[]) => void;
+  /** Missing on the last card. */
+  onNext?: () => void;
   onSkipped: (skipped: boolean) => void;
   library: readonly Exercise[];
   onSwapped: () => void;
@@ -291,23 +418,18 @@ function ExerciseCard({
   const [saving, setSaving] = useState(false);
   const { exercise, targets, sets, skipped } = card;
   const name = exercise?.name ?? "Pick an exercise";
-  const done = sets.length >= planned;
-  const needsRir = targets.targetRir !== null;
+  const done = sets.length > 0 && rows.length === 0;
   const unit = unitOf(card, settings);
-  const weighted = isWeighted(card);
-  const loads = weighted ? loadChoices(card, settings, values.load) : null;
-  const bands = bandChoices(card, settings);
-  const implement = implementOf(exercise);
-  const unloadable = loads !== null && loads.length === 0;
+  const bodyweight = isBodyweight(exercise);
 
-  async function log() {
+  async function log(index: number) {
     primeRestCue();
     setSaving(true);
     try {
-      await logSet(localDb, view, card, values, settings);
+      await logSet(localDb, view, card, rows[index]!, settings);
       markActive(view.session.id);
       syncSoon();
-      onLogged(sets.length + 1 >= planned);
+      onRows((r) => r.filter((_, i) => i !== index));
     } finally {
       setSaving(false);
     }
@@ -326,7 +448,7 @@ function ExerciseCard({
           { value: first.loadValue, unit: first.loadUnit ?? unit },
           unit,
         )
-      : values.load;
+      : (rows[0]?.load ?? null);
   const warmupSets =
     warmups && !skipped ? warmupPlan(card, settings, workingLoad) : [];
   const canSwap = !skipped && sets.length === 0 && card.warmups.length === 0;
@@ -372,7 +494,7 @@ function ExerciseCard({
         <dt className="text-fg-muted">Target</dt>
         <dd>{liftDetail(targets)}</dd>
         <dt className="text-fg-muted">Last time</dt>
-        <dd>{lastTimeLine(card.lastTime)}</dd>
+        <dd>{lastTimeLine(card.lastTime, bodyweight)}</dd>
       </dl>
       {(canSwap || (!skipped && !done)) && (
         <div className="flex gap-2">
@@ -407,7 +529,7 @@ function ExerciseCard({
         {sets.map((set) => (
           <li key={set.id} className="flex justify-between">
             <span className="text-fg-muted">Set {set.index + 1}</span>
-            <span>{describeSet(set)}</span>
+            <span>{describeSet(set, bodyweight)}</span>
           </li>
         ))}
       </ol>
@@ -422,94 +544,49 @@ function ExerciseCard({
             Undo skip
           </button>
         </div>
-      ) : done ? (
-        <div className="flex items-center justify-between gap-2">
-          <p className="font-medium text-lift">All {planned} sets done.</p>
-          <button
-            type="button"
-            className={`${button} min-h-tap`}
-            onClick={onAddSet}
-          >
-            Add set
-          </button>
-        </div>
       ) : (
-        <section
-          aria-label={`Set ${sets.length + 1} of ${planned}`}
-          className="flex flex-col gap-3"
-        >
-          <h3 className="font-semibold">
-            Set {sets.length + 1} of {planned}
-          </h3>
-          {loads && values.load !== null && loads.length > 0 && (
-            <LoadPicker
-              label="Weight"
-              value={values.load}
-              options={loads}
-              unit={unit}
-              onValueChange={(load) => onValues({ ...values, load })}
+        <>
+          {rows.map((values, i) => (
+            <SetRow
+              key={sets.length + i}
+              card={card}
+              settings={settings}
+              number={sets.length + i + 1}
+              values={values}
+              saving={saving}
+              onValues={(next) =>
+                onRows((r) => r.map((v, j) => (j === i ? next : v)))
+              }
+              onLog={() => void log(i)}
+              onRemove={
+                rows.length > 1 || sets.length > 0
+                  ? () => onRows((r) => r.filter((_, j) => j !== i))
+                  : undefined
+              }
             />
-          )}
-          {unloadable && implement && (
-            <p className="text-fg-muted">
-              No {IMPLEMENT_NAMES[implement]} in your equipment.{" "}
-              <Link to="/settings" className="text-accent underline">
-                Add them in Settings
-              </Link>{" "}
-              to log this set.
-            </p>
-          )}
-          {!loads && values.load !== null && (
-            <Stepper
-              label="Weight"
-              value={values.load}
-              step={weightStep(settings)}
-              unit={unit}
-              onValueChange={(load) => onValues({ ...values, load })}
-            />
-          )}
-          {bands && bands.length > 0 && (
-            <ChipGroup
-              type="single"
-              label="Band"
-              showLabel
-              modality="lift"
-              options={bands.map((band) => ({ value: band, label: band }))}
-              value={values.band ?? undefined}
-              onValueChange={(band) => onValues({ ...values, band })}
-            />
-          )}
-          {bands && bands.length === 0 && values.band && (
-            <p className="text-fg-muted">Band: {values.band}</p>
-          )}
-          <Stepper
-            label="Reps"
-            value={values.reps}
-            onValueChange={(reps) => onValues({ ...values, reps })}
-          />
-          <ChipGroup
-            type="single"
-            label="Reps in reserve"
-            showLabel
-            modality="lift"
-            options={RIR_OPTIONS}
-            value={values.rir === null ? undefined : String(values.rir)}
-            onValueChange={(rir) => onValues({ ...values, rir: Number(rir) })}
-          />
-          <button
-            type="button"
-            className={`${buttonBase} min-h-tap bg-lift text-bg`}
-            disabled={
-              saving ||
-              !exercise ||
-              unloadable ||
-              (needsRir && values.rir === null)
-            }
-            onClick={() => void log()}
-          >
-            Log set
-          </button>
-        </section>
+          ))}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className={`${button} min-h-tap`}
+              disabled={saving}
+              onClick={() =>
+                onRows((r) => [...r, r.at(-1) ?? prefill(card, settings)])
+              }
+            >
+              Add set
+            </button>
+            {done && onNext && (
+              <button
+                type="button"
+                className={`${button} min-h-tap`}
+                onClick={onNext}
+              >
+                Next exercise
+              </button>
+            )}
+          </div>
+        </>
       )}
     </article>
   );
@@ -566,16 +643,10 @@ export function LiftPlayer({ view }: { view: SessionView }) {
       ...p,
       card: Math.min(Math.max(card, 0), cards.length - 1),
     }));
-  const draft = position.drafts[current.itemId];
-  const values = draft
-    ? settle(current, settings, draft)
-    : prefill(current, settings);
-  const extra = position.extra?.[current.itemId] ?? 0;
+  const rows = openRows(current, settings, position.drafts[current.itemId]);
   const warmed = warmupCards(cards);
   const allDone = cards.every(
-    (c) =>
-      c.skipped ||
-      c.sets.length >= c.targets.sets + (position.extra?.[c.itemId] ?? 0),
+    (c) => c.skipped || cardDone(c, settings, position.drafts[c.itemId]),
   );
   // Sets are logged by exercise, so a session can't hold one exercise twice.
   const inSession = new Set(cards.map((c) => c.exercise?.id));
@@ -632,27 +703,18 @@ export function LiftPlayer({ view }: { view: SessionView }) {
         view={view}
         card={current}
         settings={settings}
-        values={values}
-        planned={current.targets.sets + extra}
+        rows={rows}
         warmups={warmed.has(current.itemId)}
-        onValues={(next) =>
+        onRows={(update) =>
           setPosition((p) => ({
             ...p,
-            drafts: { ...p.drafts, [current.itemId]: next },
+            drafts: {
+              ...p.drafts,
+              [current.itemId]: update(p.drafts[current.itemId] ?? rows),
+            },
           }))
         }
-        onLogged={(done) =>
-          setPosition((p) => {
-            const card = done && index < cards.length - 1 ? index + 1 : p.card;
-            return { ...p, card, drafts: dropDraft(p) };
-          })
-        }
-        onAddSet={() =>
-          setPosition((p) => ({
-            ...p,
-            extra: { ...p.extra, [current.itemId]: extra + 1 },
-          }))
-        }
+        onNext={index < cards.length - 1 ? () => go(index + 1) : undefined}
         onSkipped={(skipped) => {
           if (skipped && index < cards.length - 1) go(index + 1);
         }}

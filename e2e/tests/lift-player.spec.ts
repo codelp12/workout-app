@@ -44,6 +44,7 @@ test("a set logs in two taps and the player resumes after a kill", async ({
   ).toHaveCount(1);
   const rest = player.getByRole("region", { name: "Rest timer" });
   await expect(rest.getByRole("timer")).toHaveText(/^\d:\d\d$/);
+  await first.getByRole("button", { name: "Add set" }).click();
   await first.getByRole("button", { name: "Decrease Reps" }).click();
   const reps = await first
     .getByRole("spinbutton", { name: "Reps" })

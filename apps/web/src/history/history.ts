@@ -13,6 +13,7 @@ import {
   isSend,
   plural,
 } from "../players/climb-log";
+import { isBodyweight } from "../players/lift-log";
 import { runFacts } from "../players/run-log";
 import type { LocalDb } from "../sync/local-db";
 
@@ -28,6 +29,8 @@ export type HistoryEntry = {
 export type LoggedExercise = {
   exerciseId: string;
   name: string;
+  /** Whether weight logged on it is added to bodyweight. */
+  bodyweight: boolean;
   sets: SetLog[];
   warmups: SetLog[];
 };
@@ -215,6 +218,7 @@ export async function readHistoryDetail(
       return {
         exerciseId,
         name: exercises[i]?.name ?? "Unknown exercise",
+        bodyweight: isBodyweight(exercises[i] ?? null),
         sets: mine.filter((s) => !s.isWarmup).sort(byIndex),
         warmups: mine.filter((s) => s.isWarmup).sort(byIndex),
       };

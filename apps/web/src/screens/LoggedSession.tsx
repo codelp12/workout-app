@@ -53,7 +53,7 @@ function ExerciseSets({ exercise }: { exercise: LoggedExercise }) {
           {exercise.sets.map((set) => (
             <li key={set.id} className="flex justify-between">
               <span className="text-fg-muted">Set {set.index + 1}</span>
-              <span>{describeSet(set)}</span>
+              <span>{describeSet(set, exercise.bodyweight)}</span>
             </li>
           ))}
         </ol>

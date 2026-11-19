@@ -25,7 +25,7 @@ import { deleteRow, saveRow } from "../sync/writes";
 
 /** What the owner has dialled in for the next set. */
 export type SetValues = {
-  /** Null for bodyweight and band sets. */
+  /** Null for band sets and bodyweight sets with nothing added. */
   load: number | null;
   /** The band from the inventory, for band sets. */
   band: string | null;
@@ -158,14 +158,24 @@ export async function readLiftSession(
   };
 }
 
-/** "60 lb × 8 · RIR 2", "Red band × 12" or "Bodyweight × 10". */
+/**
+ * "60 lb × 8 · RIR 2", "Red band × 12", "Bodyweight × 10" or, for a
+ * bodyweight exercise with weight added, "Bodyweight + 20 lb × 8".
+ */
 export function describeSet(
   set: Pick<SetLog, "loadValue" | "loadUnit" | "band" | "reps" | "rir">,
+  bodyweight = false,
 ): string {
-  const what =
+  const load =
     set.loadValue !== null && set.loadUnit
       ? formatAmount(set.loadValue, set.loadUnit)
-      : (set.band ?? "Bodyweight");
+      : null;
+  const what =
+    load === null
+      ? (set.band ?? "Bodyweight")
+      : bodyweight
+        ? `Bodyweight + ${load}`
+        : load;
   return `${what} × ${set.reps}${set.rir === null ? "" : ` · RIR ${set.rir}`}`;
 }
 
@@ -179,6 +189,14 @@ export function implementOf(exercise: Exercise | null): WeightImplement | null {
   return null;
 }
 
+/** Whether the exercise moves the body itself, so any weight logged is added to it. */
+export function isBodyweight(exercise: Exercise | null): boolean {
+  return (
+    implementOf(exercise) === null &&
+    (exercise?.equipment ?? []).includes("bodyweight")
+  );
+}
+
 /** Whether the card takes a weight: a prefilled load or a weighted implement. */
 export const isWeighted = (card: LiftCard) =>
   card.targets.load !== null ||
@@ -188,6 +206,14 @@ export const isWeighted = (card: LiftCard) =>
 export const isBanded = (card: LiftCard) =>
   card.targets.band !== null ||
   (!isWeighted(card) && (card.exercise?.equipment ?? []).includes("band"));
+
+/**
+ * Whether the card takes an optional weight on top of the exercise:
+ * bodyweight moves and gear the inventory doesn't weigh (kettlebells and
+ * the like). Nothing added logs as no load.
+ */
+export const takesAddedLoad = (card: LiftCard) =>
+  !isWeighted(card) && !isBanded(card);
 
 /**
  * The weight unit of the card's sets: the inventory's for implements it
@@ -560,10 +586,30 @@ export async function openWorkout(
 /** Where the player was: the card on screen and values not yet logged. */
 export type PlayerPosition = {
   card: number;
-  drafts: Record<string, SetValues>;
-  /** Sets added past the plan, by planned item. */
-  extra?: Record<string, number>;
+  /** The set rows not yet logged, by planned item. */
+  drafts: Record<string, SetValues[]>;
 };
+
+/**
+ * The card's set rows not yet logged: the saved ones, or one prefilled row
+ * until the first set is logged. "Add set" adds more, so the owner picks how
+ * many sets to do as he goes.
+ */
+export function openRows(
+  card: LiftCard,
+  settings: PlayerSettings,
+  drafts: SetValues[] | undefined,
+): SetValues[] {
+  if (drafts) return drafts.map((d) => settle(card, settings, d));
+  return card.sets.length === 0 ? [prefill(card, settings)] : [];
+}
+
+/** Whether every set row on the card is logged, and there's at least one. */
+export const cardDone = (
+  card: LiftCard,
+  settings: PlayerSettings,
+  drafts: SetValues[] | undefined,
+) => card.sets.length > 0 && openRows(card, settings, drafts).length === 0;
 
 // Device-local, like the onboarding flag: it only has to survive a kill.
 const positionKey = (sessionId: string) =>
@@ -573,8 +619,17 @@ export function loadPosition(sessionId: string): PlayerPosition {
   try {
     const saved = JSON.parse(
       localStorage.getItem(positionKey(sessionId)) ?? "null",
-    ) as PlayerPosition | null;
-    if (saved && Number.isInteger(saved.card) && saved.drafts) return saved;
+    ) as { card: number; drafts: Record<string, unknown> } | null;
+    if (saved && Number.isInteger(saved.card) && saved.drafts) {
+      // Positions saved before set rows held one draft per card.
+      const drafts = Object.fromEntries(
+        Object.entries(saved.drafts).map(([id, d]) => [
+          id,
+          (Array.isArray(d) ? d : [d]) as SetValues[],
+        ]),
+      );
+      return { card: saved.card, drafts };
+    }
   } catch {
     // A corrupt entry just starts the player at the first card.
   }
