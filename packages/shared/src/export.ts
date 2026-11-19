@@ -23,7 +23,11 @@ export const dataExportSchema = z.object({
   exportedAt: z.int().nonnegative(),
   entities: z.object(
     Object.fromEntries(
-      ENTITY_NAMES.map((name) => [name, z.array(entitySchemas[name])]),
+      // Files from before an entity existed have no array for it.
+      ENTITY_NAMES.map((name) => [
+        name,
+        z.array(entitySchemas[name]).default([]),
+      ]),
     ),
   ),
 });
