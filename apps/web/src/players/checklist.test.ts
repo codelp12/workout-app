@@ -8,7 +8,13 @@ import {
 import { beforeEach, describe, expect, it } from "vitest";
 import type { SessionView } from "../plan/sessions";
 import { openLocalDb } from "../sync/local-db";
-import { checklistSessionType, readWarmup, toggleChecked } from "./checklist";
+import {
+  checklistSessionType,
+  readChecklist,
+  toggleChecked,
+  toggleStretchChecked,
+} from "./checklist";
+import { finishSession } from "./lift-log";
 
 const sync = {
   userId: 1,
@@ -97,17 +103,46 @@ describe("warm-up checklist", () => {
         sessionType: "legs",
         items,
       },
+      {
+        id: defaultChecklistId("stretch", "push"),
+        ...sync,
+        updatedAt: 8,
+        kind: "stretch",
+        sessionType: "push",
+        items: [
+          {
+            id: "stretch-shoulder",
+            name: "Shoulder stretch",
+            detail: "20–30 s per side",
+          },
+        ],
+      },
     ]);
   });
 
-  it("reads the live list for the session's type", async () => {
-    expect((await readWarmup(db, plannedSession()))?.items).toEqual(items);
+  it("reads the live list for the session's type and requested kind", async () => {
     expect(
-      await readWarmup(db, plannedSession({ workoutType: "legs_a" })),
+      (await readChecklist(db, plannedSession(), "warmup"))?.items,
+    ).toEqual(items);
+    expect(
+      await readChecklist(
+        db,
+        plannedSession({ workoutType: "legs_a" }),
+        "warmup",
+      ),
     ).toBeNull();
     expect(
-      await readWarmup(db, plannedSession({ workoutType: "custom" })),
+      await readChecklist(
+        db,
+        plannedSession({ workoutType: "custom" }),
+        "warmup",
+      ),
     ).toBeNull();
+    expect(
+      (await readChecklist(db, plannedSession(), "stretch"))?.items.map(
+        (item) => item.id,
+      ),
+    ).toEqual(["stretch-shoulder"]);
   });
 
   it("starts the log on the first tick and keeps it through untick", async () => {
@@ -129,6 +164,53 @@ describe("warm-up checklist", () => {
       checked: ["wall-slides"],
     });
     expect(await db.outbox.count()).toBe(3);
+  });
+
+  it("adds and removes stretch ticks without changing the finished session or warm-up ticks", async () => {
+    const view = viewOf(plannedSession());
+    const id = sessionLogId(view.session.id);
+    await toggleChecked(db, view, "arm-circles", "UTC", 1000);
+    await finishSession(db, view, { rpe: 7, notes: "Felt strong" }, 2000);
+    const finished = await db.rows("session_log").get(id);
+
+    await Promise.all([
+      toggleStretchChecked(db, id, "stretch-doorway", 3000),
+      toggleStretchChecked(db, id, "stretch-shoulder", 3000),
+    ]);
+    expect(await db.rows("session_log").get(id)).toEqual({
+      ...finished,
+      updatedAt: 3000,
+      checked: ["arm-circles", "stretch-doorway", "stretch-shoulder"],
+    });
+    await toggleStretchChecked(db, id, "stretch-doorway", 4000);
+    const checked = ["arm-circles", "stretch-shoulder"];
+    expect((await db.rows("session_log").get(id))?.checked).toEqual(checked);
+    expect((await db.outbox.toArray()).at(-1)).toMatchObject({
+      entity: "session_log",
+      action: "upsert",
+      data: { id, endedAt: 2000, rpe: 7, checked },
+    });
+  });
+
+  it("does not start, modify or revive a log for a stretch tick", async () => {
+    const view = viewOf(plannedSession());
+    const id = sessionLogId(view.session.id);
+    await toggleStretchChecked(db, id, "stretch-doorway");
+    expect(await db.rows("session_log").get(id)).toBeUndefined();
+    await toggleChecked(db, view, "arm-circles", "UTC", 1000);
+    await toggleStretchChecked(db, id, "stretch-doorway");
+    expect(await db.rows("session_log").get(id)).toMatchObject({
+      endedAt: null,
+      checked: ["arm-circles"],
+    });
+    await finishSession(db, view, { rpe: 7, notes: null }, 2000);
+    await db.rows("session_log").update(id, { deletedAt: 3000 });
+    await toggleStretchChecked(db, id, "stretch-doorway");
+    expect(await db.rows("session_log").get(id)).toMatchObject({
+      deletedAt: 3000,
+      checked: ["arm-circles"],
+    });
+    expect(await db.outbox.count()).toBe(2);
   });
 });
 

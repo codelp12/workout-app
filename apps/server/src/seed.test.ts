@@ -181,26 +181,28 @@ describe("seedTemplates", () => {
 });
 
 describe("seedChecklists", () => {
-  it("adds a warm-up list per session type once, as valid rows", () => {
-    expect(seedChecklists(db, T0)).toBe(5);
+  it("adds valid warm-up and stretch lists for each session type once", () => {
+    expect(seedChecklists(db, T0)).toBe(10);
     expect(seedChecklists(db, T0 + 1)).toBe(0);
     const rows = db.select().from(checklist).all();
-    expect(rows.map((r) => r.sessionType).sort()).toEqual([
-      "climb",
-      "legs",
-      "pull",
-      "push",
-      "run",
-    ]);
+    for (const kind of ["warmup", "stretch"]) {
+      expect(
+        rows
+          .filter((r) => r.kind === kind)
+          .map((r) => r.sessionType)
+          .sort(),
+      ).toEqual(["climb", "legs", "pull", "push", "run"]);
+    }
     for (const row of rows) {
       expect(checklistSchema.safeParse(row).success).toBe(true);
-      expect(row.id).toBe(defaultChecklistId("warmup", row.sessionType));
+      expect(row.id).toBe(defaultChecklistId(row.kind, row.sessionType));
       expect(new Set(row.items.map((i) => i.id)).size).toBe(row.items.length);
     }
   });
 
-  it("leaves edited and deleted lists alone", () => {
+  it("adds stretches to an existing database and leaves edited and deleted warm-ups alone", () => {
     seedChecklists(db, T0);
+    db.delete(checklist).where(eq(checklist.kind, "stretch")).run();
     const push = defaultChecklistId("warmup", "push");
     const run = defaultChecklistId("warmup", "run");
     db.update(checklist).set({ items: [] }).where(eq(checklist.id, push)).run();
@@ -208,7 +210,7 @@ describe("seedChecklists", () => {
       .set({ deletedAt: T0 })
       .where(eq(checklist.id, run))
       .run();
-    expect(seedChecklists(db, T0 + 1)).toBe(0);
+    expect(seedChecklists(db, T0 + 1)).toBe(5);
     const byId = new Map(
       db
         .select()
@@ -218,6 +220,6 @@ describe("seedChecklists", () => {
     );
     expect(byId.get(push)?.items).toEqual([]);
     expect(byId.get(run)?.deletedAt).toBe(T0);
-    expect(defaultChecklists()).toHaveLength(5);
+    expect(byId.size).toBe(defaultChecklists().length);
   });
 });

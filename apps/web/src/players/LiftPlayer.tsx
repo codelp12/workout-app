@@ -17,6 +17,7 @@ import { button, buttonBase, card as cardClass } from "../ui";
 import { useLiveQuery } from "../use-live-query";
 import { DiscardSheet } from "./DiscardSheet";
 import { FinishSheet } from "./FinishSheet";
+import { StretchChecklist } from "./StretchChecklist";
 import { WarmupChecklist } from "./WarmupChecklist";
 import {
   bandChoices,
@@ -615,8 +616,9 @@ export function LiftPlayer({ view }: { view: SessionView }) {
   if (!data || !settings) return <section aria-label="Lift player" />;
   if (data.log?.endedAt != null) {
     return (
-      <section aria-label="Lift player">
+      <section aria-label="Lift player" className="flex flex-col gap-3">
         <Finished data={data} />
+        <StretchChecklist session={view.session} log={data.log} />
       </section>
     );
   }

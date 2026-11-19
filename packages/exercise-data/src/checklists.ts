@@ -1,5 +1,7 @@
 import {
+  CHECKLIST_SESSION_TYPES,
   defaultChecklistId,
+  libraryExerciseId,
   type ChecklistItem,
   type ChecklistKind,
   type ChecklistSessionType,
@@ -55,12 +57,86 @@ const DEFAULT_WARMUPS: Record<ChecklistSessionType, Item[]> = {
   ],
 };
 
+function stretch(
+  key: string,
+  name: string,
+  howTo: { sourceId: string; instruction?: string } | { instruction: string },
+): ChecklistItem {
+  return {
+    id: `stretch-${key}`,
+    name,
+    detail: "20–30 s per side",
+    ...("sourceId" in howTo && {
+      exerciseId: libraryExerciseId("free-exercise-db", howTo.sourceId),
+    }),
+    ...(howTo.instruction && { instruction: howTo.instruction }),
+  };
+}
+
+const PULL_STRETCHES = [
+  stretch("lat", "Gentle lat stretch", { sourceId: "One_Arm_Against_Wall" }),
+  stretch("cross-body", "Cross-body shoulder stretch", {
+    sourceId: "Shoulder_Stretch",
+  }),
+  stretch("thoracic", "Thoracic rotation", {
+    instruction:
+      "Lie on your side with knees bent and arms out in front. Keep your knees together and gently open your top arm and upper back toward the floor behind you.",
+  }),
+];
+
+const LEG_STRETCHES = [
+  stretch("hip-flexor", "Runner’s lunge / hip-flexor stretch", {
+    sourceId: "Kneeling_Hip_Flexor",
+    instruction:
+      "Kneel on one knee with the opposite foot flat in front. Keep your torso upright and gently shift your weight forward until you feel a stretch at the front of your rear hip.",
+  }),
+  stretch("calf", "Calf stretch", {
+    sourceId: "Calf_Stretch_Hands_Against_Wall",
+    instruction:
+      "Stand facing a wall with your hands against it and one foot behind you. Bend your front knee and lean in gently, keeping your back heel down.",
+  }),
+  stretch("hamstring", "Gentle hamstring stretch", {
+    sourceId: "Hamstring_Stretch",
+    instruction:
+      "Lie on your back and loop a strap or band over one foot. Gently raise that leg until you feel a stretch behind your thigh. Keep the other leg on the floor.",
+  }),
+];
+
+/** Optional post-session stretches from the owner's training program (#122). */
+const DEFAULT_STRETCHES: Record<ChecklistSessionType, ChecklistItem[]> = {
+  push: [
+    stretch("doorway", "Doorway chest stretch", {
+      instruction:
+        "Rest a forearm on the doorframe with your elbow bent. Step forward gently until you feel a stretch across your chest.",
+    }),
+    stretch("shoulder", "Gentle shoulder stretch", {
+      sourceId: "Shoulder_Stretch",
+    }),
+  ],
+  pull: PULL_STRETCHES,
+  climb: PULL_STRETCHES,
+  run: LEG_STRETCHES,
+  legs: LEG_STRETCHES,
+};
+
+function checklistRows(
+  kind: ChecklistKind,
+  itemsFor: (type: ChecklistSessionType) => ChecklistItem[],
+): DefaultChecklistData[] {
+  return CHECKLIST_SESSION_TYPES.map((sessionType) => ({
+    id: defaultChecklistId(kind, sessionType),
+    kind,
+    sessionType,
+    items: itemsFor(sessionType),
+  }));
+}
+
 /** The default checklists as rows, with the same ids on every server. */
 export function defaultChecklists(): DefaultChecklistData[] {
-  return Object.entries(DEFAULT_WARMUPS).map(([sessionType, items]) => ({
-    id: defaultChecklistId("warmup", sessionType),
-    kind: "warmup",
-    sessionType: sessionType as ChecklistSessionType,
-    items: items.map(([id, name, detail]) => ({ id, name, detail })),
-  }));
+  return [
+    ...checklistRows("warmup", (type) =>
+      DEFAULT_WARMUPS[type].map(([id, name, detail]) => ({ id, name, detail })),
+    ),
+    ...checklistRows("stretch", (type) => DEFAULT_STRETCHES[type]),
+  ];
 }

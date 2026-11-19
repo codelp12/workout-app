@@ -630,7 +630,11 @@ describe("swap, skip, add set and warm-ups", () => {
       barbell.id,
     ]);
     // With a set logged under it, the swap is settled.
-    expect(within(swapped).queryByRole("button", { name: "Swap" })).toBeNull();
+    await vi.waitFor(() =>
+      expect(
+        within(swapped).queryByRole("button", { name: "Swap" }),
+      ).toBeNull(),
+    );
   });
 
   it("swaps to any exercise by searching the library", async () => {
@@ -948,6 +952,19 @@ describe("discarding", () => {
 
 describe("finishing", () => {
   it("finishes with RPE and notes, marks the session done and queues it for sync", async () => {
+    await localDb.rows("checklist").put({
+      ...sync,
+      id: newId(),
+      kind: "stretch",
+      sessionType: "legs",
+      items: [
+        {
+          id: "stretch-calf",
+          name: "Calf stretch",
+          detail: "20–30 s per side",
+        },
+      ],
+    });
     const user = userEvent.setup();
     const { unmount } = renderPlayer();
     const card = await screen.findByRole("article", { name: "Dumbbell Squat" });
@@ -976,6 +993,9 @@ describe("finishing", () => {
     ).toBeTruthy();
     expect(within(done).getByText("Felt strong")).toBeTruthy();
     expect(screen.queryByRole("article")).toBeNull();
+    expect(
+      await screen.findByRole("checkbox", { name: /Calf stretch/ }),
+    ).toBeTruthy();
 
     const log = await localDb.rows("session_log").get(sessionLogId(legs.id));
     expect(log).toMatchObject({ rpe: 7, notes: "Felt strong" });

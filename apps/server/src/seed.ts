@@ -129,7 +129,7 @@ export function seedTemplates(
 }
 
 /**
- * Adds the default warm-up checklists the database doesn't have yet (#121).
+ * Adds the default warm-up and stretch checklists the database doesn't have yet.
  * Like exercises, existing rows, including edited or deleted ones, are left
  * alone, and new rows get a `serverSeq` so devices receive them.
  */

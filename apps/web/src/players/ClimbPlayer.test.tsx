@@ -259,7 +259,20 @@ describe("ClimbPlayer", () => {
     ]);
   });
 
-  it("finishes with an RPE into a read-only summary and marks the session done", async () => {
+  it("finishes with an RPE into a summary and offers the climbing stretches", async () => {
+    await localDb.rows("checklist").put({
+      ...sync,
+      id: newId(),
+      kind: "stretch",
+      sessionType: "climb",
+      items: [
+        {
+          id: "stretch-lat",
+          name: "Gentle lat stretch",
+          detail: "20–30 s per side",
+        },
+      ],
+    });
     const user = userEvent.setup();
     renderPlayer();
     expect(screen.queryByRole("button", { name: "Finish session" })).toBeNull();
@@ -282,6 +295,9 @@ describe("ClimbPlayer", () => {
       within(done).getByText("1 send · hardest V4 · 1 min · RPE 7"),
     ).toBeTruthy();
     expect(screen.queryByRole("group", { name: "Grades" })).toBeNull();
+    expect(
+      await screen.findByRole("checkbox", { name: /Gentle lat stretch/ }),
+    ).toBeTruthy();
     expect(await pyramidRow("V4: 1 send")).toBeTruthy();
     const view = await readSession(limit.id);
     expect(view?.session.status).toBe("done");

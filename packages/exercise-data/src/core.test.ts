@@ -7,6 +7,7 @@ import {
   templateSlotSchema,
 } from "@workout-app/shared";
 import { describe, expect, it } from "vitest";
+import { defaultChecklists } from "./checklists.js";
 import {
   CORE_EXERCISES,
   CORE_IMAGE_BUDGET,
@@ -162,5 +163,31 @@ describe("default templates", () => {
     expect(
       templates.filter((t) => t.intensityClass === "heavy").map((t) => t.name),
     ).toEqual(["Push A", "Legs A"]);
+  });
+});
+
+describe("default stretches", () => {
+  it("has a hold time and instructions or a precached library exercise for each stretch", () => {
+    const byId = new Map(
+      core.map((e) => [
+        libraryExerciseId("free-exercise-db", e!.sourceId!),
+        e!,
+      ]),
+    );
+    for (const list of defaultChecklists().filter(
+      (c) => c.kind === "stretch",
+    )) {
+      expect(list.items.length).toBeGreaterThan(0);
+      for (const item of list.items) {
+        expect(item.detail).toBe("20–30 s per side");
+        if (item.exerciseId) {
+          const exercise = byId.get(item.exerciseId);
+          expect(exercise?.instructions.length).toBeGreaterThan(0);
+          expect(exercise?.media.length).toBeGreaterThan(0);
+        } else {
+          expect(item.instruction).toBeTruthy();
+        }
+      }
+    }
   });
 });

@@ -9,6 +9,7 @@ type PullPage = {
       plannedSessionId?: string | null;
       sessionLogId?: string;
       endedAt?: number | null;
+      checked?: string[];
       distanceValue?: number | null;
       durationSec?: number | null;
       rpe?: number | null;
@@ -21,11 +22,15 @@ type PullPage = {
 // Both browser projects share one server, so each logs a different run.
 const runIndex: Record<string, number> = { chromium: 0, webkit: 1 };
 
-test("a run logs offline with its pace and syncs", async ({
+test("a run and its stretches log offline and sync", async ({
   page,
   context,
 }, testInfo) => {
   await page.goto("/week?show=run");
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+  });
+  await page.reload();
   await page.getByLabel("Password").fill(E2E_PASSWORD);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.getByTestId("sync-chip")).toHaveText("Synced");
@@ -57,8 +62,14 @@ test("a run logs offline with its pace and syncs", async ({
   await expect(
     player.getByRole("list", { name: "Planned workout" }),
   ).toBeVisible();
+  const warmup = player.getByRole("checkbox", {
+    name: /Easy walking or jogging/,
+  });
+  await expect(warmup).toBeVisible();
 
   await context.setOffline(true);
+  await warmup.click();
+  await expect(warmup).toBeChecked();
   const form = player.getByRole("form", { name: "Log run" });
   await form.getByLabel("Distance (mi)").fill("3.1");
   await form.getByLabel("Minutes").fill("26");
@@ -73,17 +84,48 @@ test("a run logs offline with its pace and syncs", async ({
     path: testInfo.outputPath("run-logged-390x844.png"),
   });
 
+  const stretches = player.getByRole("region", {
+    name: "Post-session stretches",
+  });
+  const calf = stretches.getByRole("checkbox", {
+    name: "Calf stretch 20–30 s per side",
+  });
+  await expect(calf).toBeVisible();
+  await stretches.getByRole("button", { name: "How to: Calf stretch" }).click();
+  const howTo = page.getByRole("dialog", { name: "Calf stretch" });
+  await expect(howTo.getByText(/Stand facing a wall/)).toBeVisible();
+  const photo = howTo.getByRole("img", { name: /photo 1 of/ });
+  await expect
+    .poll(() => photo.evaluate((img: HTMLImageElement) => img.naturalWidth))
+    .toBeGreaterThan(0);
+  await howTo.getByRole("button", { name: "Close" }).click();
+  await calf.click();
+  await expect(stretches).toContainText("1 of 3");
+  await stretches.getByRole("button", { name: "Hide stretches" }).click();
+  await expect(calf).toBeHidden();
+  await expect(logged).toBeVisible();
+  await page.reload();
+  await expect(calf).toBeChecked();
+  await stretches.evaluate((panel) =>
+    panel.scrollIntoView({ block: "center" }),
+  );
+  await page.screenshot({
+    path: testInfo.outputPath("post-session-stretches-390x844.png"),
+  });
+
   await context.setOffline(false);
   let logId: string | null = null;
   await expect
     .poll(async () => {
       const rows: PullPage["changes"][number]["row"][] = [];
+      let checked: string[] | undefined;
       for (let since = 0, more = true; more;) {
         const res = await page.request.get(`/api/sync/pull?since=${since}`);
         const body = (await res.json()) as PullPage;
         for (const { row } of body.changes) {
           if (row.plannedSessionId === sessionId && "endedAt" in row) {
             logId = row.endedAt != null ? row.id : null;
+            checked = row.checked;
           }
           if ("distanceValue" in row) rows.push(row);
         }
@@ -96,10 +138,16 @@ test("a run logs offline with its pace and syncs", async ({
           distance: run.distanceValue,
           durationSec: run.durationSec,
           rpe: run.rpe,
+          checked,
         }
       );
     })
-    .toEqual({ distance: 3.1, durationSec: 1581, rpe: 4 });
+    .toEqual({
+      distance: 3.1,
+      durationSec: 1581,
+      rpe: 4,
+      checked: ["easy-jog", "stretch-calf"],
+    });
 
   // The Log reads from the device, so it works offline.
   await context.setOffline(true);
