@@ -12,6 +12,7 @@ import { readSettings } from "../settings/settings";
 import { localDb, syncSoon } from "../sync";
 import { button, buttonBase, card, input } from "../ui";
 import { useLiveQuery } from "../use-live-query";
+import { WarmupChecklist } from "./WarmupChecklist";
 import {
   durationOf,
   elevationUnitFor,
@@ -380,7 +381,14 @@ export function RunPlayer({ view }: { view: SessionView }) {
       {data.run && data.log?.endedAt != null ? (
         <RunSummary session={data} />
       ) : (
-        <RunForm view={view} unit={settings.distanceUnit} />
+        <>
+          <WarmupChecklist
+            view={view}
+            checked={data.log?.checked ?? []}
+            startOpen
+          />
+          <RunForm view={view} unit={settings.distanceUnit} />
+        </>
       )}
     </section>
   );

@@ -50,6 +50,15 @@ export const PROJECT_STATUSES = ["active", "sent", "dropped"] as const;
 export const MEDIA_KINDS = ["image", "video"] as const;
 export const CLIMB_DISCIPLINES = ["boulder", "route"] as const;
 export const PROBLEM_REPORT_STATUSES = ["new", "filed"] as const;
+export const CHECKLIST_KINDS = ["warmup", "stretch"] as const;
+/** What a checklist goes with: a run or climb, or a lift session's family (`push_a` is push). */
+export const CHECKLIST_SESSION_TYPES = [
+  "run",
+  "push",
+  "pull",
+  "climb",
+  "legs",
+] as const;
 
 export type WeightUnit = (typeof WEIGHT_UNITS)[number];
 export type DistanceUnit = (typeof DISTANCE_UNITS)[number];
@@ -73,6 +82,8 @@ export type OverrideKind = (typeof OVERRIDE_KINDS)[number];
 export type AscentStyle = (typeof ASCENT_STYLES)[number];
 export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
 export type ClimbDiscipline = (typeof CLIMB_DISCIPLINES)[number];
+export type ChecklistKind = (typeof CHECKLIST_KINDS)[number];
+export type ChecklistSessionType = (typeof CHECKLIST_SESSION_TYPES)[number];
 
 /** Milliseconds since the epoch, UTC. */
 const timestamp = z.int().nonnegative();
@@ -366,6 +377,27 @@ export const addOverrideDataSchema = z.object({
 });
 export type AddOverrideData = z.infer<typeof addOverrideDataSchema>;
 
+// --- Checklists --------------------------------------------------------------
+
+export const checklistItemSchema = z.object({
+  /** Unique within its list; session logs record ticked items by it. */
+  id: z.string().min(1),
+  name: z.string().min(1),
+  /** How much, e.g. `8–10 per side`. */
+  detail: z.string().nullable(),
+});
+export type ChecklistItem = z.infer<typeof checklistItemSchema>;
+
+/** A warm-up (or later stretch) list for one session type, editable like a template. */
+export const checklistSchema = z.object({
+  ...syncFields,
+  kind: z.enum(CHECKLIST_KINDS),
+  sessionType: z.enum(CHECKLIST_SESSION_TYPES),
+  /** In order. */
+  items: z.array(checklistItemSchema),
+});
+export type Checklist = z.infer<typeof checklistSchema>;
+
 // --- Logs -------------------------------------------------------------------
 
 export const sessionLogSchema = z.object({
@@ -379,6 +411,8 @@ export const sessionLogSchema = z.object({
   timezone: z.string().min(1),
   rpe: rpe.nullable(),
   notes: z.string().nullable(),
+  /** Ids of the checklist items ticked off. Rows from before #121 have none. */
+  checked: z.array(z.string()).default([]),
 });
 export type SessionLog = z.infer<typeof sessionLogSchema>;
 
@@ -467,6 +501,7 @@ export const entitySchemas = {
   settings: settingsSchema,
   exercise: exerciseSchema,
   template: templateSchema,
+  checklist: checklistSchema,
   block: blockSchema,
   week: weekSchema,
   planned_session: plannedSessionSchema,

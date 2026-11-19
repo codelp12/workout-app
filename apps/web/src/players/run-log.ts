@@ -142,6 +142,7 @@ export async function logRun(
       timezone: live?.timezone ?? settings.timezone,
       rpe: entry.rpe,
       notes: entry.notes?.trim() || null,
+      checked: live?.checked ?? [],
     },
     now,
   );

@@ -2,7 +2,7 @@ import { serve } from "@hono/node-server";
 import { createApp } from "./app.js";
 import { hasPassword } from "./auth.js";
 import { databasePath as dbPath, openDb, runMigrations } from "./db.js";
-import { seedExercises, seedTemplates } from "./seed.js";
+import { seedChecklists, seedExercises, seedTemplates } from "./seed.js";
 
 const host = process.env.HOST ?? "127.0.0.1";
 const port = Number(process.env.PORT ?? 3000);
@@ -19,6 +19,8 @@ if (templates.added > 0)
   console.log(`Added ${templates.added} default template(s)`);
 if (templates.upgraded > 0)
   console.log(`Upgraded ${templates.upgraded} unedited default template(s)`);
+const checklists = seedChecklists(db);
+if (checklists > 0) console.log(`Added ${checklists} default checklist(s)`);
 if (!hasPassword(db))
   console.warn(
     "No password set, so nobody can sign in. Run `node dist/set-password.js`.",

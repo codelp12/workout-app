@@ -24,6 +24,7 @@ const sessionLog = (id = newId()) => ({
   timezone: "America/New_York",
   rpe: null,
   notes: null,
+  checked: [],
 });
 
 const setLog = (sessionLogId: string, index: number) => ({

@@ -25,6 +25,11 @@ export function defaultTemplateId(key: string): string {
   return v5(`default-template:${key}`, LIBRARY_NAMESPACE);
 }
 
+/** The id of a default checklist, e.g. ("warmup", "push"). */
+export function defaultChecklistId(kind: string, sessionType: string): string {
+  return v5(`default-checklist:${kind}:${sessionType}`, LIBRARY_NAMESPACE);
+}
+
 // Plan rows get ids derived from their week, so the phone's provisional week
 // and the server's (SPEC §3.2) are the same rows and a pull replaces them.
 

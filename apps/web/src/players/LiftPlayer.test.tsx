@@ -106,6 +106,7 @@ const lastWeek: SessionLog = {
   timezone: "UTC",
   rpe: null,
   notes: null,
+  checked: [],
 };
 const lastSet = (index: number, reps: number): SetLog => ({
   id: newId(),

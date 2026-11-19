@@ -6,6 +6,9 @@
 // drizzle-kit loads this file without the workspace source condition.
 import type {
   AscentStyle,
+  ChecklistItem,
+  ChecklistKind,
+  ChecklistSessionType,
   DayAvailability,
   DaySlot,
   DistanceUnit,
@@ -134,6 +137,17 @@ export const template = sqliteTable(
   (t) => [index("template_server_seq_idx").on(t.serverSeq)],
 );
 
+export const checklist = sqliteTable(
+  "checklist",
+  {
+    ...syncColumns(),
+    kind: text("kind").$type<ChecklistKind>().notNull(),
+    sessionType: text("session_type").$type<ChecklistSessionType>().notNull(),
+    items: json<ChecklistItem[]>("items").notNull(),
+  },
+  (t) => [index("checklist_server_seq_idx").on(t.serverSeq)],
+);
+
 export const block = sqliteTable(
   "block",
   {
@@ -231,6 +245,7 @@ export const sessionLog = sqliteTable(
     timezone: text("timezone").notNull(),
     rpe: integer("rpe"),
     notes: text("notes"),
+    checked: json<string[]>("checked").notNull().default([]),
   },
   (t) => [
     index("session_log_server_seq_idx").on(t.serverSeq),

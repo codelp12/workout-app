@@ -1,5 +1,6 @@
 import {
   PREVIOUS_DEFAULT_TEMPLATES,
+  defaultChecklists,
   defaultTemplates,
   loadFreeExerciseDb,
   type DefaultTemplateData,
@@ -7,7 +8,7 @@ import {
 import { libraryExerciseId } from "@workout-app/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "./db.js";
-import { exercise, template } from "./schema.js";
+import { checklist, exercise, template } from "./schema.js";
 import { OWNER_USER_ID, nextSeq } from "./sync.js";
 
 export const LIBRARY_DATASET = "free-exercise-db";
@@ -124,5 +125,38 @@ export function seedTemplates(
       added++;
     }
     return { added, upgraded };
+  });
+}
+
+/**
+ * Adds the default warm-up checklists the database doesn't have yet (#121).
+ * Like exercises, existing rows, including edited or deleted ones, are left
+ * alone, and new rows get a `serverSeq` so devices receive them.
+ */
+export function seedChecklists(db: Db, now = Date.now()): number {
+  return db.transaction((tx) => {
+    const existing = new Set(
+      tx
+        .select({ id: checklist.id })
+        .from(checklist)
+        .all()
+        .map((row) => row.id),
+    );
+    let added = 0;
+    for (const data of defaultChecklists()) {
+      if (existing.has(data.id)) continue;
+      tx.insert(checklist)
+        .values({
+          ...data,
+          userId: OWNER_USER_ID,
+          createdAt: now,
+          updatedAt: now,
+          deletedAt: null,
+          serverSeq: nextSeq(tx),
+        })
+        .run();
+      added++;
+    }
+    return added;
   });
 }

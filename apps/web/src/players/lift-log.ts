@@ -450,6 +450,7 @@ export async function logSet(
         timezone: settings.timezone,
         rpe: null,
         notes: null,
+        checked: [],
       },
       now,
     );
@@ -511,6 +512,7 @@ export async function finishSession(
       timezone: log.timezone,
       rpe,
       notes: notes?.trim() || null,
+      checked: log.checked,
     },
     now,
   );

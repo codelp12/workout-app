@@ -39,6 +39,7 @@ import {
 } from "./climb-log";
 import { DiscardSheet } from "./DiscardSheet";
 import { FinishSheet } from "./FinishSheet";
+import { WarmupChecklist } from "./WarmupChecklist";
 import { formatDuration } from "./run-log";
 
 const HOLD_MS = 500;
@@ -598,7 +599,14 @@ export function ClimbPlayer({ view }: { view: SessionView }) {
       {data.log?.endedAt != null ? (
         <ClimbFinished data={data} discipline={discipline} />
       ) : (
-        <ClimbLogger view={view} data={data} discipline={discipline} />
+        <>
+          <WarmupChecklist
+            view={view}
+            checked={data.log?.checked ?? []}
+            startOpen={data.ascents.length === 0}
+          />
+          <ClimbLogger view={view} data={data} discipline={discipline} />
+        </>
       )}
       <Pyramid ascents={data.ascents} discipline={discipline} />
       <Projects projects={data.projects} />

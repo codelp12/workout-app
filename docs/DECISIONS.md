@@ -2,6 +2,12 @@
 
 Newest first. Each entry gives the decision, why it was made, and the spec section it affects.
 
+## 2026-11-19: Warm-up checklists (#121)
+
+- **Warm-up lists are a new synced `checklist` entity,** one row per kind (`warmup`, later `stretch` for #122) and session type (`run`, `push`, `pull`, `climb`, `legs`), with ordered items of id, name and detail. The server seeds the defaults from the owner's training program on startup, like the default templates, with fixed ids, and never touches a list that was edited or deleted, so they can be made editable in the app later. The owner chose this over a fixed file in the code. (§4)
+- **Lift sessions find their list by family:** `push_a` and `push_b` use push, and so on. Runs and climbs use theirs by modality. Climbing gets the pull list plus "Easy routes or holds before harder attempts". Sessions with no matching list (e.g. a custom lift) show nothing.
+- **Ticks are saved on the session log, in a new `session_log.checked` column** of item ids (migration 0008, defaulting to none; IndexedDB version 2 backfills it). Ticking the first item starts the session's log, like a first set or Start session, so Discard works and the ticks sync. The list is open until the first set or entry and collapsible after; it never blocks logging. Lifting's ramp-up warm-up sets are unchanged. (§3.1)
+
 ## 2026-11-17: Phase 1 acceptance week results (#63)
 
 - **The owner accepted the week of 2026-11-09 with 6 of 11 sessions logged.** The 5 the server lists as not logged (Push B, threshold, limit, Pull B, Legs B) weren't trained, so nothing was lost, and the owner called it valid data. SPEC §9 asks for all 11; the owner waived that for this week rather than repeat it. (§9)
