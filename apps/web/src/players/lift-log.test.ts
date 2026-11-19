@@ -9,9 +9,13 @@ import { testExercise } from "../library/test-exercise";
 import type { LiftTargets } from "../plan/sessions";
 import {
   bandChoices,
+  describeSet,
+  isBodyweight,
   loadChoices,
+  openRows,
   prefill,
   settle,
+  takesAddedLoad,
   warmupCards,
   warmupPlan,
   type LiftCard,
@@ -179,6 +183,38 @@ describe("load picker choices", () => {
       "Light",
     );
     expect(bandChoices(card(["dumbbell"]), settings)).toBeNull();
+  });
+});
+
+describe("set rows and added weight", () => {
+  const settings = settingsFor(DEFAULT_EQUIPMENT);
+
+  it("opens one row until a set is logged, then only the rows added", () => {
+    const c = card(["dumbbell"], { load: { value: 50, unit: "lb" } });
+    expect(openRows(c, settings, undefined)).toEqual([prefill(c, settings)]);
+    const logged = { ...c, sets: [{} as LiftCard["sets"][number]] };
+    expect(openRows(logged, settings, undefined)).toEqual([]);
+    expect(openRows(logged, settings, [])).toEqual([]);
+  });
+
+  it("takes added weight on bodyweight and unweighed gear, not bands", () => {
+    expect(takesAddedLoad(card(["bodyweight"]))).toBe(true);
+    expect(isBodyweight(card(["bodyweight"]).exercise)).toBe(true);
+    expect(takesAddedLoad(card(["kettlebell"]))).toBe(true);
+    expect(isBodyweight(card(["kettlebell"]).exercise)).toBe(false);
+    expect(takesAddedLoad(card(["band"]))).toBe(false);
+    expect(takesAddedLoad(card(["dumbbell"]))).toBe(false);
+  });
+
+  it("describes weight added to bodyweight", () => {
+    const set = { loadValue: 20, loadUnit: "lb" as const, band: null, rir: 1 };
+    expect(describeSet({ ...set, reps: 8 }, true)).toBe(
+      "Bodyweight + 20 lb × 8 · RIR 1",
+    );
+    expect(describeSet({ ...set, reps: 8 })).toBe("20 lb × 8 · RIR 1");
+    expect(
+      describeSet({ ...set, loadValue: null, loadUnit: null, reps: 8 }, true),
+    ).toBe("Bodyweight × 8 · RIR 1");
   });
 });
 

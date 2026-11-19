@@ -57,13 +57,21 @@ function targetText({ target }: LiftCell): string | null {
   return [`${target.sets} × ${reps}`, what].filter(Boolean).join(" · ");
 }
 
-function LiftCellView({ cell }: { cell: LiftCell }) {
+function LiftCellView({
+  cell,
+  bodyweight,
+}: {
+  cell: LiftCell;
+  bodyweight: boolean;
+}) {
   const target = targetText(cell);
   if (!cell.top && !target) return <span className="text-fg-muted">–</span>;
   return (
     <>
       <span className="block whitespace-nowrap">
-        {cell.top ? describeSet({ ...cell.top, rir: null }) : "Not logged"}
+        {cell.top
+          ? describeSet({ ...cell.top, rir: null }, bodyweight)
+          : "Not logged"}
       </span>
       {target && (
         <span className="block whitespace-nowrap text-sm text-fg-muted">
@@ -129,7 +137,7 @@ function LiftGrid({ weeks, rows }: { weeks: GridWeek[]; rows: LiftRow[] }) {
                   </th>
                   {row.cells.map((cell, i) => (
                     <td key={weeks[i]!.start} className={td}>
-                      <LiftCellView cell={cell} />
+                      <LiftCellView cell={cell} bodyweight={row.bodyweight} />
                     </td>
                   ))}
                 </tr>
