@@ -18,6 +18,7 @@ import { TemplateEditor } from "./screens/TemplateEditor";
 import { Today } from "./screens/Today";
 import { Week } from "./screens/Week";
 import { rememberScreen } from "./settings/problem-report";
+import { useTabBarPlacement } from "./tab-bar-placement";
 import { useAppUpdate } from "./update/update-context";
 
 type Tab = { path: string; label: string; icon: ReactNode; screen: ReactNode };
@@ -82,9 +83,12 @@ const tabs: Tab[] = [
 
 function TabBar() {
   const updateAvailable = useAppUpdate().status === "available";
+  const { hidden, offset } = useTabBarPlacement();
   return (
     <nav
       aria-label="Tabs"
+      hidden={hidden}
+      style={offset ? { transform: `translateY(${offset}px)` } : undefined}
       // viewport-fit=cover (index.html) makes the safe-area insets non-zero on
       // iPhone, so the tabs clear the home indicator and the rounded corners.
       className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface pr-[env(safe-area-inset-right)] pb-[max(0.75rem,calc(env(safe-area-inset-bottom)+0.25rem))] pl-[env(safe-area-inset-left)]"
