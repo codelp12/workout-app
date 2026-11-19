@@ -35,6 +35,8 @@ export type LiftExposure = {
   date: string;
   source: "log" | "onboarding";
   sets: LiftSet[];
+  /** What the plan asked for, when the session was planned. */
+  target?: LiftTarget | null;
 };
 
 export type LiftState = { exposures: Record<string, LiftExposure> };
@@ -57,6 +59,12 @@ export type LiftItem = {
 
 export type LiftPrescription = { items: LiftItem[]; reasons: Reason[] };
 
+/** The part of a planned item a logged exposure is judged against. */
+export type LiftTarget = Pick<
+  LiftItem,
+  "load" | "band" | "sets" | "repMin" | "repMax" | "targetRir"
+>;
+
 export type LiftSessionLog = {
   session: Pick<SessionLog, "localDate">;
   sets: readonly Pick<
@@ -70,6 +78,8 @@ export type LiftSessionLog = {
     | "rir"
     | "isWarmup"
   >[];
+  /** Each exercise's planned targets, by exercise id, when it was planned. */
+  targets?: Readonly<Record<string, LiftTarget>>;
 };
 
 // Equipment-first selection (SPEC §5.1): dumbbell, band, then bodyweight.
@@ -102,7 +112,10 @@ function resolve(
   );
 }
 
-function implementOf(exercise: LiftExercise | null): WeightImplement | null {
+/** How an exercise is loaded by weight, or null for bands and bodyweight. */
+export function implementOf(
+  exercise: LiftExercise | null,
+): WeightImplement | null {
   const equipment = exercise?.equipment ?? [];
   if (equipment.includes("dumbbell")) return "dumbbell";
   if (equipment.includes("barbell")) return "barbell";
@@ -112,7 +125,7 @@ function implementOf(exercise: LiftExercise | null): WeightImplement | null {
   return null;
 }
 
-const topSet = (sets: readonly LiftSet[]) =>
+export const topSet = (sets: readonly LiftSet[]) =>
   sets.reduce<LiftSet | null>(
     (top, s) =>
       top === null || (s.load?.value ?? -1) > (top.load?.value ?? -1) ? s : top,

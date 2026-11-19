@@ -254,6 +254,10 @@ describe("lift engine state", () => {
       firstLoggedDate: null,
       stallCount: 0,
       lastIncreaseDate: null,
+      lastOutcome: null,
+      missStreak: 0,
+      plateaus: 0,
+      plateau: null,
     });
     expect(initLiftEngineState(null, config)).toEqual({ exercises: {} });
   });

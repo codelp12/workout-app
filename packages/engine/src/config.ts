@@ -27,6 +27,29 @@ export type EngineConfig = {
       /** Reps short of target that still count as meeting it. */
       missToleranceReps: number;
     };
+    /** Progression rules (§5.1 Rules, Increments). */
+    progression: {
+      /** RIR this far above target counts as beating it. */
+      beatRirMargin: number;
+      /** Cap on a `double_progression` double increment, as a fraction of load. */
+      maxDoubleRise: number;
+      /** `double_progression` cut after a second consecutive miss. */
+      cut: number;
+      /** Stalls that trigger the plateau handler. */
+      stallsToPlateau: number;
+      /** How long a plateau fix lasts (one default block). */
+      plateauDays: number;
+      /** Reps the plateau's rep-scheme change shifts the range by. */
+      plateauRepShift: number;
+      /** A plateau back-off set's load, as a fraction of the working load. */
+      backOffLoad: number;
+      /** A next step bigger than this fraction of load is too big a jump. */
+      maxJump: number;
+      /** Reps added to the top of the range per step when the jump is too big. */
+      extraRepsStep: number;
+      maxExtraReps: number;
+      maxExtraSets: number;
+    };
   };
   run: {
     /** Share of weekly distance per run when there is no history (§5.2). */
@@ -63,6 +86,19 @@ export const ENGINE_CONFIG: EngineConfig = {
     exposuresKept: 6,
     confidenceStep: 0.3,
     calibration: { days: 14, maxRise: 0.015, missToleranceReps: 1 },
+    progression: {
+      beatRirMargin: 2,
+      maxDoubleRise: 0.05,
+      cut: 0.075,
+      stallsToPlateau: 3,
+      plateauDays: 28,
+      plateauRepShift: 3,
+      backOffLoad: 0.85,
+      maxJump: 0.25,
+      extraRepsStep: 2,
+      maxExtraReps: 4,
+      maxExtraSets: 1,
+    },
   },
   run: {
     // One long run at 35–45% of the week; easy and quality split the rest.
