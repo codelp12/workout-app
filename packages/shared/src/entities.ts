@@ -51,6 +51,8 @@ export const MEDIA_KINDS = ["image", "video"] as const;
 export const CLIMB_DISCIPLINES = ["boulder", "route"] as const;
 export const PROBLEM_REPORT_STATUSES = ["new", "filed"] as const;
 export const CHECKLIST_KINDS = ["warmup", "stretch"] as const;
+/** What a `fitness_state` row measures. Running and climbing add theirs in Phases 3–4. */
+export const FITNESS_METRICS = ["e1rm"] as const;
 /** What a checklist goes with: a run or climb, or a lift session's family (`push_a` is push). */
 export const CHECKLIST_SESSION_TYPES = [
   "run",
@@ -83,6 +85,7 @@ export type AscentStyle = (typeof ASCENT_STYLES)[number];
 export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
 export type ClimbDiscipline = (typeof CLIMB_DISCIPLINES)[number];
 export type ChecklistKind = (typeof CHECKLIST_KINDS)[number];
+export type FitnessMetric = (typeof FITNESS_METRICS)[number];
 export type ChecklistSessionType = (typeof CHECKLIST_SESSION_TYPES)[number];
 
 /** Milliseconds since the epoch, UTC. */
@@ -307,6 +310,25 @@ export const weekSchema = z.object({
 });
 export type Week = z.infer<typeof weekSchema>;
 
+/**
+ * One point of an engine's fitness time series (§4), e.g. a lift's e1RM after
+ * a day it was trained. Written by the server; the phone only reads it.
+ */
+export const fitnessStateSchema = z.object({
+  ...syncFields,
+  metric: z.enum(FITNESS_METRICS),
+  /** The lift, for `e1rm`. */
+  exerciseId: z.uuid().nullable(),
+  date: localDate,
+  /** For `e1rm`, per dumbbell on dumbbell lifts. */
+  value: z.number().nonnegative(),
+  unit: z.enum(WEIGHT_UNITS).nullable(),
+  /** 0–1. */
+  confidence: z.number().min(0).max(1).nullable(),
+  engineVersion: z.string(),
+});
+export type FitnessState = z.infer<typeof fitnessStateSchema>;
+
 export const plannedSessionSchema = z.object({
   ...syncFields,
   weekId: z.uuid().nullable(),
@@ -507,6 +529,7 @@ export const entitySchemas = {
   checklist: checklistSchema,
   block: blockSchema,
   week: weekSchema,
+  fitness_state: fitnessStateSchema,
   planned_session: plannedSessionSchema,
   planned_item: plannedItemSchema,
   plan_override: planOverrideSchema,

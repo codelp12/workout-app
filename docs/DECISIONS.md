@@ -435,3 +435,12 @@ Options considered:
 
 - **Stretch lists use the same synced checklist rows and session-log ticks as warm-ups.** Runs and legs share a routine, as do pull and climb. The list opens on the finished summary and can be hidden in one tap. Ticking it doesn't change when the workout ended.
 - **How-to uses the library where it matches.** Library photos for default stretches are precached. Doorway chest stretch and thoracic rotation have text cues instead of photos because the dataset doesn't have matching movements. Run and leg stretches show form cues alongside library photos so the checklist's hold time doesn't contradict library instructions.
+
+## 2026-11-19: Lift state and e1RM model (#144)
+
+- **Per-exercise lift state lives in the engine.** `packages/engine/src/lift/state.ts` keeps each exercise's e1RM, a 0–1 confidence, the last 6 exposures, a stall count (0 until #145), the first logged date and the date e1RM last rose. It folds sets with SPEC §5.1's Epley formula, 12-rep cutoff, asymmetric smoothing (0.3 up, 0.5 down) and +3% rise cap. Warm-ups and logs older than the latest exposure are ignored. The stub still writes plans until #148.
+- **e1RM history is a synced `fitness_state` table.** One row per metric, exercise and day (`fitnessStateId`), plus an onboarding point on the onboarding date. The server owns it: every push that applies a `settings`, `session_log` or `set_log` change recomputes the series from all lift logs, writes only changed rows and tombstones points whose logs are gone. Running and climbing metrics will reuse the table. (§4)
+- **Outside the spec, pending owner sign-off:**
+  - Calibration lasts 14 days from an exercise's first logged session. During it the rise cap is +1.5%, and #145 gives a miss 1 rep of slack.
+  - Confidence starts at 0.3 from an onboarding answer (else 0) and closes 30% of the gap to 1 with each session that has a usable set.
+  - A set logged without RIR counts as RIR 0.

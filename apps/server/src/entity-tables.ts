@@ -10,6 +10,7 @@ export const entityTables = {
   checklist: schema.checklist,
   block: schema.block,
   week: schema.week,
+  fitness_state: schema.fitnessState,
   planned_session: schema.plannedSession,
   planned_item: schema.plannedItem,
   plan_override: schema.planOverride,

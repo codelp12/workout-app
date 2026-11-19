@@ -50,6 +50,18 @@ function insertPlan(tx: Tx, plan: ReturnType<typeof planWeek>) {
   }
 }
 
+/** The owner's settings, or the defaults until they first sync. */
+export function ownerSettings(tx: Tx, now: number) {
+  const saved = tx
+    .select()
+    .from(settings)
+    .where(eq(settings.id, SETTINGS_ID))
+    .get();
+  return saved && saved.deletedAt === null
+    ? saved
+    : defaultSettings(serverTimezone(), now);
+}
+
 /**
  * Weekly rollover (SPEC §3.2): if the week that's current in the owner's zone
  * has no row yet, plans it from every log on the server. Runs at the start of
@@ -59,15 +71,7 @@ function insertPlan(tx: Tx, plan: ReturnType<typeof planWeek>) {
  */
 export function planCurrentWeek(db: Db, now: number): boolean {
   return db.transaction((tx) => {
-    const saved = tx
-      .select()
-      .from(settings)
-      .where(eq(settings.id, SETTINGS_ID))
-      .get();
-    const owner =
-      saved && saved.deletedAt === null
-        ? saved
-        : defaultSettings(serverTimezone(), now);
+    const owner = ownerSettings(tx, now);
     const weekStart = weekStartOf(localDateAt(owner.timezone, now));
     const existing = tx
       .select({ id: week.id })
