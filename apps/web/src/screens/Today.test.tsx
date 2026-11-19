@@ -186,6 +186,7 @@ describe("Today", () => {
       timezone: "UTC",
       rpe: 7,
       notes: null,
+      checked: [],
     });
     renderAt("/");
     const am = await slot("AM");

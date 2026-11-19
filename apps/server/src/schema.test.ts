@@ -40,6 +40,7 @@ const rowsMatch: RowsMatch = {
   settings: true,
   exercise: true,
   template: true,
+  checklist: true,
   block: true,
   week: true,
   planned_session: true,
@@ -135,6 +136,12 @@ const fixtures: { [E in EntityName]: EntityRow<E> } = {
     sourceId: "Dumbbell_Bench_Press",
     notes: "Use the flat bench by the window.",
   },
+  checklist: {
+    ...base(),
+    kind: "warmup",
+    sessionType: "push",
+    items: [{ id: "arm-circles", name: "Arm circles", detail: null }],
+  },
   template: {
     ...base(),
     name: "Push A",
@@ -210,6 +217,7 @@ const fixtures: { [E in EntityName]: EntityRow<E> } = {
     timezone: "America/New_York",
     rpe: 7,
     notes: "Felt good",
+    checked: [],
   },
   set_log: {
     ...base(),

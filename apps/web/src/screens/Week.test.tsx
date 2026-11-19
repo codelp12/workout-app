@@ -84,6 +84,7 @@ const log = (fields: Partial<SessionLog>): SessionLog => ({
   timezone: "UTC",
   rpe: null,
   notes: null,
+  checked: [],
   ...fields,
 });
 

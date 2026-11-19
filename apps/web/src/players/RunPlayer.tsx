@@ -12,6 +12,9 @@ import { readSettings } from "../settings/settings";
 import { localDb, syncSoon } from "../sync";
 import { button, buttonBase, card, input } from "../ui";
 import { useLiveQuery } from "../use-live-query";
+import { deleteRow } from "../sync/writes";
+import { DiscardSheet } from "./DiscardSheet";
+import { WarmupChecklist } from "./WarmupChecklist";
 import {
   durationOf,
   elevationUnitFor,
@@ -380,7 +383,24 @@ export function RunPlayer({ view }: { view: SessionView }) {
       {data.run && data.log?.endedAt != null ? (
         <RunSummary session={data} />
       ) : (
-        <RunForm view={view} unit={settings.distanceUnit} />
+        <>
+          <WarmupChecklist
+            view={view}
+            checked={data.log?.checked ?? []}
+            startOpen
+          />
+          <RunForm view={view} unit={settings.distanceUnit} />
+          {data.log && !data.run && (
+            <DiscardSheet
+              title="Discard run"
+              onDiscard={async () => {
+                if (data.log)
+                  await deleteRow(localDb, "session_log", data.log.id);
+                syncSoon();
+              }}
+            />
+          )}
+        </>
       )}
     </section>
   );

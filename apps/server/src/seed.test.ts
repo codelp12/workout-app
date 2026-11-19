@@ -1,8 +1,11 @@
 import {
   PREVIOUS_DEFAULT_TEMPLATES,
+  defaultChecklists,
   defaultTemplates,
 } from "@workout-app/exercise-data";
 import {
+  checklistSchema,
+  defaultChecklistId,
   defaultTemplateId,
   exerciseSchema,
   libraryExerciseId,
@@ -14,8 +17,13 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "./app.js";
 import { setPassword } from "./auth.js";
 import { openDb, runMigrations, type Db } from "./db.js";
-import { exercise, template } from "./schema.js";
-import { LIBRARY_DATASET, seedExercises, seedTemplates } from "./seed.js";
+import { checklist, exercise, template } from "./schema.js";
+import {
+  LIBRARY_DATASET,
+  seedChecklists,
+  seedExercises,
+  seedTemplates,
+} from "./seed.js";
 
 const T0 = Date.UTC(2026, 10, 1);
 let db: Db;
@@ -169,5 +177,47 @@ describe("seedTemplates", () => {
     expect(
       db.select().from(template).where(eq(template.id, pushA)).get(),
     ).toMatchObject({ name: "My push", deletedAt: T0 });
+  });
+});
+
+describe("seedChecklists", () => {
+  it("adds a warm-up list per session type once, as valid rows", () => {
+    expect(seedChecklists(db, T0)).toBe(5);
+    expect(seedChecklists(db, T0 + 1)).toBe(0);
+    const rows = db.select().from(checklist).all();
+    expect(rows.map((r) => r.sessionType).sort()).toEqual([
+      "climb",
+      "legs",
+      "pull",
+      "push",
+      "run",
+    ]);
+    for (const row of rows) {
+      expect(checklistSchema.safeParse(row).success).toBe(true);
+      expect(row.id).toBe(defaultChecklistId("warmup", row.sessionType));
+      expect(new Set(row.items.map((i) => i.id)).size).toBe(row.items.length);
+    }
+  });
+
+  it("leaves edited and deleted lists alone", () => {
+    seedChecklists(db, T0);
+    const push = defaultChecklistId("warmup", "push");
+    const run = defaultChecklistId("warmup", "run");
+    db.update(checklist).set({ items: [] }).where(eq(checklist.id, push)).run();
+    db.update(checklist)
+      .set({ deletedAt: T0 })
+      .where(eq(checklist.id, run))
+      .run();
+    expect(seedChecklists(db, T0 + 1)).toBe(0);
+    const byId = new Map(
+      db
+        .select()
+        .from(checklist)
+        .all()
+        .map((r) => [r.id, r]),
+    );
+    expect(byId.get(push)?.items).toEqual([]);
+    expect(byId.get(run)?.deletedAt).toBe(T0);
+    expect(defaultChecklists()).toHaveLength(5);
   });
 });

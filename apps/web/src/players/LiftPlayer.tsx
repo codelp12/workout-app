@@ -17,6 +17,7 @@ import { button, buttonBase, card as cardClass } from "../ui";
 import { useLiveQuery } from "../use-live-query";
 import { DiscardSheet } from "./DiscardSheet";
 import { FinishSheet } from "./FinishSheet";
+import { WarmupChecklist } from "./WarmupChecklist";
 import {
   bandChoices,
   cardDone,
@@ -673,6 +674,11 @@ export function LiftPlayer({ view }: { view: SessionView }) {
         else if (dx >= SWIPE) go(index - 1);
       }}
     >
+      <WarmupChecklist
+        view={view}
+        checked={data.log?.checked ?? []}
+        startOpen={cards.every((c) => c.sets.length === 0)}
+      />
       <nav
         aria-label="Exercises"
         className="flex items-center justify-between gap-2"

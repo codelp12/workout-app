@@ -164,6 +164,7 @@ export async function startClimb(
       timezone: settings.timezone,
       rpe: null,
       notes: null,
+      checked: [],
     },
     now,
   );

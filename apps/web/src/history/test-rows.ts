@@ -42,6 +42,7 @@ export const rows = {
     timezone: "UTC",
     rpe: null,
     notes: null,
+    checked: [],
     ...fields,
   }),
   set: (log: SessionLog, fields: Partial<SetLog> = {}): SetLog => ({

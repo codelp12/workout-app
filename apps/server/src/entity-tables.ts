@@ -7,6 +7,7 @@ export const entityTables = {
   settings: schema.settings,
   exercise: schema.exercise,
   template: schema.template,
+  checklist: schema.checklist,
   block: schema.block,
   week: schema.week,
   planned_session: schema.plannedSession,
