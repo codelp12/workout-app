@@ -14,6 +14,7 @@ import { button, buttonBase, card, input } from "../ui";
 import { useLiveQuery } from "../use-live-query";
 import { deleteRow } from "../sync/writes";
 import { DiscardSheet } from "./DiscardSheet";
+import { StretchChecklist } from "./StretchChecklist";
 import { WarmupChecklist } from "./WarmupChecklist";
 import {
   durationOf,
@@ -381,7 +382,10 @@ export function RunPlayer({ view }: { view: SessionView }) {
     <section aria-label="Run player" className="flex flex-col gap-3">
       <WorkoutBars view={view} />
       {data.run && data.log?.endedAt != null ? (
-        <RunSummary session={data} />
+        <>
+          <RunSummary session={data} />
+          <StretchChecklist session={view.session} log={data.log} />
+        </>
       ) : (
         <>
           <WarmupChecklist

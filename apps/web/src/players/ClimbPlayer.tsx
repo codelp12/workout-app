@@ -39,6 +39,7 @@ import {
 } from "./climb-log";
 import { DiscardSheet } from "./DiscardSheet";
 import { FinishSheet } from "./FinishSheet";
+import { StretchChecklist } from "./StretchChecklist";
 import { WarmupChecklist } from "./WarmupChecklist";
 import { formatDuration } from "./run-log";
 
@@ -597,7 +598,10 @@ export function ClimbPlayer({ view }: { view: SessionView }) {
     <section aria-label="Climb player" className="flex flex-col gap-3">
       <PlannedClimb view={view} />
       {data.log?.endedAt != null ? (
-        <ClimbFinished data={data} discipline={discipline} />
+        <>
+          <ClimbFinished data={data} discipline={discipline} />
+          <StretchChecklist session={view.session} log={data.log} />
+        </>
       ) : (
         <>
           <WarmupChecklist

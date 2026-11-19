@@ -3,7 +3,7 @@ import { useCallback, useId, useState, type FormEvent } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 import { Loading, Skeleton } from "../components/Skeleton";
 import { useToast } from "../components/toast-context";
-import { ExerciseImage } from "../library/ExerciseImage";
+import { ExercisePhotos } from "../library/ExercisePhotos";
 import { vocabLabel } from "../library/filter";
 import { localDb, save } from "../sync";
 import { button, card, input } from "../ui";
@@ -80,29 +80,6 @@ function Facts({ exercise: e }: { exercise: Exercise }) {
         </div>
       )}
     </dl>
-  );
-}
-
-function Photos({ exercise: e }: { exercise: Exercise }) {
-  const images = e.media.filter((m) => m.kind === "image");
-  if (images.length === 0) return null;
-  const credit = images[0]!;
-  return (
-    <figure className="flex flex-col gap-1">
-      <div className="flex snap-x snap-mandatory gap-2 overflow-x-auto">
-        {images.map((m, i) => (
-          <ExerciseImage
-            key={m.path}
-            path={m.path}
-            alt={`${e.name}, photo ${i + 1} of ${images.length}`}
-            className="aspect-[4/3] w-full shrink-0 snap-center"
-          />
-        ))}
-      </div>
-      <figcaption className="text-xs text-fg-muted">
-        Photos: {credit.source.split("@")[0]}, {credit.license}
-      </figcaption>
-    </figure>
   );
 }
 
@@ -183,7 +160,7 @@ export function ExerciseDetail() {
   return (
     <Screen title={exercise.name}>
       <BackButton />
-      <Photos exercise={exercise} />
+      <ExercisePhotos exercise={exercise} />
       <Facts exercise={exercise} />
       <ListSection title="Instructions" items={exercise.instructions} ordered />
       <ListSection title="Cues" items={exercise.cues} />

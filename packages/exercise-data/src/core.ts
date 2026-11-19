@@ -130,6 +130,7 @@ const substitutes = {
     "Calf_Stretch_Hands_Against_Wall",
     "Standing_Soleus_And_Achilles_Stretch",
     "Overhead_Lat",
+    "One_Arm_Against_Wall",
     "Chest_And_Front_Of_Shoulder_Stretch",
     "Shoulder_Stretch",
     "Triceps_Stretch",

@@ -5,7 +5,7 @@ import { readSettings } from "../settings/settings";
 import { localDb, syncSoon } from "../sync";
 import { card } from "../ui";
 import { useLiveQuery } from "../use-live-query";
-import { readWarmup, toggleChecked } from "./checklist";
+import { readChecklist, toggleChecked } from "./checklist";
 
 /**
  * The session type's warm-up list (#121), ticked off one tap per item. Open
@@ -21,7 +21,10 @@ export function WarmupChecklist({
   startOpen: boolean;
 }) {
   const { session } = view;
-  const query = useCallback(() => readWarmup(localDb, session), [session]);
+  const query = useCallback(
+    () => readChecklist(localDb, session, "warmup"),
+    [session],
+  );
   const list = useLiveQuery<Checklist | null>(query, null);
   const [open, setOpen] = useState(startOpen);
   if (!list || list.items.length === 0) return null;

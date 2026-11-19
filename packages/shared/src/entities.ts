@@ -385,10 +385,13 @@ export const checklistItemSchema = z.object({
   name: z.string().min(1),
   /** How much, e.g. `8–10 per side`. */
   detail: z.string().nullable(),
+  exerciseId: z.uuid().optional(),
+  /** Checklist-specific guidance, used instead of library instructions when set. */
+  instruction: z.string().min(1).optional(),
 });
 export type ChecklistItem = z.infer<typeof checklistItemSchema>;
 
-/** A warm-up (or later stretch) list for one session type, editable like a template. */
+/** A warm-up or stretch list for one session type, editable like a template. */
 export const checklistSchema = z.object({
   ...syncFields,
   kind: z.enum(CHECKLIST_KINDS),

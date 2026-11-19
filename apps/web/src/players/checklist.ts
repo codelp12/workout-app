@@ -2,6 +2,7 @@ import {
   localDateAt,
   sessionLogId,
   type Checklist,
+  type ChecklistKind,
   type ChecklistSessionType,
   type PlannedSession,
 } from "@workout-app/shared";
@@ -22,10 +23,11 @@ export function checklistSessionType(
     : null;
 }
 
-/** The session's live warm-up list, or `null` if it has none. */
-export async function readWarmup(
+/** The session's live checklist of this kind, or `null` if it has none. */
+export async function readChecklist(
   db: LocalDb,
   session: Pick<PlannedSession, "modality" | "workoutType">,
+  kind: ChecklistKind,
 ): Promise<Checklist | null> {
   const type = checklistSessionType(session);
   if (!type) return null;
@@ -34,10 +36,36 @@ export async function readWarmup(
     lists
       .filter(
         (c) =>
-          c.deletedAt === null && c.kind === "warmup" && c.sessionType === type,
+          c.deletedAt === null && c.kind === kind && c.sessionType === type,
       )
       .sort((a, b) => b.updatedAt - a.updatedAt)[0] ?? null
   );
+}
+
+function toggleItem(checked: readonly string[], itemId: string): string[] {
+  return checked.includes(itemId)
+    ? checked.filter((id) => id !== itemId)
+    : [...checked, itemId];
+}
+
+/** Updates an already finished session without starting or reviving a log. */
+export async function toggleStretchChecked(
+  db: LocalDb,
+  logId: string,
+  itemId: string,
+  now = Date.now(),
+): Promise<void> {
+  const logs = db.rows("session_log");
+  await db.transaction("rw", logs, db.outbox, async () => {
+    const log = await logs.get(logId);
+    if (!log || log.deletedAt !== null || log.endedAt === null) return;
+    await saveRow(
+      db,
+      "session_log",
+      { ...log, checked: toggleItem(log.checked, itemId), updatedAt: now },
+      now,
+    );
+  });
 }
 
 async function applyToggle(
@@ -50,10 +78,6 @@ async function applyToggle(
   const id = sessionLogId(view.session.id);
   const existing = await db.rows("session_log").get(id);
   const live = existing && existing.deletedAt === null ? existing : null;
-  const checked = live?.checked ?? [];
-  const next = checked.includes(itemId)
-    ? checked.filter((i) => i !== itemId)
-    : [...checked, itemId];
   await saveRow(
     db,
     "session_log",
@@ -70,7 +94,7 @@ async function applyToggle(
       timezone: live?.timezone ?? timezone,
       rpe: live?.rpe ?? null,
       notes: live?.notes ?? null,
-      checked: next,
+      checked: toggleItem(live?.checked ?? [], itemId),
     },
     now,
   );
