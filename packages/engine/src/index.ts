@@ -8,3 +8,4 @@ export * from "./stubs/run.js";
 export * from "./types.js";
 export * from "./units.js";
 export * from "./week.js";
+export * from "./lift/progression.js";
