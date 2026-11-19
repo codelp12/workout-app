@@ -123,8 +123,19 @@ test("a run logs offline with its pace and syncs", async ({
   const download = await downloading;
   expect(download.suggestedFilename()).toMatch(/^workout-app-runs-.*\.csv$/);
   const csv = await readFile(await download.path(), "utf8");
-  expect(csv.split("\r\n")[1]).toMatch(
-    /^\d{4}-\d{2}-\d{2},threshold,3\.1,mi,1581,/,
+  // Which run was picked depends on the weekday, so match its type.
+  const type = (
+    {
+      "Easy run": "easy",
+      "Threshold run": "threshold",
+      Intervals: "intervals",
+      "Long run": "long",
+    } as Record<string, string>
+  )[title];
+  expect(csv.split("\r\n").slice(1)).toContainEqual(
+    expect.stringMatching(
+      new RegExp(`^\\d{4}-\\d{2}-\\d{2},${type},3\\.1,mi,1581,`),
+    ),
   );
   await context.setOffline(false);
 
