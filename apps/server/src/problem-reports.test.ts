@@ -3,7 +3,12 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "./app.js";
 import { setPassword } from "./auth.js";
 import { openDb, runMigrations, type Db } from "./db.js";
-import { formatReports, markFiled, newReports } from "./problem-reports.js";
+import {
+  formatReports,
+  markAllFiled,
+  markFiled,
+  newReports,
+} from "./problem-reports.js";
 
 const PASSWORD = "correct horse battery";
 const T0 = Date.UTC(2026, 10, 10, 17);
@@ -142,5 +147,53 @@ describe("problem reports", () => {
     expect(markFiled(db, a.id, 0)).toMatchObject({ ok: false });
     expect(markFiled(db, a.id.toUpperCase(), 7)).toMatchObject({ ok: true });
     expect(newReports(db).map((r) => r.id)).toEqual([b.id]);
+  });
+
+  it("marks a whole batch filed in one call, so the next list is empty", async () => {
+    const a = report({ text: "A" });
+    const b = report({ text: "B" });
+    await push(a, b);
+
+    const result = markAllFiled(
+      db,
+      [
+        { idSuffix: a.id.slice(-8), issue: 134 },
+        { idSuffix: b.id.slice(-8), issue: 135 },
+      ],
+      T0 + 1000,
+    );
+    expect(result).toMatchObject({
+      ok: true,
+      reports: [{ githubIssue: 134 }, { githubIssue: 135 }],
+    });
+    expect(newReports(db)).toEqual([]);
+  });
+
+  it("marks none of a batch when one filing in the middle is bad", async () => {
+    const a = report({ text: "A" });
+    const b = report({ text: "B" });
+    await push(a, b);
+
+    const result = markAllFiled(db, [
+      { idSuffix: a.id.slice(-8), issue: 134 },
+      { idSuffix: "ffffffff", issue: 135 },
+      { idSuffix: b.id.slice(-8), issue: 136 },
+    ]);
+    expect(result).toEqual({
+      ok: false,
+      error: "No report id ends with ffffffff.",
+    });
+    expect(newReports(db).map((r) => r.id)).toEqual([a.id, b.id]);
+    expect(markAllFiled(db, [])).toMatchObject({ ok: false });
+    expect(
+      markAllFiled(db, [
+        { idSuffix: a.id.slice(-8), issue: 134 },
+        { idSuffix: a.id, issue: 135 },
+      ]),
+    ).toEqual({
+      ok: false,
+      error: `${a.id.slice(-8)} and ${a.id} are the same report; give it once.`,
+    });
+    expect(newReports(db).map((r) => r.id)).toEqual([a.id, b.id]);
   });
 });
