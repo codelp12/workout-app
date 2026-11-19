@@ -185,5 +185,15 @@ describe("problem reports", () => {
     });
     expect(newReports(db).map((r) => r.id)).toEqual([a.id, b.id]);
     expect(markAllFiled(db, [])).toMatchObject({ ok: false });
+    expect(
+      markAllFiled(db, [
+        { idSuffix: a.id.slice(-8), issue: 134 },
+        { idSuffix: a.id, issue: 135 },
+      ]),
+    ).toEqual({
+      ok: false,
+      error: `${a.id.slice(-8)} and ${a.id} are the same report; give it once.`,
+    });
+    expect(newReports(db).map((r) => r.id)).toEqual([a.id, b.id]);
   });
 });

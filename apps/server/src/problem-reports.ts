@@ -79,9 +79,19 @@ export function markAllFiled(
   if (filings.length === 0)
     return { ok: false, error: "Give at least one <id> <issue> pair." };
   try {
-    const reports = db.transaction((tx) =>
-      filings.map((f) => markOne(tx, f, now)),
-    );
+    const reports = db.transaction((tx) => {
+      const marked = filings.map((f) => markOne(tx, f, now));
+      const seen = new Map<string, number>();
+      for (const [i, r] of marked.entries()) {
+        const first = seen.get(r.id);
+        if (first !== undefined)
+          throw new FilingError(
+            `${filings[first]!.idSuffix} and ${filings[i]!.idSuffix} are the same report; give it once.`,
+          );
+        seen.set(r.id, i);
+      }
+      return marked;
+    });
     return { ok: true, reports };
   } catch (e) {
     if (e instanceof FilingError) return { ok: false, error: e.message };
