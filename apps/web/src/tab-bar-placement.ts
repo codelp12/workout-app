@@ -29,12 +29,13 @@ const tallest = new Map<number, number>();
 function keyboardUp(): boolean {
   const vv = window.visualViewport;
   if (!vv) return false;
+  // Zoom shrinks `height` too; scaled back up, only the keyboard shrinks it.
+  const height = vv.height * vv.scale;
   const width = window.innerWidth;
-  const full = Math.max(tallest.get(width) ?? 0, window.innerHeight, vv.height);
+  const full = Math.max(tallest.get(width) ?? 0, window.innerHeight, height);
   tallest.set(width, full);
   return (
-    isTextEntry(document.activeElement) &&
-    full - vv.height >= KEYBOARD_MIN_HEIGHT
+    isTextEntry(document.activeElement) && full - height >= KEYBOARD_MIN_HEIGHT
   );
 }
 

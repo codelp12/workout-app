@@ -6,6 +6,7 @@ import { isTextEntry, useTabBarPlacement } from "./tab-bar-placement";
 class FakeViewport extends EventTarget {
   offsetTop = 0;
   height = 800;
+  scale = 1;
 }
 
 let vv: FakeViewport;
@@ -87,6 +88,16 @@ describe("useTabBarPlacement", () => {
     act(() => {
       vv.offsetTop = 100;
       resize(400);
+    });
+    expect(placement()).toBe("false 0");
+  });
+
+  it("keeps the bar when a field is focused while zoomed in", () => {
+    render(<Probe />);
+    act(() => {
+      vv.scale = 2;
+      resize(400);
+      screen.getByLabelText("Reps").focus();
     });
     expect(placement()).toBe("false 0");
   });
