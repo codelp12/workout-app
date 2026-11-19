@@ -107,7 +107,7 @@ test("swaps and skips sync to the server", async ({ page }, testInfo) => {
   const card = player.getByRole("article");
 
   // The first card belongs to the other test; swap the second, skip the third.
-  await player.getByRole("button", { name: "Next" }).click();
+  await player.getByRole("button", { name: "Next", exact: true }).click();
   await expect(player.getByText("Exercise 2 of")).toBeVisible();
   await card.getByRole("button", { name: "Swap" }).click();
   const sheet = page.getByRole("dialog", { name: "Swap exercise" });
@@ -120,7 +120,7 @@ test("swaps and skips sync to the server", async ({ page }, testInfo) => {
   await expect(sheet).toBeHidden();
   await expect(player.getByRole("article", { name: swappedTo })).toBeVisible();
 
-  await player.getByRole("button", { name: "Next" }).click();
+  await player.getByRole("button", { name: "Next", exact: true }).click();
   await expect(player.getByText("Exercise 3 of")).toBeVisible();
   await card.getByRole("button", { name: "Skip" }).click();
   await expect(player.getByText("Exercise 4 of")).toBeVisible();
@@ -169,8 +169,11 @@ test("a finished session shows as done and syncs", async ({
   const sessionId = new URL(page.url()).pathname.split("/").pop()!;
   const player = page.getByRole("region", { name: "Lift player" });
   const card = player.getByRole("article");
-  await card.getByRole("radio", { name: "2" }).click();
-  await card.getByRole("button", { name: "Log set" }).click();
+  // The first test may have logged this card's only row already.
+  await card.getByRole("button", { name: "Add set" }).click();
+  const row = card.getByRole("region", { name: /^Set \d+$/ }).last();
+  await row.getByRole("radio", { name: "2" }).click();
+  await row.getByRole("button", { name: "Log set" }).click();
 
   await player.getByRole("button", { name: "Finish workout" }).click();
   const sheet = page.getByRole("dialog", { name: "Finish workout" });
