@@ -6,6 +6,7 @@ import {
   deleteDataSchema,
   syncOpSchema,
   upsertDataSchemas,
+  type EntityName,
   type PullResponse,
   type PushResponse,
   type PushResult,
@@ -16,6 +17,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { Db } from "./db.js";
 import { entityTables } from "./entity-tables.js";
+import { refreshFitnessState } from "./fitness.js";
 import { planCurrentWeek } from "./plan.js";
 import { opReceipt, syncCounter } from "./schema.js";
 
@@ -43,6 +45,13 @@ const pullQuery = z.object({
     .max(MAX_PULL_LIMIT)
     .default(DEFAULT_PULL_LIMIT),
 });
+
+/** Entities the e1RM series is computed from (`refreshFitnessState`). */
+const FITNESS_INPUTS = new Set<EntityName>([
+  "settings",
+  "session_log",
+  "set_log",
+]);
 
 /** Claims the next global `serverSeq`. */
 export function nextSeq(tx: Tx): number {
@@ -143,10 +152,18 @@ export function syncRoutes(
     const body = pushBody.safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json({ error: "Invalid push" }, 400);
     const receivedAt = now();
-    const response = db.transaction((tx): PushResponse => ({
-      results: body.data.ops.map((op) => applyOp(tx, op, receivedAt)),
-      cursor: currentSeq(tx),
-    }));
+    const response = db.transaction((tx): PushResponse => {
+      const results = body.data.ops.map((op) => applyOp(tx, op, receivedAt));
+      const liftInputsChanged = results.some(
+        (result, i) =>
+          result.status === "applied" &&
+          FITNESS_INPUTS.has(
+            (body.data.ops[i] as { entity?: unknown }).entity as EntityName,
+          ),
+      );
+      if (liftInputsChanged) refreshFitnessState(tx, receivedAt);
+      return { results, cursor: currentSeq(tx) };
+    });
     return c.json(response);
   });
 

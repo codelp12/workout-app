@@ -14,6 +14,7 @@ import type {
   DistanceUnit,
   ElevationUnit,
   Equipment,
+  FitnessMetric,
   Goals,
   IntensityClass,
   Intent,
@@ -174,6 +175,24 @@ export const week = sqliteTable(
     index("week_server_seq_idx").on(t.serverSeq),
     index("week_block_id_idx").on(t.blockId),
     index("week_start_date_idx").on(t.startDate),
+  ],
+);
+
+export const fitnessState = sqliteTable(
+  "fitness_state",
+  {
+    ...syncColumns(),
+    metric: text("metric").$type<FitnessMetric>().notNull(),
+    exerciseId: text("exercise_id"),
+    date: text("date").notNull(),
+    value: real("value").notNull(),
+    unit: text("unit").$type<WeightUnit>(),
+    confidence: real("confidence"),
+    engineVersion: text("engine_version").notNull(),
+  },
+  (t) => [
+    index("fitness_state_server_seq_idx").on(t.serverSeq),
+    index("fitness_state_exercise_id_idx").on(t.exerciseId),
   ],
 );
 

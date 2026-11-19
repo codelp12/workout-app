@@ -43,6 +43,18 @@ export function weekId(startDate: string): string {
   return v5(`week:${startDate}`, LIBRARY_NAMESPACE);
 }
 
+/** The id of a metric's point on a date, e.g. ("e1rm", <exercise id>, "2026-11-02"). */
+export function fitnessStateId(
+  metric: string,
+  subjectId: string | null,
+  date: string,
+): string {
+  return v5(
+    `fitness-state:${metric}:${subjectId ?? ""}:${date}`,
+    LIBRARY_NAMESPACE,
+  );
+}
+
 /** The id of a week's generated session, e.g. ("2026-11-02", "push_a"). */
 export function plannedSessionId(weekStart: string, key: string): string {
   return v5(`planned-session:${weekStart}:${key}`, LIBRARY_NAMESPACE);
