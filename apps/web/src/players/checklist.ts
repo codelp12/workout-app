@@ -40,11 +40,7 @@ export async function readWarmup(
   );
 }
 
-/**
- * Ticks or unticks a checklist item on the session's log, starting the log
- * if this is the first thing done in the session, like a first set.
- */
-export async function toggleChecked(
+async function applyToggle(
   db: LocalDb,
   view: SessionView,
   itemId: string,
@@ -78,4 +74,23 @@ export async function toggleChecked(
     },
     now,
   );
+}
+
+let queue: Promise<void> = Promise.resolve();
+
+/**
+ * Ticks or unticks a checklist item on the session's log, starting the log
+ * if this is the first thing done in the session, like a first set. Toggles
+ * run one at a time, so quick taps don't overwrite each other.
+ */
+export function toggleChecked(
+  db: LocalDb,
+  view: SessionView,
+  itemId: string,
+  timezone: string,
+  now = Date.now(),
+): Promise<void> {
+  const run = queue.then(() => applyToggle(db, view, itemId, timezone, now));
+  queue = run.catch(() => {});
+  return run;
 }

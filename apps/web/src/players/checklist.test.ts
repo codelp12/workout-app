@@ -131,3 +131,16 @@ describe("warm-up checklist", () => {
     expect(await db.outbox.count()).toBe(3);
   });
 });
+
+describe("overlapping toggles", () => {
+  const db = openLocalDb("checklist-overlap-test");
+  it("keeps both ticks", async () => {
+    const session = plannedSession();
+    await Promise.all([
+      toggleChecked(db, viewOf(session), "a", "UTC", 1000),
+      toggleChecked(db, viewOf(session), "b", "UTC", 1000),
+    ]);
+    const log = await db.rows("session_log").get(sessionLogId(session.id));
+    expect(log?.checked).toEqual(["a", "b"]);
+  });
+});
