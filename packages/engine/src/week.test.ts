@@ -188,9 +188,16 @@ describe("planWeek", () => {
           id: "s1",
           modality: "lift",
           localDate: "2026-10-27",
+          startedAt: 0,
           deletedAt: null,
         },
-        { id: "s2", modality: "run", localDate: "2026-10-28", deletedAt: null },
+        {
+          id: "s2",
+          modality: "run",
+          localDate: "2026-10-28",
+          startedAt: 0,
+          deletedAt: null,
+        },
       ],
       sets: [
         {
@@ -239,6 +246,35 @@ describe("planWeek", () => {
     ).toMatchObject({
       distance: { value: 3, unit: "mi" },
     });
+  });
+
+  it("orders same-day sessions by start time", () => {
+    const session = (id: string, startedAt: number) => ({
+      id,
+      modality: "lift" as const,
+      localDate: "2026-10-27",
+      startedAt,
+      deletedAt: null,
+    });
+    const set = (sessionLogId: string, loadValue: number) => ({
+      sessionLogId,
+      exerciseId: "e",
+      index: 0,
+      loadValue,
+      loadUnit: "lb" as const,
+      band: null,
+      reps: 8,
+      rir: 2,
+      isWarmup: false,
+      deletedAt: null,
+    });
+    const { lift } = groupLogs({
+      sessions: [session("late", 2), session("early", 1)],
+      sets: [set("late", 60), set("early", 50)],
+      runs: [],
+      ascents: [],
+    });
+    expect(lift.map((l) => l.sets[0]?.loadValue)).toEqual([50, 60]);
   });
 
   it("has one spec per key", () => {

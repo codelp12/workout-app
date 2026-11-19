@@ -151,7 +151,10 @@ export type PlanLogs = {
 
 /** Groups synced log rows into each engine's session logs, skipping deleted rows. */
 export function groupLogs(rows: {
-  sessions: readonly (Pick<SessionLog, "id" | "modality" | "localDate"> &
+  sessions: readonly (Pick<
+    SessionLog,
+    "id" | "modality" | "localDate" | "startedAt"
+  > &
     Live)[];
   sets: readonly (LiftSessionLog["sets"][number] &
     Pick<SetLog, "sessionLogId"> &
@@ -174,8 +177,9 @@ export function groupLogs(rows: {
   const runs = bySession(live(rows.runs));
   const ascents = bySession(live(rows.ascents));
   const logs: PlanLogs = { lift: [], run: [], climb: [] };
-  const sessions = [...live(rows.sessions)].sort((a, b) =>
-    a.localDate.localeCompare(b.localDate),
+  const sessions = [...live(rows.sessions)].sort(
+    (a, b) =>
+      a.localDate.localeCompare(b.localDate) || a.startedAt - b.startedAt,
   );
   for (const s of sessions) {
     const session = { localDate: s.localDate };
