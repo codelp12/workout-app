@@ -141,6 +141,10 @@ describe("weekScheme", () => {
     ) => weekScheme(s, accessory, state.exercises.bench, at(index, 6), ctx);
     expect(scheme(met, 1)).toMatchObject({ rampSets: 1, rampGained: true });
     expect(scheme(missed, 1)).toMatchObject({ rampSets: 0 });
+    const short = log(START, 12);
+    expect(
+      scheme(fold({ ...short, sets: short.sets.slice(0, 1) }), 1).rampSets,
+    ).toBe(0);
     expect(scheme(met, 1, { ...slot, ramp: false }).rampSets).toBe(0);
     expect(scheme(met, 0).rampSets).toBe(0);
 
