@@ -87,6 +87,30 @@ export type LiftSessionLog = {
 
 // Equipment-first selection (SPEC §5.1): dumbbell, band, then bodyweight.
 const PREFERENCE = ["dumbbell", "band", "bodyweight"];
+const EQUIPMENT_WORDS = new Set([
+  "barbell",
+  "dumbbell",
+  "cable",
+  "machine",
+  "band",
+  "bands",
+]);
+
+function nameSimilarity(a: string, b: string): number {
+  const words = (name: string) =>
+    new Set(
+      name
+        .toLowerCase()
+        .split(/[^a-z0-9]+/)
+        .filter((word) => word.length > 0 && !EQUIPMENT_WORDS.has(word)),
+    );
+  const left = words(a);
+  const right = words(b);
+  const union = new Set([...left, ...right]);
+  if (union.size === 0) return 0;
+  const intersection = [...left].filter((word) => right.has(word)).length;
+  return intersection / union.size;
+}
 
 /** Lower is preferred: dumbbell, band, bodyweight, then anything else (SPEC §5.1). */
 export const equipmentRank = (exercise: Pick<LiftExercise, "equipment">) => {
@@ -146,6 +170,8 @@ export function resolveSlot(
       .sort(
         (a, b) =>
           ownedRank(a, equipment) - ownedRank(b, equipment) ||
+          nameSimilarity(b.name, exercise.name) -
+            nameSimilarity(a.name, exercise.name) ||
           a.name.localeCompare(b.name),
       );
     return candidates[0] ?? exercise;

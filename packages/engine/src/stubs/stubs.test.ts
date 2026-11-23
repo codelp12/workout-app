@@ -207,6 +207,29 @@ describe("lift stub", () => {
     });
   });
 
+  it("prefers the most similar name among explicit-slot dumbbell candidates", () => {
+    const barbellId = exercises[5]?.id ?? null;
+    const similar: LiftIntent = {
+      ...pushA,
+      exercises: [
+        ...exercises,
+        {
+          id: "00000000-0000-4000-8000-000000000005",
+          name: "A dumbbell alternative",
+          equipment: ["dumbbell"],
+          substitutionGroup: "squat_quads",
+        },
+      ],
+      slots: [slot({ exerciseId: barbellId })],
+    };
+    const [item] = liftStub.prescribe(
+      liftStub.initState(null),
+      similar,
+      ctx,
+    ).items;
+    expect(item?.exerciseId).toBe(squat);
+  });
+
   it("keeps a pinned explicit barbell exercise", () => {
     const intent: LiftIntent = {
       ...pushA,
