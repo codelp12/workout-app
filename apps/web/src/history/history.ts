@@ -61,12 +61,16 @@ type Logged = {
   ascents: Ascent[];
 };
 
-async function readLogged(db: LocalDb, logIds: Set<string>): Promise<Logged> {
+async function readLogged(
+  db: LocalDb,
+  logIds: Set<string>,
+  sets: SetLog[],
+): Promise<Logged> {
   const mine = <T extends { sessionLogId: string; deletedAt: number | null }>(
     rows: T[],
   ) => live(rows).filter((r) => logIds.has(r.sessionLogId));
   return {
-    sets: mine(await db.rows("set_log").toArray()),
+    sets: mine(sets),
     runs: mine(await db.rows("run_log").toArray()),
     ascents: mine(await db.rows("ascent").toArray()),
   };
@@ -127,17 +131,18 @@ function summarize(log: SessionLog, logged: Logged): string {
 }
 
 /** "Push A" from the planned session, else from the run's type or the modality. */
-async function titles(
+async function historyContext(
   db: LocalDb,
   logs: SessionLog[],
   runs: RunLog[],
-): Promise<Map<string, string>> {
+  sets: SetLog[],
+) {
   const [planned, overrides, allLogs] = await Promise.all([
     db.rows("planned_session").toArray(),
     db.rows("plan_override").toArray(),
     db.rows("session_log").toArray(),
   ]);
-  const combinations = liftCombinations(overrides, planned, allLogs);
+  const combinations = liftCombinations(overrides, planned, allLogs, sets);
   const planIds = new Set(
     logs.flatMap((l) => {
       if (!l.plannedSessionId) return [];
@@ -160,7 +165,7 @@ async function titles(
       t && t.deletedAt === null ? [[t.id, t.name]] : [],
     ),
   );
-  return new Map(
+  const names = new Map(
     logs.map((log) => {
       const session = log.plannedSessionId
         ? sessions.get(log.plannedSessionId)
@@ -188,6 +193,7 @@ async function titles(
       ];
     }),
   );
+  return { names, absorbed: new Set(combinations.values()) };
 }
 
 /** Every logged session, newest first, including ones not finished yet. */
@@ -196,13 +202,23 @@ export async function readHistory(db: LocalDb): Promise<HistoryEntry[]> {
     (a, b) =>
       b.localDate.localeCompare(a.localDate) || b.startedAt - a.startedAt,
   );
-  const logged = await readLogged(db, new Set(logs.map((l) => l.id)));
-  const names = await titles(db, logs, logged.runs);
-  return logs.map((log) => ({
-    log,
-    title: names.get(log.id)!,
-    summary: summarize(log, logged),
-  }));
+  const sets = await db.rows("set_log").toArray();
+  const logged = await readLogged(db, new Set(logs.map((l) => l.id)), sets);
+  const { names, absorbed } = await historyContext(db, logs, logged.runs, sets);
+  const withSets = new Set(logged.sets.map((s) => s.sessionLogId));
+  return logs
+    .filter(
+      (log) =>
+        log.endedAt !== null ||
+        !log.plannedSessionId ||
+        !absorbed.has(log.plannedSessionId) ||
+        withSets.has(log.id),
+    )
+    .map((log) => ({
+      log,
+      title: names.get(log.id)!,
+      summary: summarize(log, logged),
+    }));
 }
 
 /** A logged session with its sets, run or climbs, or null if there's no such log. */
@@ -212,8 +228,9 @@ export async function readHistoryDetail(
 ): Promise<HistoryDetail | null> {
   const log = await db.rows("session_log").get(logId);
   if (!log || log.deletedAt !== null) return null;
-  const logged = await readLogged(db, new Set([log.id]));
-  const names = await titles(db, [log], logged.runs);
+  const allSets = await db.rows("set_log").toArray();
+  const logged = await readLogged(db, new Set([log.id]), allSets);
+  const { names } = await historyContext(db, [log], logged.runs, allSets);
 
   const order = (s: SetLog) => s.completedAt ?? s.createdAt;
   const sets = [...logged.sets].sort((a, b) => order(a) - order(b));

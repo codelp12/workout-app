@@ -121,6 +121,19 @@ export function checkWeek(db: Db, weekStart: string): WeekCheck {
       .all(),
     candidates,
     [...logById.values()],
+    db
+      .select({
+        sessionLogId: setLog.sessionLogId,
+        deletedAt: setLog.deletedAt,
+      })
+      .from(setLog)
+      .where(
+        and(
+          inArray(setLog.sessionLogId, candidateLogIds),
+          isNull(setLog.deletedAt),
+        ),
+      )
+      .all(),
   );
   const absorbed = new Map(
     [...pairs].map(([primary, other]) => [other, primary]),

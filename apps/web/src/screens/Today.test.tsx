@@ -27,7 +27,12 @@ import { Navigation } from "../Navigation";
 import { combineLifts } from "../plan/combine";
 import { moveSession } from "../plan/moves";
 import { readSession, weekPlan } from "../plan/sessions";
-import { finishSession, logSet, readLiftSession } from "../players/lift-log";
+import {
+  finishSession,
+  logSet,
+  readLiftSession,
+  startLift,
+} from "../players/lift-log";
 import { deviceTimezone } from "../settings/settings";
 import { localDb } from "../sync";
 
@@ -158,6 +163,7 @@ describe("Today", () => {
       .put({ ...row, id: newId(), plannedSessionId: pull.id });
     expect(await combineLifts(localDb, push.id, pull.id)).toBe(false);
     await moveSession(localDb, pull, pull, push);
+    const staleView = (await readSession(pull.id))!;
     const user = userEvent.setup();
     renderAt("/");
     await user.click(
@@ -209,6 +215,9 @@ describe("Today", () => {
     await user.click(await player.findByRole("radio", { name: "2" }));
     await user.click(player.getByRole("button", { name: "Log set" }));
     await player.findByRole("list", { name: "Sets" });
+    await startLift(localDb, staleView, { timezone: "UTC" });
+    expect((await readSession(pull.id))?.session.id).toBe(push.id);
+    expect((await readSession(push.id))?.combinedWith).toBe(pull.id);
     await finishSession(localDb, view, { rpe: 8, notes: null });
     expect((await weekPlan(weekStartOf(today))).tally.current.lift).toEqual({
       planned: 2,

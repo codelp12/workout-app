@@ -168,7 +168,12 @@ async function placedSessions(includeMoved = false): Promise<Placed[]> {
   const byLogId = new Map(
     logs.filter((l) => l.deletedAt === null).map((l) => [l.id, l]),
   );
-  const pairs = liftCombinations(overrides, sessions, logs);
+  const pairs = liftCombinations(
+    overrides,
+    sessions,
+    logs,
+    await localDb.rows("set_log").toArray(),
+  );
   const absorbed = new Map(
     [...pairs].map(([primary, other]) => [other, primary]),
   );
