@@ -334,38 +334,34 @@ export function settle(
   return { ...values, load, band };
 }
 
+function defaultSetLoad(
+  card: LiftCard,
+  settings: PlayerSettings,
+): number | null {
+  const unit = unitOf(card, settings);
+  const last = card.sets.at(-1);
+  if (last?.loadValue != null)
+    return toWeightUnit(
+      { value: last.loadValue, unit: last.loadUnit ?? unit },
+      unit,
+    );
+  if (!isWeighted(card)) return null;
+  return card.targets.load ? toWeightUnit(card.targets.load, unit) : 0;
+}
+
 /**
  * The next set prefilled: the last set logged this session if there is one,
  * RIR included, else the target (top of the rep range), snapped to the
  * inventory. The first set's RIR is left for the owner to pick.
  */
 export function prefill(card: LiftCard, settings: PlayerSettings): SetValues {
-  const unit = unitOf(card, settings);
   const last = card.sets.at(-1);
-  const raw: SetValues = last
-    ? {
-        load:
-          last.loadValue === null
-            ? null
-            : toWeightUnit(
-                { value: last.loadValue, unit: last.loadUnit ?? unit },
-                unit,
-              ),
-        band: last.band,
-        reps: last.reps,
-        rir: last.rir,
-      }
-    : {
-        load: isWeighted(card)
-          ? card.targets.load
-            ? toWeightUnit(card.targets.load, unit)
-            : 0
-          : null,
-        band: card.targets.band,
-        reps: card.targets.repMax,
-        rir: null,
-      };
-  return settle(card, settings, raw);
+  return settle(card, settings, {
+    load: defaultSetLoad(card, settings),
+    band: last ? last.band : card.targets.band,
+    reps: last ? last.reps : card.targets.repMax,
+    rir: last?.rir ?? null,
+  });
 }
 
 // Warm-up ramp (SPEC §5.1): share of the first working load, and reps.
@@ -611,12 +607,7 @@ export function openRows(
       : [];
   return rows.map((draft) => {
     const load =
-      draft.load ??
-      (isWeighted(card)
-        ? card.targets.load
-          ? toWeightUnit(card.targets.load, unitOf(card, settings))
-          : 0
-        : null);
+      draft.load ?? (isWeighted(card) ? defaultSetLoad(card, settings) : null);
     const settled = settle(card, settings, { ...draft, load });
     return { ...draft, ...settled, load: settled.load ?? load };
   });

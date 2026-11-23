@@ -545,6 +545,35 @@ describe("LiftPlayer", () => {
       expect(await card.findByText("45 lb × 8 · RIR 2")).toBeTruthy();
     });
 
+    it("prefills a set added with dumbbells disabled from the last logged weight", async () => {
+      const settings = { ...defaultSettings(deviceTimezone(), 0), ...sync };
+      await localDb.rows("settings").put(settings);
+      await localDb
+        .rows("planned_item")
+        .put({ ...items[0]!, targets: squatTargets(50) });
+      const user = userEvent.setup();
+      renderPlayer();
+      const squat = await screen.findByRole("article", {
+        name: "Dumbbell Squat",
+      });
+      const card = within(squat);
+      await card.findByRole("button", { name: "Weight: 50 lb" });
+      await user.click(card.getByRole("button", { name: "Increase Weight" }));
+      await user.click(card.getByRole("radio", { name: "2" }));
+      await user.click(card.getByRole("button", { name: "Log set" }));
+      await logged(squat);
+      await localDb.rows("settings").put({
+        ...settings,
+        equipment: { ...settings.equipment, dumbbells: null },
+      });
+      await user.click(card.getByRole("button", { name: "Add set" }));
+      await card.findByText(/No dumbbells in your equipment/);
+      await localDb.rows("settings").put(settings);
+      expect(
+        await card.findByRole("button", { name: "Weight: 55 lb" }),
+      ).toBeTruthy();
+    });
+
     it("says so and won't log when the equipment has no dumbbells", async () => {
       await localDb.rows("settings").put({
         ...defaultSettings(deviceTimezone(), 0),
