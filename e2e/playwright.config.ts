@@ -15,6 +15,8 @@ export default defineConfig({
   testDir: "tests",
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
+  // GitHub's runners have 4 CPUs; Playwright's default uses half of them.
+  workers: process.env.CI ? 4 : undefined,
   reporter: process.env.CI ? [["github"], ["list"]] : "list",
   use: {
     baseURL,
