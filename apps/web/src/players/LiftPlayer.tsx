@@ -1,6 +1,13 @@
 import { toWeightUnit, type WeightImplement } from "@workout-app/engine";
 import { newId, type Exercise, type SetLog } from "@workout-app/shared";
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type Ref,
+} from "react";
 import { Link } from "react-router";
 import { BottomSheet } from "../components/BottomSheet";
 import { ChipGroup } from "../components/ChipGroup";
@@ -144,33 +151,36 @@ function SwapSheet({
         </button>
       }
     >
-      {card.substitutes.length > 0 && (
-        <ul aria-label="Substitutes" className="flex flex-col gap-2">
-          {card.substitutes.map((e) => {
-            const current = e.id === card.exercise?.id;
-            return (
-              <li key={e.id}>
-                <button
-                  type="button"
-                  aria-pressed={current}
-                  className={`${button} min-h-tap w-full flex-col items-start text-left ${current ? "ring-2 ring-lift" : ""}`}
-                  onClick={() => void swap(e.id)}
-                >
-                  <span className="font-medium">{e.name}</span>
-                  <span className="text-sm text-fg-muted">
-                    {e.equipment.map(vocabLabel).join(", ") || "No equipment"}
-                    {e.id === card.item.exerciseId ? " · Planned" : ""}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
       <ExercisePicker
         exercises={library}
         browse={false}
         onPick={(e) => void swap(e.id)}
+        suggestions={
+          card.substitutes.length > 0 && (
+            <ul aria-label="Substitutes" className="flex flex-col gap-2">
+              {card.substitutes.map((e) => {
+                const current = e.id === card.exercise?.id;
+                return (
+                  <li key={e.id}>
+                    <button
+                      type="button"
+                      aria-pressed={current}
+                      className={`${button} min-h-tap w-full flex-col items-start text-left ${current ? "ring-2 ring-lift" : ""}`}
+                      onClick={() => void swap(e.id)}
+                    >
+                      <span className="font-medium">{e.name}</span>
+                      <span className="text-sm text-fg-muted">
+                        {e.equipment.map(vocabLabel).join(", ") ||
+                          "No equipment"}
+                        {e.id === card.item.exerciseId ? " · Planned" : ""}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )
+        }
       />
     </BottomSheet>
   );
@@ -284,6 +294,7 @@ function Warmups({
 
 /** One set not yet logged: its weight, band, reps and RIR, and its Log button. */
 function SetRow({
+  rowRef,
   card,
   settings,
   number,
@@ -293,6 +304,7 @@ function SetRow({
   onLog,
   onRemove,
 }: {
+  rowRef?: Ref<HTMLElement>;
   card: LiftCard;
   settings: SettingsData;
   /** The set's number on the card, counting the ones logged. */
@@ -316,7 +328,12 @@ function SetRow({
   const unloadable = loads !== null && loads.length === 0;
   const label = `Set ${number}`;
   return (
-    <section aria-label={label} className="flex flex-col gap-3">
+    <section
+      ref={rowRef}
+      tabIndex={-1}
+      aria-label={label}
+      className="flex flex-col gap-3"
+    >
       <div className="flex items-center justify-between gap-2">
         <h3 className="font-semibold">{label}</h3>
         {onRemove && (
@@ -458,6 +475,14 @@ function ExerciseCard({
 }) {
   const titleId = useId();
   const [saving, setSaving] = useState(false);
+  const lastRow = useRef<HTMLElement>(null);
+  const revealAddedRow = useRef(false);
+  useEffect(() => {
+    if (!revealAddedRow.current) return;
+    revealAddedRow.current = false;
+    lastRow.current?.focus({ preventScroll: true });
+    lastRow.current?.scrollIntoView?.({ block: "nearest" });
+  }, [rows.length]);
   const { exercise, targets, sets, skipped } = card;
   const name = exercise?.name ?? "Pick an exercise";
   const done = sets.length > 0 && rows.length === 0;
@@ -602,6 +627,7 @@ function ExerciseCard({
           {rows.map((values, i) => (
             <SetRow
               key={`${exercise?.id}:${values.id}`}
+              rowRef={i === rows.length - 1 ? lastRow : undefined}
               card={card}
               settings={settings}
               number={sets.length + i + 1}
@@ -610,7 +636,9 @@ function ExerciseCard({
               onValues={(next) =>
                 onRows((r) =>
                   r.map((v) =>
-                    v.id === values.id ? { ...next, id: v.id } : v,
+                    v.id === values.id
+                      ? { ...next, id: v.id, untouchedExtra: undefined }
+                      : v,
                   ),
                 )
               }
@@ -629,23 +657,30 @@ function ExerciseCard({
               disabled={saving}
               onClick={() => {
                 const id = newId();
+                revealAddedRow.current = true;
                 onRows((r) => [
                   ...r,
-                  { ...(r.at(-1) ?? prefill(card, settings)), id },
+                  {
+                    ...(r.at(-1) ?? prefill(card, settings)),
+                    id,
+                    untouchedExtra: true,
+                  },
                 ]);
               }}
             >
               Add set
             </button>
-            {done && onNext && (
-              <button
-                type="button"
-                className={`${button} min-h-tap`}
-                onClick={onNext}
-              >
-                Next exercise
-              </button>
-            )}
+            {sets.length > 0 &&
+              rows.every((row) => row.untouchedExtra) &&
+              onNext && (
+                <button
+                  type="button"
+                  className={`${button} min-h-tap`}
+                  onClick={onNext}
+                >
+                  Next exercise
+                </button>
+              )}
           </div>
         </>
       )}
@@ -701,10 +736,19 @@ export function LiftPlayer({ view }: { view: SessionView }) {
   const current = cards[index]!;
   const rest = latestRest(cards);
   const go = (card: number) =>
-    setPosition((p) => ({
-      ...p,
-      card: Math.min(Math.max(card, 0), cards.length - 1),
-    }));
+    setPosition((p) => {
+      const drafts = p.drafts[current.itemId];
+      return {
+        card,
+        drafts:
+          card > index && drafts?.some((row) => row.untouchedExtra)
+            ? {
+                ...p.drafts,
+                [current.itemId]: drafts.filter((row) => !row.untouchedExtra),
+              }
+            : p.drafts,
+      };
+    });
   const rows = openRows(current, settings, position.drafts[current.itemId]);
   const warmed = warmupCards(cards);
   const allDone = cards.every(
@@ -731,8 +775,8 @@ export function LiftPlayer({ view }: { view: SessionView }) {
         swipeStart.current = null;
         if (start === null) return;
         const dx = e.clientX - start;
-        if (dx <= -SWIPE) go(index + 1);
-        else if (dx >= SWIPE) go(index - 1);
+        if (dx <= -SWIPE && index < cards.length - 1) go(index + 1);
+        else if (dx >= SWIPE && index > 0) go(index - 1);
       }}
     >
       <WarmupChecklist
@@ -777,7 +821,9 @@ export function LiftPlayer({ view }: { view: SessionView }) {
             ...p,
             drafts: {
               ...p.drafts,
-              [current.itemId]: update(p.drafts[current.itemId] ?? rows),
+              [current.itemId]: update(
+                openRows(current, settings, p.drafts[current.itemId]),
+              ),
             },
           }))
         }
@@ -791,7 +837,7 @@ export function LiftPlayer({ view }: { view: SessionView }) {
       <AddExerciseSheet
         view={view}
         library={addable}
-        onAdded={() => setPosition((p) => ({ ...p, card: cards.length }))}
+        onAdded={() => go(cards.length)}
       />
       <FinishSheet
         view={view}

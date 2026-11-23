@@ -515,6 +515,67 @@ describe("LiftPlayer", () => {
       ).toBeTruthy();
     });
 
+    it("keeps the remaining draft's load when dumbbells are disabled and re-enabled", async () => {
+      const settings = { ...defaultSettings(deviceTimezone(), 0), ...sync };
+      await localDb.rows("settings").put({
+        ...settings,
+        equipment: { ...settings.equipment, dumbbells: null },
+      });
+      savePosition(legs.id, {
+        card: 0,
+        drafts: {
+          [items[0]!.id]: [
+            { id: "first", load: 45, band: null, reps: 8, rir: 2 },
+            { id: "second", load: 50, band: null, reps: 9, rir: 2 },
+          ],
+        },
+      });
+      const user = userEvent.setup();
+      renderPlayer();
+      const card = within(
+        await screen.findByRole("article", { name: "Dumbbell Squat" }),
+      );
+      expect(
+        await card.findAllByText(/No dumbbells in your equipment/),
+      ).toHaveLength(2);
+      await user.click(card.getByRole("button", { name: "Remove set 2" }));
+      await localDb.rows("settings").put(settings);
+      expect(
+        await card.findByRole("button", { name: "Weight: 45 lb" }),
+      ).toBeTruthy();
+      await user.click(card.getByRole("button", { name: "Log set" }));
+      expect(await card.findByText("45 lb × 8 · RIR 2")).toBeTruthy();
+    });
+
+    it("prefills a set added with dumbbells disabled from the last logged weight", async () => {
+      const settings = { ...defaultSettings(deviceTimezone(), 0), ...sync };
+      await localDb.rows("settings").put(settings);
+      await localDb
+        .rows("planned_item")
+        .put({ ...items[0]!, targets: squatTargets(50) });
+      const user = userEvent.setup();
+      renderPlayer();
+      const squat = await screen.findByRole("article", {
+        name: "Dumbbell Squat",
+      });
+      const card = within(squat);
+      await card.findByRole("button", { name: "Weight: 50 lb" });
+      await user.click(card.getByRole("button", { name: "Increase Weight" }));
+      await user.click(card.getByRole("radio", { name: "2" }));
+      await user.click(card.getByRole("button", { name: "Log set" }));
+      await logged(squat);
+      await localDb.rows("settings").put({
+        ...settings,
+        equipment: { ...settings.equipment, dumbbells: null },
+      });
+      await user.click(card.getByRole("button", { name: "Add set" }));
+      await card.findByText(/No dumbbells in your equipment/);
+      await localDb.rows("settings").put(settings);
+      expect(
+        await card.findByRole("button", { name: "Weight: 55 lb" }),
+      ).toBeTruthy();
+    });
+
     it("says so and won't log when the equipment has no dumbbells", async () => {
       await localDb.rows("settings").put({
         ...defaultSettings(deviceTimezone(), 0),
@@ -650,7 +711,28 @@ describe("swap, skip, add set and warm-ups", () => {
     const card = await screen.findByRole("article", { name: "Dumbbell Squat" });
     await user.click(within(card).getByRole("button", { name: "Swap" }));
     const sheet = await screen.findByRole("dialog", { name: "Swap exercise" });
+    const search = within(sheet).getByRole("searchbox", {
+      name: "Search exercises",
+    });
+    const substitutes = within(sheet).getByRole("list", {
+      name: "Substitutes",
+    });
+    expect(
+      search.compareDocumentPosition(substitutes) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(within(sheet).queryByRole("list", { name: "Exercises" })).toBeNull();
+    await user.type(search, "zz");
+    expect(within(sheet).getByRole("status").textContent).toBe(
+      "No matching exercises.",
+    );
+    expect(
+      within(sheet).queryByRole("list", { name: "Substitutes" }),
+    ).toBeNull();
+    await user.clear(search);
+    expect(
+      within(sheet).getByRole("list", { name: "Substitutes" }),
+    ).toBeTruthy();
     await user.type(
       within(sheet).getByRole("searchbox", { name: "Search exercises" }),
       "press",
@@ -824,6 +906,53 @@ describe("swap, skip, add set and warm-ups", () => {
       [1, 9],
       [2, 9],
     ]);
+  });
+
+  it("focuses an added set and drops it if untouched when advancing", async () => {
+    const user = userEvent.setup();
+    renderPlayer();
+    const card = await screen.findByRole("article", { name: "Dumbbell Squat" });
+    await user.click(within(card).getByRole("radio", { name: "2" }));
+    await user.click(within(card).getByRole("button", { name: "Log set" }));
+    await logged(card);
+
+    await user.click(within(card).getByRole("button", { name: "Add set" }));
+    expect(document.activeElement).toBe(
+      within(card).getByRole("region", { name: "Set 2" }),
+    );
+    await user.click(
+      within(card).getByRole("button", { name: "Next exercise" }),
+    );
+    const nav = screen.getByRole("navigation", { name: "Exercises" });
+    await user.click(within(nav).getByRole("button", { name: "Previous" }));
+    const returned = await screen.findByRole("article", {
+      name: "Dumbbell Squat",
+    });
+    expect(
+      within(returned).queryByRole("region", { name: "Set 2" }),
+    ).toBeNull();
+    expect(await sessionSets()).toHaveLength(1);
+  });
+
+  it("keeps an editable first set after leaving an exercise with only an untouched extra", async () => {
+    const user = userEvent.setup();
+    renderPlayer();
+    const card = within(
+      await screen.findByRole("article", { name: "Dumbbell Squat" }),
+    );
+    await user.click(card.getByRole("button", { name: "Add set" }));
+    await user.click(card.getByRole("button", { name: "Remove set 1" }));
+    const nav = within(screen.getByRole("navigation", { name: "Exercises" }));
+    await user.click(nav.getByRole("button", { name: /^Next$/ }));
+    await screen.findByRole("article", { name: "Plank" });
+    await user.click(nav.getByRole("button", { name: "Previous" }));
+    const returned = within(
+      await screen.findByRole("article", { name: "Dumbbell Squat" }),
+    );
+    await user.click(returned.getByRole("radio", { name: "2" }));
+    await user.click(returned.getByRole("button", { name: "Log set" }));
+    await logged(screen.getByRole("article", { name: "Dumbbell Squat" }));
+    expect(await sessionSets()).toHaveLength(1);
   });
 
   it("collapses the warm-ups and logs them flagged, outside the working sets", async () => {

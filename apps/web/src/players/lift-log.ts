@@ -33,6 +33,8 @@ export type SetValues = {
   rir: number | null;
 };
 
+export type SetDraft = SetValues & { id: string; untouchedExtra?: true };
+
 /** One exercise of the session, as the player shows it. */
 export type LiftCard = {
   itemId: string;
@@ -380,38 +382,34 @@ export function settle(
   return { ...values, load, band };
 }
 
+function defaultSetLoad(
+  card: LiftCard,
+  settings: PlayerSettings,
+): number | null {
+  const unit = unitOf(card, settings);
+  const last = card.sets.at(-1);
+  if (last?.loadValue != null)
+    return toWeightUnit(
+      { value: last.loadValue, unit: last.loadUnit ?? unit },
+      unit,
+    );
+  if (!isWeighted(card)) return null;
+  return card.targets.load ? toWeightUnit(card.targets.load, unit) : 0;
+}
+
 /**
  * The next set prefilled: the last set logged this session if there is one,
  * RIR included, else the target (top of the rep range), snapped to the
  * inventory. The first set's RIR is left for the owner to pick.
  */
 export function prefill(card: LiftCard, settings: PlayerSettings): SetValues {
-  const unit = unitOf(card, settings);
   const last = card.sets.at(-1);
-  const raw: SetValues = last
-    ? {
-        load:
-          last.loadValue === null
-            ? null
-            : toWeightUnit(
-                { value: last.loadValue, unit: last.loadUnit ?? unit },
-                unit,
-              ),
-        band: last.band,
-        reps: last.reps,
-        rir: last.rir,
-      }
-    : {
-        load: isWeighted(card)
-          ? card.targets.load
-            ? toWeightUnit(card.targets.load, unit)
-            : 0
-          : null,
-        band: card.targets.band,
-        reps: card.targets.repMax,
-        rir: null,
-      };
-  return settle(card, settings, raw);
+  return settle(card, settings, {
+    load: defaultSetLoad(card, settings),
+    band: last ? last.band : card.targets.band,
+    reps: last ? last.reps : card.targets.repMax,
+    rir: last?.rir ?? null,
+  });
 }
 
 // Warm-up ramp (SPEC §5.1): share of the first working load, and reps.
@@ -640,8 +638,6 @@ export type PlayerPosition = {
   drafts: Record<string, SetDraft[]>;
 };
 
-export type SetDraft = SetValues & { id: string };
-
 /**
  * The card's set rows not yet logged: the saved ones, or one prefilled row
  * until the first set is logged. "Add set" adds more, so the owner picks how
@@ -652,11 +648,17 @@ export function openRows(
   settings: PlayerSettings,
   drafts: SetDraft[] | undefined,
 ): SetDraft[] {
-  if (drafts)
-    return drafts.map((d) => ({ ...settle(card, settings, d), id: d.id }));
-  return card.sets.length === 0
-    ? [{ ...prefill(card, settings), id: "draft-0" }]
-    : [];
+  const rows = drafts?.length
+    ? drafts
+    : card.sets.length === 0
+      ? [{ ...prefill(card, settings), id: "draft-0" }]
+      : [];
+  return rows.map((draft) => {
+    const load =
+      draft.load ?? (isWeighted(card) ? defaultSetLoad(card, settings) : null);
+    const settled = settle(card, settings, { ...draft, load });
+    return { ...draft, ...settled, load: settled.load ?? load };
+  });
 }
 
 /** Whether every set row on the card is logged, and there's at least one. */
@@ -680,9 +682,11 @@ export function loadPosition(sessionId: string): PlayerPosition {
       const drafts = Object.fromEntries(
         Object.entries(saved.drafts).map(([id, d]) => [
           id,
-          ((Array.isArray(d) ? d : [d]) as (SetValues & { id?: string })[]).map(
-            (row, index) => ({ ...row, id: row.id ?? `draft-${index}` }),
-          ),
+          (
+            (Array.isArray(d) ? d : [d]) as (Omit<SetDraft, "id"> & {
+              id?: string;
+            })[]
+          ).map((row, index) => ({ ...row, id: row.id ?? `draft-${index}` })),
         ]),
       );
       return { card: saved.card, drafts };
