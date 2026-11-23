@@ -193,6 +193,41 @@ describe("Today", () => {
     expect((await readSession(pull.id))?.session.status).toBe("done");
   });
 
+  it("keeps a completed combination credited if another device logs the absorbed lift", async () => {
+    const pull = session({ workoutType: "pull_a" });
+    await localDb.rows("planned_session").put(pull);
+    const now = Date.now();
+    expect(await combineLifts(localDb, push.id, pull.id, now)).toBe(true);
+    const finished = {
+      ...sync,
+      id: sessionLogId(push.id),
+      plannedSessionId: push.id,
+      modality: "lift" as const,
+      startedAt: now + 1,
+      endedAt: now + 2,
+      localDate: today,
+      timezone: "UTC",
+      rpe: null,
+      notes: null,
+      checked: [],
+    };
+    await localDb
+      .rows("session_log")
+      .bulkPut([
+        finished,
+        { ...finished, id: sessionLogId(pull.id), plannedSessionId: pull.id },
+      ]);
+    expect((await readSession(pull.id))?.session.id).toBe(push.id);
+    expect(
+      (await readHistory(localDb)).find(({ log }) => log.id === finished.id)
+        ?.title,
+    ).toBe("Push A + Pull A");
+    expect((await weekPlan(weekStartOf(today))).tally.current.lift).toEqual({
+      planned: 2,
+      done: 2,
+    });
+  });
+
   it("rejects pairs on different dates or once either lift has started", async () => {
     const pull = session({ workoutType: "pull_a", date: addDays(today, 1) });
     await localDb.rows("planned_session").put(pull);

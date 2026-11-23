@@ -21,8 +21,10 @@ export function liftCombinations(
       )
       .map((p) => [p.id, p]),
   );
-  const logged = new Set(
-    logs.filter((l) => l.deletedAt === null).map((l) => l.plannedSessionId),
+  const liveLogs = logs.filter((l) => l.deletedAt === null);
+  const logged = new Set(liveLogs.map((l) => l.plannedSessionId));
+  const finished = new Set(
+    liveLogs.filter((l) => l.endedAt !== null).map((l) => l.plannedSessionId),
   );
   const used = new Set<string>();
   const pairs = new Map<string, string>();
@@ -39,7 +41,7 @@ export function liftCombinations(
     if (
       other === primary ||
       lifts.get(other)?.status !== "planned" ||
-      logged.has(other) ||
+      (logged.has(other) && !finished.has(primary)) ||
       used.has(primary) ||
       used.has(other)
     )

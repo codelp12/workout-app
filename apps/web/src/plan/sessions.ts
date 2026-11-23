@@ -345,13 +345,21 @@ export async function weekPlan(weekStart: string): Promise<WeekPlan> {
   const logs = (await localDb.rows("session_log").toArray()).filter(
     (l) => l.deletedAt === null && l.endedAt !== null,
   );
+  const absorbed = new Set(
+    placed.filter((p) => p.combinedInto).map((p) => p.session.id),
+  );
   const tally = (start: string): WeekTally => {
     const count = (modality: Modality) => ({
       planned: placed.filter(
         (p) => p.session.modality === modality && inWeek(start, p.session.date),
       ).length,
       done: logs.reduce((sum, l) => {
-        if (l.modality !== modality || !inWeek(start, l.localDate)) return sum;
+        if (
+          l.modality !== modality ||
+          !inWeek(start, l.localDate) ||
+          (l.plannedSessionId !== null && absorbed.has(l.plannedSessionId))
+        )
+          return sum;
         const combined = placed.some(
           (p) => p.combinedWith && p.session.id === l.plannedSessionId,
         );
