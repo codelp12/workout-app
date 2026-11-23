@@ -1,5 +1,6 @@
 import {
   addDays,
+  daysBetween,
   type Equipment,
   type Onboarding,
   type Weight,
@@ -30,6 +31,8 @@ export type ExerciseState = {
   firstLoggedDate: string | null;
   /** Stalls since the exercise last hit the top of its range (§5.1). */
   stallCount: number;
+  /** The date of the latest stall, for the early deload (§5.1). */
+  lastStallDate: string | null;
   /** The last date the e1RM estimate rose. */
   lastIncreaseDate: string | null;
   /** How the latest exposure went against its target; null when unplanned. */
@@ -138,6 +141,7 @@ const emptyExercise = (): ExerciseState => ({
   exposures: [],
   firstLoggedDate: null,
   stallCount: 0,
+  lastStallDate: null,
   lastIncreaseDate: null,
   lastOutcome: null,
   missStreak: 0,
@@ -218,6 +222,7 @@ function judgeInto(
     return;
   }
   next.lastOutcome = "stalled";
+  next.lastStallDate = exposure.date;
   next.missStreak = 0;
   next.stallCount += 1;
   if (next.stallCount >= config.progression.stallsToPlateau) {
@@ -264,6 +269,7 @@ function foldExposure(
   config: Lift,
 ): ExerciseState {
   const firstLoggedDate = previous.firstLoggedDate ?? exposure.date;
+  const lastLogged = previous.exposures.findLast((e) => e.source === "log");
   const calibrating = isCalibrating({ firstLoggedDate }, exposure.date, config);
   const next: ExerciseState = {
     ...previous,
@@ -282,7 +288,14 @@ function foldExposure(
     next.e1rm = { value: estimate, unit };
     return next;
   }
-  const value = smoothE1rm(previous.e1rm.value, estimate, calibrating, config);
+  // After a long layoff a weaker session replaces the estimate outright (§5.1).
+  const recalibrate =
+    lastLogged !== undefined &&
+    daysBetween(lastLogged.date, exposure.date) >= config.layoff.longDays &&
+    estimate < previous.e1rm.value;
+  const value = recalibrate
+    ? estimate
+    : smoothE1rm(previous.e1rm.value, estimate, calibrating, config);
   next.e1rm = { value, unit };
   if (value > previous.e1rm.value + 1e-9) {
     next.lastIncreaseDate = exposure.date;

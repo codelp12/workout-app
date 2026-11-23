@@ -1,4 +1,4 @@
-import { groupLogs, planWeek, type LiftExercise } from "@workout-app/engine";
+import { groupLogs, planWeek, type PlanExercise } from "@workout-app/engine";
 import {
   defaultSettings,
   localDateAt,
@@ -80,7 +80,7 @@ export function planCurrentWeek(db: Db, now: number): boolean {
       .get();
     if (existing) return false;
 
-    const exercises: LiftExercise[] = tx
+    const exercises: PlanExercise[] = tx
       .select()
       .from(exercise)
       .all()
@@ -99,6 +99,7 @@ export function planCurrentWeek(db: Db, now: number): boolean {
           sets: tx.select().from(setLog).all(),
           runs: tx.select().from(runLog).all(),
           ascents: tx.select().from(ascent).all(),
+          items: tx.select().from(plannedItem).all(),
         }),
       }),
     );

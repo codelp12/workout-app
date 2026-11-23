@@ -50,6 +50,33 @@ export type EngineConfig = {
       maxExtraReps: number;
       maxExtraSets: number;
     };
+    /** Block structure (§5.1 Block structure). */
+    block: {
+      /** Main-lift target RIR in a block's first and last loading weeks. */
+      rirStart: number;
+      rirEnd: number;
+      /** Loading weeks after the first in which `ramp` slots may gain a set. */
+      rampWeeks: number;
+      /** Hard sets per primary muscle per week that ramp sets can't pass. */
+      hardSetCap: number;
+      /** Share of a slot's sets kept in a deload week, rounded up. */
+      deloadSets: number;
+      /** Deload load as a fraction of the block's week-1 load. */
+      deloadLoad: number;
+      deloadMinRir: number;
+      /** Main lifts stalled in one block that call an early deload. */
+      earlyDeloadStalls: number;
+    };
+    /** Layoff re-entry (§5.1 Rules), by days since the last lift session. */
+    layoff: {
+      shortDays: number;
+      longDays: number;
+      /** Load cut for the first session back after a short layoff. */
+      shortCut: number;
+      /** Load cut for every session in the first `longCutDays` back after a long one. */
+      longCut: number;
+      longCutDays: number;
+    };
   };
   run: {
     /** Share of weekly distance per run when there is no history (§5.2). */
@@ -98,6 +125,23 @@ export const ENGINE_CONFIG: EngineConfig = {
       extraRepsStep: 2,
       maxExtraReps: 4,
       maxExtraSets: 1,
+    },
+    block: {
+      rirStart: 3,
+      rirEnd: 1,
+      rampWeeks: 2,
+      hardSetCap: 20,
+      deloadSets: 0.5,
+      deloadLoad: 0.9,
+      deloadMinRir: 3,
+      earlyDeloadStalls: 2,
+    },
+    layoff: {
+      shortDays: 7,
+      longDays: 14,
+      shortCut: 0.075,
+      longCut: 0.175,
+      longCutDays: 7,
     },
   },
   run: {

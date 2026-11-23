@@ -95,7 +95,8 @@ export const equipmentRank = (exercise: Pick<LiftExercise, "equipment">) => {
   return Number.isFinite(best) ? best : PREFERENCE.length;
 };
 
-function resolve(
+/** The exercise a slot resolves to: its own, or its group's most equipment-friendly. */
+export function resolveSlot(
   slot: TemplateSlot,
   exercises: readonly LiftExercise[],
 ): LiftExercise | null {
@@ -177,7 +178,7 @@ function prescribeSlot(
   exercises: readonly LiftExercise[],
   ctx: EngineContext,
 ): LiftItem {
-  const exercise = resolve(slot, exercises);
+  const exercise = resolveSlot(slot, exercises);
   const reasons: Reason[] = [];
   const item: LiftItem = {
     exerciseId: exercise?.id ?? null,

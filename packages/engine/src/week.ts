@@ -9,7 +9,9 @@ import {
   type Ascent,
   type Block,
   type DaySlot,
+  type Exercise,
   type Intent,
+  type PlannedItem,
   type PlannedItemKind,
   type RunLog,
   type SessionLog,
@@ -25,17 +27,36 @@ import {
   type EngineConfig,
   type RunWorkoutType,
 } from "./config.js";
+import {
+  capRampSets,
+  describeLoad,
+  layoffReentry,
+  rampReason,
+  scaleLoad,
+  stalledMainLifts,
+  weekOneLoad,
+  weekScheme,
+  type BlockPosition,
+  type RampRequest,
+} from "./lift/block.js";
+import {
+  initLiftEngineState,
+  updateLiftEngineState,
+  type LiftEngineState,
+} from "./lift/state.js";
 import { climbStub, type ClimbSessionLog } from "./stubs/climb.js";
 import {
   liftStub,
+  resolveSlot,
   type LiftExercise,
   type LiftSessionLog,
+  type LiftTarget,
 } from "./stubs/lift.js";
 import { runStub, type RunSessionLog } from "./stubs/run.js";
 import type { EngineContext, Reason } from "./types.js";
 
 /** Stored as `engineVersion` on generated blocks and weeks. */
-export const PLAN_VERSION = "stub-1";
+export const PLAN_VERSION = "plan-2";
 
 type SessionSpec = {
   /** Stable within a week; part of the session's id. */
@@ -149,18 +170,28 @@ export type PlanLogs = {
   climb: ClimbSessionLog[];
 };
 
-/** Groups synced log rows into each engine's session logs, skipping deleted rows. */
+/**
+ * Groups synced log rows into each engine's session logs, skipping deleted
+ * rows. A lift log carries its planned session's exercise targets from
+ * `items`, so the engine can judge it (§5.1).
+ */
 export function groupLogs(rows: {
   sessions: readonly (Pick<
     SessionLog,
     "id" | "modality" | "localDate" | "startedAt"
   > &
+    Partial<Pick<SessionLog, "plannedSessionId">> &
     Live)[];
   sets: readonly (LiftSessionLog["sets"][number] &
     Pick<SetLog, "sessionLogId"> &
     Live)[];
   runs: readonly (RunSessionLog["run"] & Pick<RunLog, "sessionLogId"> & Live)[];
   ascents: readonly (Pick<Ascent, "sessionLogId" | "grade" | "style"> & Live)[];
+  items?: readonly (Pick<
+    PlannedItem,
+    "plannedSessionId" | "exerciseId" | "targets"
+  > &
+    Live)[];
 }): PlanLogs {
   const live = <T extends Live>(list: readonly T[]) =>
     list.filter((r) => r.deletedAt === null);
@@ -176,6 +207,14 @@ export function groupLogs(rows: {
   const sets = bySession(live(rows.sets));
   const runs = bySession(live(rows.runs));
   const ascents = bySession(live(rows.ascents));
+  const targets = new Map<string, Record<string, LiftTarget>>();
+  for (const item of live(rows.items ?? [])) {
+    const target = liftTargetOf(item.targets);
+    if (item.exerciseId === null || target === null) continue;
+    const forSession = targets.get(item.plannedSessionId) ?? {};
+    forSession[item.exerciseId] ??= target;
+    targets.set(item.plannedSessionId, forSession);
+  }
   const logs: PlanLogs = { lift: [], run: [], climb: [] };
   const sessions = [...live(rows.sessions)].sort(
     (a, b) =>
@@ -184,7 +223,14 @@ export function groupLogs(rows: {
   for (const s of sessions) {
     const session = { localDate: s.localDate };
     if (s.modality === "lift") {
-      logs.lift.push({ session, sets: sets.get(s.id) ?? [] });
+      const planned = s.plannedSessionId
+        ? targets.get(s.plannedSessionId)
+        : undefined;
+      logs.lift.push({
+        session,
+        sets: sets.get(s.id) ?? [],
+        ...(planned ? { targets: planned } : {}),
+      });
     } else if (s.modality === "run") {
       for (const run of runs.get(s.id) ?? []) logs.run.push({ session, run });
     } else if (s.modality === "climb") {
@@ -194,31 +240,78 @@ export function groupLogs(rows: {
   return logs;
 }
 
+const num = (v: unknown) => (typeof v === "number" ? v : null);
+
+/** A planned item's stored targets as a lift target, or null when they aren't one. */
+function liftTargetOf(targets: Record<string, unknown>): LiftTarget | null {
+  const sets = num(targets.sets);
+  const repMin = num(targets.repMin);
+  const repMax = num(targets.repMax);
+  if (sets === null || repMin === null || repMax === null) return null;
+  const load = targets.load as { value?: unknown; unit?: unknown } | null;
+  return {
+    sets,
+    repMin,
+    repMax,
+    targetRir: num(targets.targetRir),
+    load:
+      load &&
+      typeof load.value === "number" &&
+      (load.unit === "kg" || load.unit === "lb")
+        ? { value: load.value, unit: load.unit }
+        : null,
+    band: typeof targets.band === "string" ? targets.band : null,
+  };
+}
+
+/** A lift exercise with what the block calendar needs (main lift, muscles). */
+export type PlanExercise = LiftExercise &
+  Pick<Exercise, "progressionModel" | "primaryMuscles">;
+
 export type WeekPlanInput = {
   /** The Monday of the week to plan. */
   weekStart: string;
   /** Stamped on the rows as `createdAt` and `updatedAt`. */
   now: number;
-  blocks: readonly (Pick<Block, "id" | "startDate" | "weekCount"> & Live)[];
+  blocks: readonly (Pick<
+    Block,
+    "id" | "createdAt" | "name" | "startDate" | "weekCount" | "engineVersion"
+  > &
+    Live)[];
   settings: Pick<
     Settings,
     "weightUnit" | "distanceUnit" | "equipment" | "availability" | "onboarding"
   >;
   templates: readonly Template[];
-  exercises: readonly LiftExercise[];
+  exercises: readonly PlanExercise[];
   logs: PlanLogs;
   config?: EngineConfig;
 };
 
 export type WeekPlan = {
-  /** A new block, when the week doesn't fall in an existing one. */
+  /**
+   * A new block when the week doesn't fall in an existing one, or the
+   * current block shortened by an early deload; otherwise null.
+   */
   block: UpsertData<"block"> | null;
   week: UpsertData<"week">;
   sessions: UpsertData<"planned_session">[];
   items: UpsertData<"planned_item">[];
 };
 
-function blockFor(input: WeekPlanInput, config: EngineConfig) {
+const weekTypeAt = (index: number, weekCount: number): WeekType =>
+  weekCount > 1 && index === weekCount - 1 ? "deload" : "loading";
+
+/**
+ * The week's place on the global calendar (SPEC §5.1, §5.4). When two or
+ * more main lifts stalled earlier in the block, the block ends early with
+ * this week as its deload, which moves the calendar for every modality.
+ */
+function blockFor(
+  input: WeekPlanInput,
+  config: EngineConfig,
+  lift: LiftEngineState,
+): { id: string; position: BlockPosition; row: UpsertData<"block"> | null } {
   const containing = input.blocks
     .filter((b) => {
       const days = daysBetween(b.startDate, input.weekStart);
@@ -226,11 +319,39 @@ function blockFor(input: WeekPlanInput, config: EngineConfig) {
     })
     .sort((a, b) => b.startDate.localeCompare(a.startDate))[0];
   if (containing) {
+    const index = Math.floor(
+      daysBetween(containing.startDate, input.weekStart) / 7,
+    );
+    const earlyDeload =
+      index < containing.weekCount - 1 &&
+      stalledMainLifts(
+        lift,
+        input.exercises,
+        containing.startDate,
+        input.weekStart,
+      ) >= config.lift.block.earlyDeloadStalls;
+    const weekCount = earlyDeload ? index + 1 : containing.weekCount;
     return {
       id: containing.id,
-      weekCount: containing.weekCount,
-      index: Math.floor(daysBetween(containing.startDate, input.weekStart) / 7),
-      created: null,
+      position: {
+        startDate: containing.startDate,
+        index,
+        weekCount,
+        type: weekTypeAt(index, weekCount),
+        earlyDeload,
+      },
+      row: earlyDeload
+        ? {
+            id: containing.id,
+            createdAt: containing.createdAt,
+            updatedAt: input.now,
+            deletedAt: null,
+            name: containing.name,
+            startDate: containing.startDate,
+            weekCount,
+            engineVersion: PLAN_VERSION,
+          }
+        : null,
     };
   }
   const created: UpsertData<"block"> = {
@@ -243,30 +364,111 @@ function blockFor(input: WeekPlanInput, config: EngineConfig) {
     weekCount: config.calendar.blockWeeks,
     engineVersion: PLAN_VERSION,
   };
-  return { id: created.id, weekCount: created.weekCount, index: 0, created };
+  return {
+    id: created.id,
+    position: {
+      startDate: created.startDate,
+      index: 0,
+      weekCount: created.weekCount,
+      type: weekTypeAt(0, created.weekCount),
+      earlyDeload: false,
+    },
+    row: created,
+  };
 }
 
+type PlannedSlot = {
+  sets: number;
+  targetRir: number | null;
+  reasons: Reason[];
+};
+
 /**
- * Plans a week from the stubs (SPEC §3.2, §5.4): the block calendar position,
- * then {@link DEFAULT_WEEK}'s sessions with targets and reasons. Pure, and the
+ * Every lift slot's sets and RIR for the week (§5.1 Block structure), keyed
+ * `<session key>:<slot index>`, with ramp sets held to the weekly hard-set cap.
+ */
+function planSlots(
+  input: WeekPlanInput,
+  lift: LiftEngineState,
+  position: BlockPosition,
+  ctxFor: (date: string) => EngineContext,
+  config: EngineConfig,
+): Map<string, PlannedSlot> {
+  const byId = new Map(input.exercises.map((e) => [e.id, e]));
+  const keys: string[] = [];
+  const schemes: ReturnType<typeof weekScheme>[] = [];
+  const requests: RampRequest[] = [];
+  for (const spec of DEFAULT_WEEK) {
+    if (spec.modality !== "lift") continue;
+    const template = templateFor(input, spec.template);
+    if (!template) continue;
+    const ctx = ctxFor(addDays(input.weekStart, spec.weekday - 1));
+    template.slots.forEach((slot, i) => {
+      const resolved = resolveSlot(slot, input.exercises);
+      const exercise = resolved && (byId.get(resolved.id) ?? null);
+      const scheme = weekScheme(
+        slot,
+        exercise,
+        exercise ? lift.exercises[exercise.id] : undefined,
+        position,
+        ctx,
+      );
+      keys.push(`${spec.key}:${i}`);
+      schemes.push(scheme);
+      requests.push({
+        muscles: exercise?.primaryMuscles ?? [],
+        sets: scheme.sets,
+        rampSets: scheme.rampSets,
+      });
+    });
+  }
+  const cap = config.lift.block.hardSetCap;
+  const granted = capRampSets(requests, cap);
+  return new Map(
+    keys.map((key, i) => {
+      const scheme = schemes[i]!;
+      const ramp = rampReason(scheme, granted[i]!, cap);
+      return [
+        key,
+        {
+          sets: scheme.sets + granted[i]!.rampSets,
+          targetRir: scheme.targetRir,
+          reasons: ramp ? [...scheme.reasons, ramp] : scheme.reasons,
+        },
+      ];
+    }),
+  );
+}
+
+const templateFor = (input: WeekPlanInput, key: string) =>
+  input.templates.find(
+    (t) => t.id === defaultTemplateId(key) && t.deletedAt === null,
+  );
+
+/**
+ * Plans a week (SPEC §3.2, §5.4): the block calendar position, then
+ * {@link DEFAULT_WEEK}'s sessions from the stubs, with lifting's block
+ * scheme, deload loads and layoff re-entry applied, and reasons. Pure, and the
  * same inputs give the same ids, so the phone's provisional week and the
  * server's line up.
  */
 export function planWeek(input: WeekPlanInput): WeekPlan {
   const config = input.config ?? ENGINE_CONFIG;
   const { now, weekStart, settings } = input;
-  const block = blockFor(input, config);
-  const type: WeekType =
-    block.weekCount > 1 && block.index === block.weekCount - 1
-      ? "deload"
-      : "loading";
+  let liftState = initLiftEngineState(settings.onboarding, config.lift);
+  for (const log of input.logs.lift) {
+    liftState = updateLiftEngineState(liftState, log, config.lift);
+  }
+  const block = blockFor(input, config, liftState);
+  const { position } = block;
+  const type = position.type;
   const week: UpsertData<"week"> = {
     id: weekId(weekStart),
     createdAt: now,
     updatedAt: now,
     deletedAt: null,
     blockId: block.id,
-    index: block.index,
+    index: position.index,
     startDate: weekStart,
     type,
     engineVersion: PLAN_VERSION,
@@ -279,6 +481,21 @@ export function planWeek(input: WeekPlanInput): WeekPlan {
   let climb = climbStub.initState(settings.onboarding);
   for (const log of input.logs.climb) climb = climbStub.update(climb, log);
 
+  const ctxFor = (date: string): EngineContext => ({
+    date,
+    weekType: type,
+    readiness: "green",
+    weightUnit: settings.weightUnit,
+    distanceUnit: settings.distanceUnit,
+    equipment: settings.equipment,
+    config,
+  });
+  const slots = planSlots(input, liftState, position, ctxFor, config);
+  const byId = new Map(input.exercises.map((e) => [e.id, e]));
+  const liftDates = input.logs.lift
+    .filter((l) => l.sets.some((s) => !s.isWarmup))
+    .map((l) => l.session.localDate);
+
   const taken = new Set<string>();
   const sessions: UpsertData<"planned_session">[] = [];
   const items: UpsertData<"planned_item">[] = [];
@@ -286,15 +503,7 @@ export function planWeek(input: WeekPlanInput): WeekPlan {
   for (const spec of DEFAULT_WEEK) {
     const date = addDays(weekStart, spec.weekday - 1);
     const id = plannedSessionId(weekStart, spec.key);
-    const ctx: EngineContext = {
-      date,
-      weekType: type,
-      readiness: "green",
-      weightUnit: settings.weightUnit,
-      distanceUnit: settings.distanceUnit,
-      equipment: settings.equipment,
-      config,
-    };
+    const ctx = ctxFor(date);
     const targets: {
       kind: PlannedItemKind;
       exerciseId: string | null;
@@ -307,37 +516,69 @@ export function planWeek(input: WeekPlanInput): WeekPlan {
     let version: string;
 
     if (spec.modality === "lift") {
-      const template = input.templates.find(
-        (t) =>
-          t.id === defaultTemplateId(spec.template) && t.deletedAt === null,
-      );
+      const template = templateFor(input, spec.template);
       workoutType = spec.key;
       intent = template?.intent ?? "support";
       version = liftStub.version;
       if (template) {
         templateId = template.id;
+        const planned = template.slots.map((_, i) =>
+          slots.get(`${spec.key}:${i}`),
+        );
         const prescription = liftStub.prescribe(
           lift,
           {
             name: template.name,
-            slots: template.slots,
+            slots: template.slots.map((slot, i) => ({
+              ...slot,
+              sets: planned[i]?.sets ?? slot.sets,
+              targetRir: planned[i]?.targetRir ?? slot.targetRir,
+            })),
             exercises: input.exercises,
           },
           ctx,
         );
-        for (const { exerciseId, reasons, ...rest } of prescription.items) {
+        const reentry = layoffReentry(liftDates, date, config.lift.layoff);
+        liftDates.push(date);
+        prescription.items.forEach(({ exerciseId, reasons, ...rest }, i) => {
+          const exercise =
+            exerciseId === null ? null : (byId.get(exerciseId) ?? null);
+          const extra = [...(planned[i]?.reasons ?? [])];
+          let load = rest.load;
+          if (load && type === "deload") {
+            const share = config.lift.block.deloadLoad;
+            load = scaleLoad(
+              weekOneLoad(
+                exerciseId === null
+                  ? undefined
+                  : liftState.exercises[exerciseId],
+                position.startDate,
+              ) ?? load,
+              share,
+              exercise,
+              ctx,
+            );
+            extra.push({
+              code: "deload_load",
+              text: `${describeLoad(load)}, about ${Math.round(share * 100)}% of week 1's weight.`,
+            });
+          }
+          if (load && reentry) {
+            load = scaleLoad(load, 1 - reentry.cut, exercise, ctx);
+            extra.push(reentry.reason);
+          }
           targets.push({
             kind: "exercise",
             exerciseId,
-            targets: rest,
-            reasons,
+            targets: { ...rest, load },
+            reasons: [...reasons, ...extra],
           });
-        }
+        });
       }
     } else if (spec.modality === "run") {
       const runType: RunWorkoutType =
         spec.workoutType === "quality"
-          ? block.index % 2 === 0
+          ? position.index % 2 === 0
             ? "threshold"
             : "intervals"
           : spec.workoutType;
@@ -403,7 +644,7 @@ export function planWeek(input: WeekPlanInput): WeekPlan {
     );
   }
 
-  return { block: block.created, week, sessions, items };
+  return { block: block.row, week, sessions, items };
 }
 
 /** The spec's slot, or the day's other slot if only that one is free and available. */

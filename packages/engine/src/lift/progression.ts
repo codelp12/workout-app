@@ -32,7 +32,7 @@ export type ProgressionExercise = Pick<
   | "increment"
 >;
 
-/** The slot's scheme for this week, after any block RIR step (#146). */
+/** The slot's scheme for this week, after the block's RIR step and sets ({@link weekScheme}). */
 export type SlotScheme = Pick<
   TemplateSlot,
   "sets" | "repMin" | "repMax" | "targetRir"

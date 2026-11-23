@@ -1,4 +1,5 @@
 import {
+  addDays,
   DEFAULT_EQUIPMENT,
   MAIN_LIFTS,
   type Onboarding,
@@ -253,6 +254,7 @@ describe("lift engine state", () => {
       exposures: [{ date: "", source: "onboarding", sets: [set(50, 8, 2)] }],
       firstLoggedDate: null,
       stallCount: 0,
+      lastStallDate: null,
       lastIncreaseDate: null,
       lastOutcome: null,
       missStreak: 0,
@@ -310,6 +312,28 @@ describe("lift engine state", () => {
       before - 0.5 * (before - e1rmOf(40, 8, 2)),
     );
     expect(state.exercises[squat]?.lastIncreaseDate).toBe("2026-11-16");
+  });
+
+  it("recalibrates to a weaker session after 14+ days off", () => {
+    const after = (gap: number) => {
+      let state = initLiftEngineState(null, config);
+      state = updateLiftEngineState(
+        state,
+        session("2026-11-02", squat, [{ load: 60, reps: 8, rir: 2 }]),
+        config,
+      );
+      return updateLiftEngineState(
+        state,
+        session(addDays("2026-11-02", gap), squat, [
+          { load: 40, reps: 8, rir: 2 },
+        ]),
+        config,
+      ).exercises[squat]?.e1rm?.value;
+    };
+    expect(after(14)).toBeCloseTo(e1rmOf(40, 8, 2));
+    expect(after(13)).toBeCloseTo(
+      e1rmOf(60, 8, 2) - 0.5 * (e1rmOf(60, 8, 2) - e1rmOf(40, 8, 2)),
+    );
   });
 
   it("keeps the e1RM when a session has no loaded hard set", () => {
