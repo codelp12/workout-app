@@ -1,4 +1,5 @@
 import {
+  combineOverrideId,
   MAX_PUSH_OPS,
   newId,
   type EntityName,
@@ -130,6 +131,28 @@ class Client {
 }
 
 describe("POST /api/sync/push", () => {
+  it("round-trips a combine override to another device", async () => {
+    const first = new Client();
+    const second = new Client();
+    const primaryId = newId();
+    const opId = newId();
+    const combination = {
+      id: combineOverrideId(primaryId),
+      createdAt: T0,
+      updatedAt: T0,
+      deletedAt: null,
+      kind: "combine",
+      plannedSessionId: primaryId,
+      weekId: null,
+      data: { otherSessionId: newId() },
+      opId,
+      supersededAt: null,
+    } satisfies UpsertData<"plan_override">;
+    first.queue(upsert("plan_override", combination, opId));
+    await first.push();
+    await second.pull();
+    expect(second.rows.get(combination.id)).toMatchObject(combination);
+  });
   it("applies upserts and stamps them with the owner and a server seq", async () => {
     const row = project();
     const op = upsert("project", {

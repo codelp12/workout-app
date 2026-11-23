@@ -37,6 +37,7 @@ export type SetValues = {
 export type LiftCard = {
   itemId: string;
   item: Pick<PlannedItem, "id" | "plannedSessionId" | "exerciseId">;
+  duplicateItems?: LiftCard["item"][];
   /** The exercise being done: the planned one, or what it was swapped for. */
   exercise: Exercise | null;
   /** Same-group exercises to swap to, preferred first (SPEC §5.1). */
@@ -72,7 +73,11 @@ export async function readLiftSession(
   const overrides = itemOverrides(await db.rows("plan_override").toArray());
   const items: AddedItem[] = [
     ...view.items.filter((i) => i.kind === "exercise"),
-    ...overrides.added.filter((i) => i.plannedSessionId === view.session.id),
+    ...overrides.added.filter(
+      (i) =>
+        i.plannedSessionId === view.session.id ||
+        i.plannedSessionId === view.combinedWith,
+    ),
   ];
   const exerciseOf = (item: AddedItem) =>
     overrides.swaps.get(item.id) ?? item.exerciseId;
@@ -129,33 +134,64 @@ export async function readLiftSession(
       : [];
   };
 
+  const cards = items.map((item): LiftCard => {
+    const planned = (item.exerciseId && byId.get(item.exerciseId)) || null;
+    const exerciseId = exerciseOf(item);
+    const exercise = (exerciseId && byId.get(exerciseId)) || null;
+    const mine = sets
+      .filter((s) => s.sessionLogId === logId && s.exerciseId === exerciseId)
+      .sort((a, b) => a.index - b.index);
+    return {
+      itemId: item.id,
+      item: {
+        id: item.id,
+        plannedSessionId: item.plannedSessionId,
+        exerciseId: item.exerciseId,
+      },
+      exercise,
+      substitutes: substitutes(planned, exercise),
+      skipped: overrides.skips.has(item.id),
+      targets: item.targets as LiftTargets,
+      sets: mine.filter((s) => !s.isWarmup),
+      warmups: mine.filter((s) => s.isWarmup),
+      lastTime: exerciseId ? lastTime(exerciseId) : [],
+    };
+  });
   return {
     log: log && log.deletedAt === null ? log : null,
-    cards: items.map((item) => {
-      const planned = (item.exerciseId && byId.get(item.exerciseId)) || null;
-      const exerciseId = exerciseOf(item);
-      const exercise = (exerciseId && byId.get(exerciseId)) || null;
-      const mine = sets
-        .filter((s) => s.sessionLogId === logId && s.exerciseId === exerciseId)
-        .sort((a, b) => a.index - b.index);
-      return {
-        itemId: item.id,
-        item: {
-          id: item.id,
-          plannedSessionId: item.plannedSessionId,
-          exerciseId: item.exerciseId,
-        },
-        exercise,
-        substitutes: substitutes(planned, exercise),
-        skipped: overrides.skips.has(item.id),
-        targets: item.targets as LiftTargets,
-        sets: mine.filter((s) => !s.isWarmup),
-        warmups: mine.filter((s) => s.isWarmup),
-        lastTime: exerciseId ? lastTime(exerciseId) : [],
-      };
-    }),
+    cards: view.combinedWith ? mergeDuplicateCards(cards) : cards,
     library: exercises.sort((a, b) => a.name.localeCompare(b.name)),
   };
+}
+
+function mergeDuplicateCards(cards: LiftCard[]): LiftCard[] {
+  const byExercise = new Map<string, LiftCard[]>();
+  for (const card of cards) {
+    if (!card.exercise) continue;
+    const group = byExercise.get(card.exercise.id);
+    if (group) group.push(card);
+    else byExercise.set(card.exercise.id, [card]);
+  }
+  return cards.flatMap((card) => {
+    const group = card.exercise && byExercise.get(card.exercise.id);
+    if (!group || group.length === 1) return [card];
+    if (group[0] !== card) return [];
+    const active = group.filter((c) => !c.skipped);
+    const first = active[0] ?? card;
+    return [
+      {
+        ...first,
+        duplicateItems: group.filter((c) => c !== first).map((c) => c.item),
+        targets: {
+          ...first.targets,
+          sets: (active.length > 0 ? active : group).reduce(
+            (sum, c) => sum + c.targets.sets,
+            0,
+          ),
+        },
+      },
+    ];
+  });
 }
 
 /**

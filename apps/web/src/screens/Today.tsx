@@ -37,6 +37,11 @@ function SessionCard({ view }: { view: SessionView }) {
         {summary && (
           <span className="text-fg-muted tabular-nums">{summary}</span>
         )}
+        {view.combineCandidate && (
+          <span className="text-sm text-fg-muted">
+            Can combine with {view.combineCandidate.title}
+          </span>
+        )}
       </div>
       {session.status === "planned" ? (
         <button

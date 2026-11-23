@@ -455,3 +455,8 @@ Options considered:
   - A next step over 25% of the load is too big a jump. The top of the range then rises 2 reps at a time (at most +4), then 1 set is added, and then the step is taken. Past the heaviest weight, the engine suggests a harder variation.
   - A double increment that would exceed +5% falls back to one step.
   - Three stalls start the plateau handler for 28 days, rotating rep scheme (range shifted by 3 reps), a back-off set at 85%, and a same-group variation (a back-off set when there's none).
+
+## Combining two planned lifts (#157)
+
+- **Two unstarted lifts in the same date and AM/PM slot can be combined after confirmation.** Opening either lift lets the owner combine it with the other. A synced `combine` plan override records the pair; the selected lift owns the single log, and both original plans get completion credit. No database migration is needed. (§3.1, §5.4 exception approved by the owner)
+- **The selected lift comes first.** When both include the same exercise, it appears once with the active set targets added together and the first active prescription's other targets. The selected lift supplies the session-level warm-up and stretch checklists.
