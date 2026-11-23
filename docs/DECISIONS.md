@@ -456,6 +456,12 @@ Options considered:
   - A double increment that would exceed +5% falls back to one step.
   - Three stalls start the plateau handler for 28 days, rotating rep scheme (range shifted by 3 reps), a back-off set at 85%, and a same-group variation (a back-off set when there's none).
 
+## Lift-player set entry and swap search (#154, #155, #158)
+
+- **Add set reveals the new entry.** Advancing drops extra rows the owner didn't edit or log. Edited drafts still survive navigation and a reload; logged sets are unaffected. (§6.3)
+- **Swap starts with search above the suggested substitutes.** A non-empty query shows live matches in their place; clearing it brings the suggestions back in equipment-first order. (§5.1, §6.3)
+- **Barbell Bench Press already exists in the full library.** Searching for “bench” when swapping Dumbbell Bench Press surfaces it without modifying the dataset or ranking. (§7)
+
 ## Combining two planned lifts (#157)
 
 - **Two unstarted lifts in the same date and AM/PM slot can be combined after confirmation.** Opening either lift lets the owner combine it with the other. A synced `combine` plan override records the pair; the selected lift owns the single log, and both original plans get completion credit. No database migration is needed. (§3.1, §5.4 exception approved by the owner)

@@ -33,6 +33,8 @@ export type SetValues = {
   rir: number | null;
 };
 
+export type SetDraft = SetValues & { untouchedExtra?: true };
+
 /** One exercise of the session, as the player shows it. */
 export type LiftCard = {
   itemId: string;
@@ -374,38 +376,34 @@ export function settle(
   return { ...values, load, band };
 }
 
+function defaultSetLoad(
+  card: LiftCard,
+  settings: PlayerSettings,
+): number | null {
+  const unit = unitOf(card, settings);
+  const last = card.sets.at(-1);
+  if (last?.loadValue != null)
+    return toWeightUnit(
+      { value: last.loadValue, unit: last.loadUnit ?? unit },
+      unit,
+    );
+  if (!isWeighted(card)) return null;
+  return card.targets.load ? toWeightUnit(card.targets.load, unit) : 0;
+}
+
 /**
  * The next set prefilled: the last set logged this session if there is one,
  * RIR included, else the target (top of the rep range), snapped to the
  * inventory. The first set's RIR is left for the owner to pick.
  */
 export function prefill(card: LiftCard, settings: PlayerSettings): SetValues {
-  const unit = unitOf(card, settings);
   const last = card.sets.at(-1);
-  const raw: SetValues = last
-    ? {
-        load:
-          last.loadValue === null
-            ? null
-            : toWeightUnit(
-                { value: last.loadValue, unit: last.loadUnit ?? unit },
-                unit,
-              ),
-        band: last.band,
-        reps: last.reps,
-        rir: last.rir,
-      }
-    : {
-        load: isWeighted(card)
-          ? card.targets.load
-            ? toWeightUnit(card.targets.load, unit)
-            : 0
-          : null,
-        band: card.targets.band,
-        reps: card.targets.repMax,
-        rir: null,
-      };
-  return settle(card, settings, raw);
+  return settle(card, settings, {
+    load: defaultSetLoad(card, settings),
+    band: last ? last.band : card.targets.band,
+    reps: last ? last.reps : card.targets.repMax,
+    rir: last?.rir ?? null,
+  });
 }
 
 // Warm-up ramp (SPEC §5.1): share of the first working load, and reps.
@@ -631,7 +629,7 @@ export async function openWorkout(
 export type PlayerPosition = {
   card: number;
   /** The set rows not yet logged, by planned item. */
-  drafts: Record<string, SetValues[]>;
+  drafts: Record<string, SetDraft[]>;
 };
 
 /**
@@ -642,17 +640,26 @@ export type PlayerPosition = {
 export function openRows(
   card: LiftCard,
   settings: PlayerSettings,
-  drafts: SetValues[] | undefined,
-): SetValues[] {
-  if (drafts) return drafts.map((d) => settle(card, settings, d));
-  return card.sets.length === 0 ? [prefill(card, settings)] : [];
+  drafts: SetDraft[] | undefined,
+): SetDraft[] {
+  const rows = drafts?.length
+    ? drafts
+    : card.sets.length === 0
+      ? [prefill(card, settings)]
+      : [];
+  return rows.map((draft) => {
+    const load =
+      draft.load ?? (isWeighted(card) ? defaultSetLoad(card, settings) : null);
+    const settled = settle(card, settings, { ...draft, load });
+    return { ...draft, ...settled, load: settled.load ?? load };
+  });
 }
 
 /** Whether every set row on the card is logged, and there's at least one. */
 export const cardDone = (
   card: LiftCard,
   settings: PlayerSettings,
-  drafts: SetValues[] | undefined,
+  drafts: SetDraft[] | undefined,
 ) => card.sets.length > 0 && openRows(card, settings, drafts).length === 0;
 
 // Device-local, like the onboarding flag: it only has to survive a kill.
@@ -669,7 +676,7 @@ export function loadPosition(sessionId: string): PlayerPosition {
       const drafts = Object.fromEntries(
         Object.entries(saved.drafts).map(([id, d]) => [
           id,
-          (Array.isArray(d) ? d : [d]) as SetValues[],
+          (Array.isArray(d) ? d : [d]) as SetDraft[],
         ]),
       );
       return { card: saved.card, drafts };
