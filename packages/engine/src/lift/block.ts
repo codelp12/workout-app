@@ -62,8 +62,8 @@ const MET = new Set(["top", "beat", "done"]);
  * A slot's scheme for its week of the block (§5.1 Block structure). Deload
  * weeks halve the sets (rounded up) at 3+ RIR. Loading weeks step main lifts'
  * (`e1rm_rir`) RIR down the block, and `ramp` slots gain a set in weeks 2
- * and 3 when the exercise's last exposure this block met its targets with
- * every prescribed set.
+ * and 3 when the exercise's last exposure this block logged every prescribed
+ * set and met its targets; otherwise they keep the sets already earned.
  */
 export function weekScheme(
   slot: Pick<TemplateSlot, "sets" | "repMin" | "repMax" | "targetRir" | "ramp">,
@@ -126,8 +126,7 @@ export function weekScheme(
     position.index > 0 &&
     last?.source === "log" &&
     last.target &&
-    last.date >= position.startDate &&
-    last.sets.length >= last.target.sets
+    last.date >= position.startDate
   ) {
     const earned = Math.min(
       Math.max(last.target.sets - slot.sets, 0),
@@ -136,6 +135,7 @@ export function weekScheme(
     rampGained =
       position.index <= config.rampWeeks &&
       earned < position.index &&
+      last.sets.length >= last.target.sets &&
       MET.has(state?.lastOutcome ?? "");
     rampSets = earned + (rampGained ? 1 : 0);
   }

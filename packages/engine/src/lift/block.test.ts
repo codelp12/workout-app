@@ -154,6 +154,10 @@ describe("weekScheme", () => {
       rampSets: 2,
       rampGained: true,
     });
+    const week2short = log("2026-11-09", 12, { sets: 4 });
+    expect(
+      scheme(fold({ ...week2short, sets: week2short.sets.slice(0, 2) }), 2),
+    ).toMatchObject({ rampSets: 1, rampGained: false });
     expect(scheme(week2missed, 2)).toMatchObject({
       rampSets: 1,
       rampGained: false,
