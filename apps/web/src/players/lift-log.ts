@@ -165,6 +165,7 @@ export async function readLiftSession(
 export function describeSet(
   set: Pick<SetLog, "loadValue" | "loadUnit" | "band" | "reps" | "rir">,
   bodyweight = false,
+  timed = false,
 ): string {
   const load =
     set.loadValue !== null && set.loadUnit
@@ -176,8 +177,13 @@ export function describeSet(
       : bodyweight
         ? `Bodyweight + ${load}`
         : load;
-  return `${what} × ${set.reps}${set.rir === null ? "" : ` · RIR ${set.rir}`}`;
+  return `${what} × ${set.reps}${timed ? " s" : ""}${set.rir === null ? "" : ` · RIR ${set.rir}`}`;
 }
+
+const TIMED_HOLDS = new Set(["Plank", "Side_Bridge", "Kneeling_Hip_Flexor"]);
+
+export const isTimedHold = (exercise: Exercise | null) =>
+  exercise?.sourceId != null && TIMED_HOLDS.has(exercise.sourceId);
 
 /** The implement an exercise is loaded on, if it's loaded by weight. */
 export function implementOf(exercise: Exercise | null): WeightImplement | null {

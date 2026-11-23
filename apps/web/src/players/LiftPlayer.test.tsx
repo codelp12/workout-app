@@ -950,6 +950,54 @@ describe("discarding", () => {
   });
 });
 
+describe("timed holds", () => {
+  it("uses the full elapsed seconds after the app returns to the foreground", async () => {
+    await localDb.rows("exercise").put({ ...plank, sourceId: "Plank" });
+    const user = userEvent.setup();
+    renderPlayer();
+    const squatCard = await screen.findByRole("article", {
+      name: "Dumbbell Squat",
+    });
+    expect(
+      within(squatCard).queryByRole("region", { name: "Hold timer" }),
+    ).toBeNull();
+    await user.click(
+      within(screen.getByRole("navigation", { name: "Exercises" })).getByRole(
+        "button",
+        { name: /^Next$/ },
+      ),
+    );
+    const card = within(await screen.findByRole("article", { name: "Plank" }));
+    const hold = within(card.getByRole("region", { name: "Hold timer" }));
+    const start = Date.now();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(start);
+    try {
+      await user.click(hold.getByRole("button", { name: "Start hold" }));
+      expect(hold.getByRole("timer").textContent).toBe("0:00");
+      expect(
+        card.getByRole<HTMLButtonElement>("button", { name: "Log set" })
+          .disabled,
+      ).toBe(true);
+      clock.mockReturnValue(start + 45_000);
+      fireEvent(document, new Event("visibilitychange"));
+      expect(hold.getByRole("timer").textContent).toBe("0:45");
+      await user.click(hold.getByRole("button", { name: "Stop hold" }));
+      expect(
+        card
+          .getByRole("spinbutton", { name: "Seconds" })
+          .getAttribute("aria-valuenow"),
+      ).toBe("45");
+      await user.click(card.getByRole("button", { name: "Log set" }));
+      expect(await card.findByText("Bodyweight × 45 s")).toBeTruthy();
+      expect(
+        await screen.findByRole("region", { name: "Rest timer" }),
+      ).toBeTruthy();
+    } finally {
+      clock.mockRestore();
+    }
+  });
+});
+
 describe("finishing", () => {
   it("finishes with RPE and notes, marks the session done and queues it for sync", async () => {
     await localDb.rows("checklist").put({

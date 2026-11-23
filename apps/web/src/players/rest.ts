@@ -32,6 +32,9 @@ export function latestRest(cards: LiftCard[]): Rest | null {
 export const secondsLeft = (rest: Rest, now: number) =>
   Math.ceil((rest.endsAt - now) / 1000);
 
+export const holdSeconds = (startedAt: number, now: number) =>
+  Math.max(0, Math.floor((now - startedAt) / 1000));
+
 /** `2:05` */
 export const formatClock = (sec: number) =>
   `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
