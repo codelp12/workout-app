@@ -167,6 +167,14 @@ describe("POST /api/sync/push", () => {
     await second.push();
     await second.pull();
     expect(second.rows.get(stale.id)).toMatchObject(finished);
+
+    second.queue(upsert("session_log", { ...stale, checked: ["wall-slides"] }));
+    await second.push();
+    await first.pull();
+    expect(first.rows.get(stale.id)).toMatchObject({
+      ...finished,
+      checked: ["warm-up", "wall-slides"],
+    });
   });
   it("round-trips a combine override to another device", async () => {
     const first = new Client();

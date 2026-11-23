@@ -106,7 +106,7 @@ function applyOp(tx: Tx, raw: { opId: string }, now: number): PushResult {
     const update = { ...row } as Partial<EntityTable["$inferInsert"]>;
     delete update.id;
     delete update.createdAt;
-    const preserved =
+    const finished =
       op.data.entity === "session_log" &&
       "endedAt" in row &&
       row.modality === "lift" &&
@@ -114,8 +114,8 @@ function applyOp(tx: Tx, raw: { opId: string }, now: number): PushResult {
       row.endedAt === null &&
       row.deletedAt === null &&
       tx
-        .update(sessionLog)
-        .set({ serverSeq })
+        .select({ checked: sessionLog.checked })
+        .from(sessionLog)
         .where(
           and(
             eq(sessionLog.id, row.id),
@@ -123,8 +123,16 @@ function applyOp(tx: Tx, raw: { opId: string }, now: number): PushResult {
             isNotNull(sessionLog.endedAt),
           ),
         )
-        .run().changes > 0;
-    if (!preserved) {
+        .get();
+    if (finished && "checked" in row) {
+      tx.update(sessionLog)
+        .set({
+          serverSeq,
+          checked: [...new Set([...finished.checked, ...row.checked])],
+        })
+        .where(eq(sessionLog.id, row.id))
+        .run();
+    } else {
       tx.insert(table)
         .values(row as EntityTable["$inferInsert"])
         .onConflictDoUpdate({
