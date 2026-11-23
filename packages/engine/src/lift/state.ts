@@ -7,7 +7,12 @@ import {
 } from "@workout-app/shared";
 import type { EngineConfig } from "../config.js";
 import { roundToLoadable, type WeightImplement } from "../loads.js";
-import type { LiftExposure, LiftSessionLog, LiftSet } from "../stubs/lift.js";
+import type {
+  LiftExposure,
+  LiftSessionLog,
+  LiftSet,
+  LiftTarget,
+} from "../stubs/lift.js";
 import { toWeightUnit } from "../units.js";
 
 /** Stored with every `fitness_state` row the lift engine writes. */
@@ -23,11 +28,30 @@ export type ExerciseState = {
   exposures: LiftExposure[];
   /** Calibration mode runs from here (§5.0). Null until a session is logged. */
   firstLoggedDate: string | null;
-  /** Consecutive missed exposures; the progression rules (#145) drive it. */
+  /** Stalls since the exercise last hit the top of its range (§5.1). */
   stallCount: number;
   /** The last date the e1RM estimate rose. */
   lastIncreaseDate: string | null;
+  /** How the latest exposure went against its target; null when unplanned. */
+  lastOutcome: Outcome | null;
+  /** Consecutive missed exposures since the last stall. */
+  missStreak: number;
+  /** Plateaus so far, which picks the next plateau fix. */
+  plateaus: number;
+  /** The plateau fix in force, if any (§5.1). */
+  plateau: { action: PlateauAction; startedOn: string } | null;
 };
+
+/**
+ * `missed`: a set at the prescribed load fell short of the range's bottom.
+ * `stalled`: the second miss in a row. `top`: every set reached the top of
+ * the range at the target RIR or easier; `beat` went past it. `done`: neither.
+ */
+export const OUTCOMES = ["missed", "stalled", "top", "beat", "done"] as const;
+export type Outcome = (typeof OUTCOMES)[number];
+
+export const PLATEAU_ACTIONS = ["rep_scheme", "back_off", "variation"] as const;
+export type PlateauAction = (typeof PLATEAU_ACTIONS)[number];
 
 export type LiftEngineState = { exercises: Record<string, ExerciseState> };
 
@@ -115,7 +139,96 @@ const emptyExercise = (): ExerciseState => ({
   firstLoggedDate: null,
   stallCount: 0,
   lastIncreaseDate: null,
+  lastOutcome: null,
+  missStreak: 0,
+  plateaus: 0,
+  plateau: null,
 });
+
+const EPSILON = 1e-6;
+
+/**
+ * Judges an exposure's working sets against what was planned, ignoring sets
+ * lighter than the prescribed load. Null when no set was at the target, as
+ * when the owner went lighter. A set without RIR counts as RIR 0.
+ */
+export function judgeExposure(
+  sets: readonly LiftSet[],
+  target: LiftTarget,
+  missToleranceReps: number,
+  config: Lift,
+): Exclude<Outcome, "stalled"> | null {
+  const atTarget = sets.filter((set) => {
+    if (target.load !== null) {
+      return (
+        set.load !== null &&
+        toWeightUnit(set.load, target.load.unit) >= target.load.value - EPSILON
+      );
+    }
+    return set.band === target.band;
+  });
+  if (atTarget.length === 0) return null;
+  if (atTarget.some((s) => s.reps < target.repMin - missToleranceReps)) {
+    return "missed";
+  }
+  const rirOf = (set: LiftSet) => set.rir ?? 0;
+  const top =
+    atTarget.length >= target.sets &&
+    atTarget.every(
+      (s) =>
+        s.reps >= target.repMax &&
+        (target.targetRir === null || rirOf(s) >= target.targetRir),
+    );
+  if (!top) return "done";
+  const margin = config.progression.beatRirMargin;
+  const beat = atTarget.every(
+    (s) =>
+      s.reps > target.repMax ||
+      (target.targetRir !== null && rirOf(s) >= target.targetRir + margin),
+  );
+  return beat ? "beat" : "top";
+}
+
+/** The miss, stall and plateau bookkeeping after an exposure (§5.1 Rules). */
+function judgeInto(
+  next: ExerciseState,
+  exposure: LiftExposure,
+  calibrating: boolean,
+  config: Lift,
+): void {
+  const target = exposure.target ?? null;
+  const outcome =
+    target === null
+      ? null
+      : judgeExposure(
+          exposure.sets,
+          target,
+          calibrating ? config.calibration.missToleranceReps : 0,
+          config,
+        );
+  next.lastOutcome = outcome;
+  if (outcome === null) return;
+  if (outcome !== "missed") {
+    next.missStreak = 0;
+    if (outcome !== "done") next.stallCount = 0;
+    return;
+  }
+  if (next.missStreak + 1 < 2) {
+    next.missStreak += 1;
+    return;
+  }
+  next.lastOutcome = "stalled";
+  next.missStreak = 0;
+  next.stallCount += 1;
+  if (next.stallCount >= config.progression.stallsToPlateau) {
+    next.stallCount = 0;
+    next.plateau = {
+      action: PLATEAU_ACTIONS[next.plateaus % PLATEAU_ACTIONS.length]!,
+      startedOn: exposure.date,
+    };
+    next.plateaus += 1;
+  }
+}
 
 /**
  * Starting state from the onboarding answers (§5.0 cold start): each main
@@ -151,11 +264,13 @@ function foldExposure(
   config: Lift,
 ): ExerciseState {
   const firstLoggedDate = previous.firstLoggedDate ?? exposure.date;
+  const calibrating = isCalibrating({ firstLoggedDate }, exposure.date, config);
   const next: ExerciseState = {
     ...previous,
     firstLoggedDate,
     exposures: [...previous.exposures, exposure].slice(-config.exposuresKept),
   };
+  judgeInto(next, exposure, calibrating, config);
   const unit =
     previous.e1rm?.unit ??
     exposure.sets.find((s) => s.load !== null)?.load?.unit;
@@ -167,12 +282,7 @@ function foldExposure(
     next.e1rm = { value: estimate, unit };
     return next;
   }
-  const value = smoothE1rm(
-    previous.e1rm.value,
-    estimate,
-    isCalibrating({ firstLoggedDate }, exposure.date, config),
-    config,
-  );
+  const value = smoothE1rm(previous.e1rm.value, estimate, calibrating, config);
   next.e1rm = { value, unit };
   if (value > previous.e1rm.value + 1e-9) {
     next.lastIncreaseDate = exposure.date;
@@ -210,6 +320,7 @@ export function updateLiftEngineState(
       {
         date,
         source: "log",
+        target: log.targets?.[exerciseId] ?? null,
         sets: [...sets]
           .sort((a, b) => a.index - b.index)
           .map((s) => ({

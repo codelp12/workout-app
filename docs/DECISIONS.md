@@ -440,7 +440,18 @@ Options considered:
 
 - **Per-exercise lift state lives in the engine.** `packages/engine/src/lift/state.ts` keeps each exercise's e1RM, a 0–1 confidence, the last 6 exposures, a stall count (0 until #145), the first logged date and the date e1RM last rose. It folds sets with SPEC §5.1's Epley formula, 12-rep cutoff, asymmetric smoothing (0.3 up, 0.5 down) and +3% rise cap. Warm-ups and logs older than the latest exposure are ignored. The stub still writes plans until #148.
 - **e1RM history is a synced `fitness_state` table.** One row per metric, exercise and day (`fitnessStateId`), plus an onboarding point on the onboarding date. The server owns it: every push that applies a `settings`, `session_log` or `set_log` change recomputes the series from all lift logs, writes only changed rows and tombstones points whose logs are gone. Running and climbing metrics will reuse the table. (§4)
-- **Outside the spec, pending owner sign-off:**
+- **Outside the spec, signed off by the owner:**
   - Calibration lasts 14 days from an exercise's first logged session. During it the rise cap is +1.5%, and #145 gives a miss 1 rep of slack.
   - Confidence starts at 0.3 from an onboarding answer (else 0) and closes 30% of the gap to 1 with each session that has a usable set.
   - A set logged without RIR counts as RIR 0.
+
+## 2026-11-19: Lift progression rules (#145)
+
+- **Exposures remember their targets.** A lift log can carry each exercise's planned targets (`LiftSessionLog.targets`), and `updateLiftEngineState` judges every planned exposure as `missed`, `stalled`, `top`, `beat` or `done` (`judgeExposure`). Sets lighter than prescribed aren't judged. A miss is any set at the prescribed load under the range's bottom. A second consecutive miss is a stall, and hitting the top of the range resets the stall count. #148 passes the targets in when it builds plans.
+- **`progressExercise` makes the next prescription** with reasons, for both models (§5.1 Rules, Increments). The tunables are in `ENGINE_CONFIG.lift.progression`, so the owner can adjust them as he trains. Wiring it into the weekly plan is #148.
+- **Outside the spec, owner approved and open to tuning:**
+  - `e1rm_rir` sets the load for the bottom of the rep range at the target RIR. When the rack can't go heavy enough, it raises reps instead (reps + RIR at most 12).
+  - The `double_progression` cut is 7.5%, and always at least one step down.
+  - A next step over 25% of the load is too big a jump. The top of the range then rises 2 reps at a time (at most +4), then 1 set is added, and then the step is taken. Past the heaviest weight, the engine suggests a harder variation.
+  - A double increment that would exceed +5% falls back to one step.
+  - Three stalls start the plateau handler for 28 days, rotating rep scheme (range shifted by 3 reps), a back-off set at 85%, and a same-group variation (a back-off set when there's none).
