@@ -54,6 +54,22 @@ test("a set logs in two taps and the player resumes after a kill", async ({
     .getByRole("heading", { level: 2 })
     .textContent())!;
 
+  if (title === "Push A") {
+    const bench = player.getByRole("article", { name: "Dumbbell Bench Press" });
+    await bench.getByRole("button", { name: "Swap" }).click();
+    const sheet = page.getByRole("dialog", { name: "Swap exercise" });
+    await sheet.getByRole("searchbox").pressSequentially("bench");
+    await expect(sheet.getByRole("list", { name: "Substitutes" })).toHaveCount(
+      0,
+    );
+    await expect(
+      sheet.getByRole("list", { name: "Exercises" }).getByRole("button", {
+        name: "Barbell Bench Press - Medium Grip",
+        exact: true,
+      }),
+    ).toBeInViewport();
+    await sheet.getByRole("button", { name: "Close", exact: true }).click();
+  }
   await first.getByRole("radio", { name: "2" }).click();
   await first.getByRole("button", { name: "Log set" }).click();
   await expect(
@@ -62,6 +78,9 @@ test("a set logs in two taps and the player resumes after a kill", async ({
   const rest = player.getByRole("region", { name: "Rest timer" });
   await expect(rest.getByRole("timer")).toHaveText(/^\d:\d\d$/);
   await first.getByRole("button", { name: "Add set" }).click();
+  const newSet = first.getByRole("region", { name: "Set 2" });
+  await expect(newSet).toBeFocused();
+  await expect(newSet.getByRole("heading")).toBeInViewport();
   await first.getByRole("button", { name: "Decrease Reps" }).click();
   const reps = await first
     .getByRole("spinbutton", { name: "Reps" })
