@@ -12,14 +12,14 @@ import {
   type PushResult,
   type SyncChange,
 } from "@workout-app/shared";
-import { asc, eq, gt, sql } from "drizzle-orm";
+import { and, asc, eq, gt, isNotNull, isNull, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import type { Db } from "./db.js";
 import { entityTables } from "./entity-tables.js";
 import { refreshFitnessState } from "./fitness.js";
 import { planCurrentWeek } from "./plan.js";
-import { opReceipt, syncCounter } from "./schema.js";
+import { opReceipt, sessionLog, syncCounter } from "./schema.js";
 
 /** Single-user app (SPEC §1): every row belongs to the one account. */
 export const OWNER_USER_ID = 1;
@@ -106,13 +106,33 @@ function applyOp(tx: Tx, raw: { opId: string }, now: number): PushResult {
     const update = { ...row } as Partial<EntityTable["$inferInsert"]>;
     delete update.id;
     delete update.createdAt;
-    tx.insert(table)
-      .values(row as EntityTable["$inferInsert"])
-      .onConflictDoUpdate({
-        target: table.id,
-        set: update,
-      })
-      .run();
+    const preserved =
+      op.data.entity === "session_log" &&
+      "endedAt" in row &&
+      row.modality === "lift" &&
+      row.plannedSessionId !== null &&
+      row.endedAt === null &&
+      row.deletedAt === null &&
+      tx
+        .update(sessionLog)
+        .set({ serverSeq })
+        .where(
+          and(
+            eq(sessionLog.id, row.id),
+            isNull(sessionLog.deletedAt),
+            isNotNull(sessionLog.endedAt),
+          ),
+        )
+        .run().changes > 0;
+    if (!preserved) {
+      tx.insert(table)
+        .values(row as EntityTable["$inferInsert"])
+        .onConflictDoUpdate({
+          target: table.id,
+          set: update,
+        })
+        .run();
+    }
   } else {
     const data = deleteDataSchema.safeParse(op.data.data);
     if (!data.success) return rejected(opId, data.error);
