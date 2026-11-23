@@ -273,6 +273,8 @@ export const templateSlotSchema = z
     targetRir: rir.nullable(),
     restSec: count,
     ramp: z.boolean(),
+    /** Keeps a barbell, cable or machine exercise instead of the planner's equipment-first swap (SPEC §5.1). Absent means false. */
+    pinned: z.boolean().optional(),
   })
   .refine((s) => s.exerciseId !== null || s.substitutionGroup !== null, {
     message: "A slot needs an exercise or a substitution group",

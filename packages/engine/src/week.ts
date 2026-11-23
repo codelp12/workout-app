@@ -410,7 +410,7 @@ function planSlots(
     if (!template) continue;
     const ctx = ctxFor(addDays(input.weekStart, spec.weekday - 1));
     template.slots.forEach((slot, i) => {
-      const resolved = resolveSlot(slot, input.exercises);
+      const resolved = resolveSlot(slot, input.exercises, ctx.equipment);
       const exercise = resolved && (byId.get(resolved.id) ?? null);
       const scheme = weekScheme(
         slot,

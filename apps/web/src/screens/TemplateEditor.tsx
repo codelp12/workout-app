@@ -91,10 +91,12 @@ function SlotCard({
   template,
   index,
   names,
+  swappableExerciseIds,
 }: {
   template: Template;
   index: number;
   names: Names;
+  swappableExerciseIds: ReadonlySet<string>;
 }) {
   const headingId = useId();
   const slot = template.slots[index];
@@ -174,6 +176,23 @@ function SlotCard({
         >
           Add a set in loading weeks
         </button>
+        {slot.exerciseId !== null &&
+          swappableExerciseIds.has(slot.exerciseId) && (
+            <>
+              <button
+                type="button"
+                className={`${toggle} self-start`}
+                aria-pressed={slot.pinned ?? false}
+                onClick={() => set({ pinned: !(slot.pinned ?? false) })}
+              >
+                Keep this exercise
+              </button>
+              <p className="text-sm text-fg-muted">
+                Otherwise the planner swaps in a dumbbell or band version you
+                can load.
+              </p>
+            </>
+          )}
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -264,6 +283,15 @@ function Editor({
   exercises: readonly Exercise[];
 }) {
   const names: Names = new Map(exercises.map((e) => [e.id, e.name]));
+  const swappableExerciseIds = new Set(
+    exercises
+      .filter((e) =>
+        e.equipment.some((kind) =>
+          ["barbell", "cable", "machine"].includes(kind),
+        ),
+      )
+      .map((e) => e.id),
+  );
   return (
     <>
       <Section title="Template">
@@ -306,6 +334,7 @@ function Editor({
                 template={template}
                 index={i}
                 names={names}
+                swappableExerciseIds={swappableExerciseIds}
               />
             ))}
           </ol>
