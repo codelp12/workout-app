@@ -44,6 +44,7 @@ function plannedSession(fields: Partial<PlannedSession> = {}): PlannedSession {
 const viewOf = (session: PlannedSession): SessionView => ({
   session,
   planned: { date: session.date, slot: session.slot },
+  inProgress: false,
   title: "Push A",
   items: [],
   exerciseNames: new Map(),

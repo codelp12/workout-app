@@ -28,15 +28,16 @@ test("Today works offline and Start opens the session's player", async ({
   await expect(page.getByRole("region", { name: "Coach note" })).toBeVisible();
   // Thursday is the default week's rest day unless Week's test moved a
   // session onto it; every other day has sessions.
-  const start = page.getByRole("button", { name: /^Start / }).first();
+  const start = page
+    .getByRole("button", { name: /^(Start|Preview|Resume) / })
+    .first();
   const rest = page.getByText("Rest day: nothing planned today.");
   await expect(start.or(rest)).toBeVisible();
   if (await rest.isVisible()) return;
   await page.screenshot({ path: testInfo.outputPath("today-390x844.png") });
 
-  const title = (await start.getAttribute("aria-label"))!.slice(
-    "Start ".length,
-  );
+  const label = (await start.getAttribute("aria-label"))!;
+  const title = label.slice(label.indexOf(" ") + 1);
   const card = page.getByRole("listitem", { name: title, exact: true });
   const modality = (await card
     .getByText(/^(Lifting|Running|Climbing)$/)
@@ -46,6 +47,9 @@ test("Today works offline and Start opens the session's player", async ({
   await expect(
     page.getByRole("heading", { level: 1, name: title }),
   ).toBeVisible();
+  if (label.startsWith("Preview ")) {
+    await page.getByRole("button", { name: "Start workout" }).click();
+  }
   await expect(
     page.getByRole("region", { name: players[modality] }),
   ).toBeVisible();

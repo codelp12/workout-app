@@ -30,13 +30,30 @@ test("a set logs in two taps and the player resumes after a kill", async ({
     .getByRole("dialog", { name: title })
     .getByRole("button", { name: "Open session" })
     .click();
+  const overview = page.getByRole("region", { name: "Workout overview" });
+  await expect(overview.getByRole("listitem").first()).toContainText(
+    /\d+ × \d+/,
+  );
+  await expect(page.getByRole("region", { name: "Lift player" })).toHaveCount(
+    0,
+  );
+  await context.setOffline(true);
+  await overview.getByRole("button", { name: "Start workout" }).click();
+  await expect(page.getByRole("region", { name: "Lift player" })).toBeVisible();
+  await page.getByRole("button", { name: "Back" }).click();
+  await page
+    .getByRole("button", { name: new RegExp(`^${title}, .*In progress`) })
+    .click();
+  await page
+    .getByRole("dialog", { name: title })
+    .getByRole("button", { name: "Resume session" })
+    .click();
   const player = page.getByRole("region", { name: "Lift player" });
   const first = player.getByRole("article");
   const exercise = (await first
     .getByRole("heading", { level: 2 })
     .textContent())!;
 
-  await context.setOffline(true);
   await first.getByRole("radio", { name: "2" }).click();
   await first.getByRole("button", { name: "Log set" }).click();
   await expect(
@@ -99,11 +116,14 @@ test("swaps and skips sync to the server", async ({ page }, testInfo) => {
   await page.getByRole("button", { name: new RegExp(`^${title}, `) }).click();
   await page
     .getByRole("dialog", { name: title })
-    .getByRole("button", { name: "Open session" })
+    .getByRole("button", { name: /^(Open|Resume) session$/ })
     .click();
   await expect(page).toHaveURL(/\/session\//);
-  const sessionId = new URL(page.url()).pathname.split("/").pop()!;
+  const start = page.getByRole("button", { name: "Start workout" });
   const player = page.getByRole("region", { name: "Lift player" });
+  await expect(start.or(player)).toBeVisible();
+  if (await start.isVisible()) await start.click();
+  const sessionId = new URL(page.url()).pathname.split("/").pop()!;
   const card = player.getByRole("article");
 
   // The first card belongs to the other test; swap the second, skip the third.
@@ -163,11 +183,14 @@ test("a finished session shows as done and syncs", async ({
   await page.getByRole("button", { name: new RegExp(`^${title}, `) }).click();
   await page
     .getByRole("dialog", { name: title })
-    .getByRole("button", { name: "Open session" })
+    .getByRole("button", { name: /^(Open|Resume) session$/ })
     .click();
   await expect(page).toHaveURL(/\/session\//);
-  const sessionId = new URL(page.url()).pathname.split("/").pop()!;
+  const start = page.getByRole("button", { name: "Start workout" });
   const player = page.getByRole("region", { name: "Lift player" });
+  await expect(start.or(player)).toBeVisible();
+  if (await start.isVisible()) await start.click();
+  const sessionId = new URL(page.url()).pathname.split("/").pop()!;
   const card = player.getByRole("article");
   // The first test may have logged this card's only row already.
   await card.getByRole("button", { name: "Add set" }).click();

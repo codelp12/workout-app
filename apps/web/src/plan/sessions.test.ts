@@ -54,6 +54,7 @@ const item = (
 const view = (s: PlannedSession, items: PlannedItem[]): SessionView => ({
   session: s,
   planned: { date: s.date, slot: s.slot },
+  inProgress: false,
   title: "",
   items,
   exerciseNames: new Map(),

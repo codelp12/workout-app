@@ -44,11 +44,13 @@ function readFilter(params: URLSearchParams): Filter {
 }
 
 const statusLabel = (view: SessionView) =>
-  view.session.status === "done"
-    ? "Done"
-    : view.session.status === "skipped"
-      ? "Skipped"
-      : null;
+  view.inProgress
+    ? "In progress"
+    : view.session.status === "done"
+      ? "Done"
+      : view.session.status === "skipped"
+        ? "Skipped"
+        : null;
 
 const isMoved = (view: SessionView) =>
   !samePlacement(view.session, view.planned);
@@ -294,7 +296,7 @@ function MoveForm({
         className={`${button} min-h-tap`}
         onClick={() => void navigate(`/session/${view.session.id}`)}
       >
-        Open session
+        {view.inProgress ? "Resume session" : "Open session"}
       </button>
     </>
   );
@@ -305,7 +307,7 @@ function Plan({ weekStart, today }: { weekStart: string; today: string }) {
   const filter = readFilter(params);
   const query = useCallback(() => weekPlan(weekStart), [weekStart]);
   const plan = useLiveQuery<WeekPlan | undefined>(query, undefined);
-  const [selected, setSelected] = useState<SessionView | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   if (!plan) {
     return (
@@ -318,6 +320,9 @@ function Plan({ weekStart, today }: { weekStart: string; today: string }) {
   const empty = plan.days.every(
     (d) => d.slots.am.length + d.slots.pm.length === 0,
   );
+  const selected = plan.days
+    .flatMap((day) => [...day.slots.am, ...day.slots.pm])
+    .find((view) => view.session.id === selectedId);
   return (
     <>
       <p className="-mt-2 flex items-center gap-2 text-fg-muted">
@@ -359,7 +364,7 @@ function Plan({ weekStart, today }: { weekStart: string; today: string }) {
                 day={day}
                 today={today}
                 filter={filter}
-                onSelect={setSelected}
+                onSelect={(view) => setSelectedId(view.session.id)}
               />
             ))}
           </ol>
@@ -367,15 +372,15 @@ function Plan({ weekStart, today }: { weekStart: string; today: string }) {
       )}
       <BottomSheet
         title={selected?.title ?? ""}
-        open={selected !== null}
-        onOpenChange={(open) => !open && setSelected(null)}
+        open={selected !== undefined}
+        onOpenChange={(open) => !open && setSelectedId(null)}
       >
         {selected && (
           <MoveForm
             key={selected.session.id}
             view={selected}
             weekStart={weekStart}
-            onDone={() => setSelected(null)}
+            onDone={() => setSelectedId(null)}
           />
         )}
       </BottomSheet>

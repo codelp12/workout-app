@@ -143,16 +143,54 @@ describe("Today", () => {
     const user = userEvent.setup();
     renderAt("/");
     await user.click(
-      await screen.findByRole("button", { name: "Start Push A" }),
+      await screen.findByRole("button", { name: "Preview Push A" }),
     );
     expect(
       await screen.findByRole("heading", { level: 1, name: "Push A" }),
     ).toBeTruthy();
-    const lift = within(screen.getByRole("region", { name: "Lift player" }));
+    const preview = within(
+      screen.getByRole("region", { name: "Workout overview" }),
+    );
+    expect(await preview.findByText("Dumbbell Bench Press")).toBeTruthy();
+    expect(
+      preview.getByText("3 × 6–10 · 50 lb · RIR 2 · rest 3:00"),
+    ).toBeTruthy();
+    expect(
+      await localDb.rows("session_log").get(sessionLogId(push.id)),
+    ).toBeUndefined();
+    await user.click(preview.getByRole("button", { name: "Start workout" }));
+    const lift = within(
+      await screen.findByRole("region", { name: "Lift player" }),
+    );
     expect(await lift.findByText("Dumbbell Bench Press")).toBeTruthy();
     expect(lift.getByText("3 × 6–10 · 50 lb · RIR 2 · rest 3:00")).toBeTruthy();
 
     await user.click(screen.getByRole("button", { name: "Back" }));
+    const resume = await screen.findByRole("button", { name: "Resume Push A" });
+    const am = await slot("AM");
+    expect(am.getByText("In progress")).toBeTruthy();
+    await user.click(resume);
+    expect(
+      await screen.findByRole("region", { name: "Lift player" }),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("region", { name: "Workout overview" }),
+    ).toBeNull();
+    await user.click(
+      await screen.findByRole("button", { name: "Discard workout" }),
+    );
+    await user.click(
+      within(await screen.findByRole("dialog")).getByRole("button", {
+        name: "Discard workout",
+      }),
+    );
+    expect(
+      await screen.findByRole("region", { name: "Workout overview" }),
+    ).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    expect(
+      await screen.findByRole("button", { name: "Preview Push A" }),
+    ).toBeTruthy();
     await user.click(
       await screen.findByRole("button", { name: "Start Easy run" }),
     );

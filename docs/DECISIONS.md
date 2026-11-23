@@ -455,3 +455,8 @@ Options considered:
   - A next step over 25% of the load is too big a jump. The top of the range then rises 2 reps at a time (at most +4), then 1 set is added, and then the step is taken. Past the heaviest weight, the engine suggests a harder variation.
   - A double increment that would exceed +5% falls back to one step.
   - Three stalls start the plateau handler for 28 days, rotating rep scheme (range shifted by 3 reps), a back-off set at 85%, and a same-group variation (a back-off set when there's none).
+
+## Lift workout preview and resume (#156, #159)
+
+- **Preview does not start a lift.** It uses the same exercise order, overrides and targets as the player. Start workout creates the existing offline-first session log; no schema change is needed. (§3.1, §6.3)
+- **Today and Week derive In progress from an open log.** Resume bypasses the preview; discarding the log resets the preview, and finishing still marks the planned session done. (§6, §10)

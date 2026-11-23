@@ -623,9 +623,22 @@ export function LiftPlayer({ view }: { view: SessionView }) {
     );
   }
   const { cards } = data;
+  const canFinish =
+    Boolean(data.log?.checked.length) ||
+    cards.some((c) => c.sets.length > 0 || c.warmups.length > 0);
+  const discard = data.log && (
+    <DiscardSheet
+      title="Discard workout"
+      onDiscard={async () => {
+        await discardLift(localDb, sessionId);
+        syncSoon();
+        setPosition({ card: 0, drafts: {} });
+      }}
+    />
+  );
   if (cards.length === 0) {
     return (
-      <section aria-label="Lift player">
+      <section aria-label="Lift player" className="flex flex-col gap-3">
         <p className={`${cardClass} text-fg-muted`}>
           Nothing is planned for this session yet.
         </p>
@@ -634,6 +647,7 @@ export function LiftPlayer({ view }: { view: SessionView }) {
           library={data.library}
           onAdded={() => setPosition((p) => ({ ...p, card: 0 }))}
         />
+        {discard}
       </section>
     );
   }
@@ -738,24 +752,15 @@ export function LiftPlayer({ view }: { view: SessionView }) {
         view={view}
         title="Finish workout"
         modality="lift"
-        disabled={!data.log}
+        disabled={!canFinish}
         prominent={allDone}
       />
-      {!data.log && (
+      {!canFinish && (
         <p className="text-center text-sm text-fg-muted">
           Log a set to finish the workout.
         </p>
       )}
-      {data.log && (
-        <DiscardSheet
-          title="Discard workout"
-          onDiscard={async () => {
-            await discardLift(localDb, sessionId);
-            syncSoon();
-            setPosition({ card: 0, drafts: {} });
-          }}
-        />
-      )}
+      {discard}
     </section>
   );
 }

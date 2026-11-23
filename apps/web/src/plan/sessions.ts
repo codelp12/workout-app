@@ -25,6 +25,7 @@ export type SessionView = {
   session: PlannedSession;
   /** Where the plan put it. */
   planned: Placement;
+  inProgress: boolean;
   title: string;
   /** Live items, in order. */
   items: PlannedItem[];
@@ -136,35 +137,38 @@ export function formatLongDate(date: string): string {
   }).format(Date.UTC(y!, m! - 1, d));
 }
 
-type Placed = Pick<SessionView, "session" | "planned">;
+type Placed = Pick<SessionView, "session" | "planned" | "inProgress">;
 
 /**
  * Marks a planned session `done` once its log is finished. The server owns
  * plan rows, so the client works this out from the log instead of writing it.
  */
-async function withStatus(
-  sessions: PlannedSession[],
-): Promise<PlannedSession[]> {
+async function placeSessions(sessions: PlannedSession[]): Promise<Placed[]> {
+  const moves = latestMoves(await localDb.rows("plan_override").toArray());
   const logs = await localDb
     .rows("session_log")
     .bulkGet(sessions.map((s) => sessionLogId(s.id)));
   return sessions.map((s, i) => {
+    const session = placeSession(s, moves);
     const log = logs[i];
-    const finished = log && log.deletedAt === null && log.endedAt !== null;
-    return finished && s.status === "planned" ? { ...s, status: "done" } : s;
+    const started = s.status === "planned" && log?.deletedAt === null;
+    return {
+      session:
+        started && log.endedAt !== null
+          ? { ...session, status: "done" }
+          : session,
+      planned: { date: s.date, slot: s.slot },
+      inProgress: started && log.endedAt === null,
+    };
   });
 }
 
 /** Live sessions, not marked `moved`, where they sit now. */
 async function placedSessions(): Promise<Placed[]> {
-  const moves = latestMoves(await localDb.rows("plan_override").toArray());
   const sessions = (await localDb.rows("planned_session").toArray()).filter(
     (s) => s.deletedAt === null && s.status !== "moved",
   );
-  return (await withStatus(sessions)).map((s) => ({
-    session: placeSession(s, moves),
-    planned: { date: s.date, slot: s.slot },
-  }));
+  return placeSessions(sessions);
 }
 
 const utc = (date: string) => {
@@ -217,9 +221,9 @@ async function views(placed: Placed[]): Promise<SessionView[]> {
   const exerciseNames = new Map(
     exercises.flatMap((e) => (e ? [[e.id, e.name]] : [])),
   );
-  return placed.map(({ session, planned }) => ({
+  return placed.map(({ session, ...placement }) => ({
     session,
-    planned,
+    ...placement,
     title: sessionTitle(
       session,
       (session.templateId && names.get(session.templateId)) || null,
@@ -323,14 +327,5 @@ export async function weekPlan(weekStart: string): Promise<WeekPlan> {
 export async function readSession(id: string): Promise<SessionView | null> {
   const row = await localDb.rows("planned_session").get(id);
   if (!row || row.deletedAt !== null) return null;
-  const [session] = await withStatus([row]);
-  const moves = latestMoves(await localDb.rows("plan_override").toArray());
-  return (
-    await views([
-      {
-        session: placeSession(session!, moves),
-        planned: { date: row.date, slot: row.slot },
-      },
-    ])
-  )[0]!;
+  return (await views(await placeSessions([row])))[0]!;
 }
