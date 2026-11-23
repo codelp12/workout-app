@@ -43,6 +43,11 @@ function SessionCard({ view }: { view: SessionView }) {
           <span className="text-fg-muted tabular-nums">{summary}</span>
         )}
         {view.inProgress && <span className="font-medium">In progress</span>}
+        {view.combineCandidate && (
+          <span className="text-sm text-fg-muted">
+            Can combine with {view.combineCandidate.title}
+          </span>
+        )}
       </div>
       {session.status === "planned" ? (
         <button

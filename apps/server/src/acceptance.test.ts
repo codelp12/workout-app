@@ -1,4 +1,4 @@
-import { newId, sessionLogId } from "@workout-app/shared";
+import { combineOverrideId, newId, sessionLogId } from "@workout-app/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { checkWeek, formatWeekCheck } from "./acceptance.js";
 import { openDb, runMigrations, type Db } from "./db.js";
@@ -88,6 +88,29 @@ const set = (sessionLogId: string, index: number, isWarmup = false) =>
     .run();
 
 describe("checkWeek", () => {
+  it("credits both planned lifts through one finished log", () => {
+    const date = "2026-11-09";
+    const push = plan(date);
+    const pull = plan(date, { workoutType: "pull_a" });
+    const id = sessionLogId(push.id);
+    db.insert(planOverride)
+      .values({
+        ...sync,
+        id: combineOverrideId(push.id),
+        plannedSessionId: push.id,
+        weekId: null,
+        kind: "combine",
+        data: { otherSessionId: pull.id },
+        opId: newId(),
+        supersededAt: null,
+      })
+      .run();
+    log(date, { id, plannedSessionId: push.id });
+    expect(checkWeek(db, date).sessions).toMatchObject([
+      { logId: id, title: "pull_a", status: "finished" },
+      { logId: id, title: "push_a", status: "finished" },
+    ]);
+  });
   it("matches planned sessions to their logs and flags what's missing", () => {
     const push = plan("2026-11-09");
     const run = plan("2026-11-10", { modality: "run", workoutType: "easy" });

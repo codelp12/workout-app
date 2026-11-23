@@ -460,3 +460,8 @@ Options considered:
 
 - **Preview does not start a lift.** It uses the same exercise order, overrides and targets as the player. Start workout creates the existing offline-first session log; no schema change is needed. (§3.1, §6.3)
 - **Today and Week derive In progress from an open log.** Resume bypasses the preview; discarding the log resets the preview, and finishing still marks the planned session done. (§6, §10)
+
+## Combining two planned lifts (#157)
+
+- **Two unstarted lifts in the same date and AM/PM slot can be combined after confirmation.** Opening either lift lets the owner combine it with the other. A synced `combine` plan override records the pair; the selected lift owns the single log, and both original plans get completion credit. No database migration is needed. (§3.1, §5.4 exception approved by the owner)
+- **The selected lift comes first.** When both include the same exercise, it appears once with the active set targets added together and the first active prescription's other targets. The selected lift supplies the session-level warm-up and stretch checklists.

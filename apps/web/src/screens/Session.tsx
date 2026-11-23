@@ -16,6 +16,7 @@ import { readSettings } from "../settings/settings";
 import { localDb, syncSoon } from "../sync";
 import { button, buttonBase, card } from "../ui";
 import { useLiveQuery } from "../use-live-query";
+import { CombineWorkouts } from "./CombineWorkouts";
 import { Screen } from "./Screen";
 
 function BackButton() {
@@ -149,6 +150,9 @@ export function Session() {
           {formatLongDate(session.date)}, {session.slot.toUpperCase()}
         </span>
       </p>
+      {view.combineCandidate && (
+        <CombineWorkouts view={view} other={view.combineCandidate} />
+      )}
       <Player key={session.id} view={view} />
     </Screen>
   );

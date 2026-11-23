@@ -1,5 +1,6 @@
 import {
   addDays,
+  liftCombinations,
   moveOverrideDataSchema,
   sessionLogId,
   type MoveOverrideData,
@@ -112,16 +113,31 @@ export function checkWeek(db: Db, weekStart: string): WeekCheck {
       .all()
       .map((l) => [l.id, l]),
   );
+  const pairs = liftCombinations(
+    db
+      .select()
+      .from(planOverride)
+      .where(eq(planOverride.kind, "combine"))
+      .all(),
+    candidates,
+    [...logById.values()],
+  );
+  const absorbed = new Map(
+    [...pairs].map(([primary, other]) => [other, primary]),
+  );
   // Where each session ended up: the day it was logged, else where the owner
   // moved it, else where it was planned.
+  const byId = new Map(candidates.map((p) => [p.id, p]));
   const planned = candidates.flatMap((p) => {
-    const log = logById.get(sessionLogId(p.id));
+    const sharedId = absorbed.get(p.id) ?? p.id;
+    const log = logById.get(sessionLogId(sharedId));
     if (!log && p.status === "moved") return [];
-    const move = moves.get(p.id);
+    const source = byId.get(sharedId)!;
+    const move = moves.get(sharedId);
     const placed = {
       ...p,
-      date: log?.localDate ?? move?.date ?? p.date,
-      slot: move?.slot ?? p.slot,
+      date: log?.localDate ?? move?.date ?? source.date,
+      slot: move?.slot ?? source.slot,
     };
     return inWeek(placed.date) ? [placed] : [];
   });
@@ -175,9 +191,10 @@ export function checkWeek(db: Db, weekStart: string): WeekCheck {
     logId: string,
     log: LogRow | undefined,
     plan: PlannedRow | undefined,
+    countActivity = true,
   ): CheckedSession => {
     const mine = <T extends { sessionLogId: string }>(rows: T[]) =>
-      rows.filter((r) => r.sessionLogId === logId);
+      countActivity ? rows.filter((r) => r.sessionLogId === logId) : [];
     const logSets = mine(sets);
     return {
       logId,
@@ -205,8 +222,9 @@ export function checkWeek(db: Db, weekStart: string): WeekCheck {
 
   const sessions = [
     ...planned.map((p) => {
-      const id = sessionLogId(p.id);
-      return describe(id, logById.get(id), p);
+      const primary = absorbed.get(p.id);
+      const id = sessionLogId(primary ?? p.id);
+      return describe(id, logById.get(id), p, !primary);
     }),
     ...logs.map((l) => describe(l.id, l, undefined)),
   ].sort(
@@ -216,7 +234,9 @@ export function checkWeek(db: Db, weekStart: string): WeekCheck {
       a.title.localeCompare(b.title),
   );
 
-  const byLog = new Map(sessions.map((x) => [x.logId, x]));
+  const byLog = new Map(
+    sessions.filter((x) => x.sets + x.warmups > 0).map((x) => [x.logId, x]),
+  );
   const counts = new Map<string, typeof sets>();
   for (const s of sets) {
     const key = [s.sessionLogId, s.exerciseId, s.index, s.isWarmup].join("|");

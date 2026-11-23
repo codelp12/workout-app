@@ -67,3 +67,59 @@ test("Week filters by modality and a move syncs to another device", async ({
   ).toBeVisible();
   await other.close();
 });
+
+test("same-slot lifts combine offline after confirmation and appear once in history", async ({
+  page,
+  context,
+}) => {
+  await signIn(page);
+  // Both projects share the same server and planned lifts.
+  await context.setOffline(true);
+  await page.getByRole("button", { name: /^Legs B, / }).click();
+  const move = page.getByRole("dialog", { name: "Legs B" });
+  await move.getByRole("radio", { name: /^Wed/ }).click();
+  await move.getByRole("radio", { name: "PM" }).click();
+  await move.getByRole("button", { name: "Move", exact: true }).click();
+
+  await page.getByRole("button", { name: "Legs A, PM, can combine" }).click();
+  await page.getByRole("button", { name: "Open session" }).click();
+  await page.getByRole("button", { name: "Combine with Legs B" }).click();
+  const confirmation = page.getByRole("dialog", { name: "Combine workouts?" });
+  await expect(confirmation).toContainText("both planned lifts");
+  await confirmation
+    .getByRole("button", { name: "Combine workouts", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Legs A + Legs B", exact: true }),
+  ).toBeVisible();
+
+  const preview = page.getByRole("region", { name: "Workout overview" });
+  await preview.getByRole("button", { name: "Start workout" }).click();
+  await expect(page.getByRole("region", { name: "Lift player" })).toBeVisible();
+  await page.getByRole("link", { name: "Week", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Legs A + Legs B, PM, In progress" })
+    .click();
+  await page.getByRole("button", { name: "Resume session" }).click();
+  await expect(preview).toHaveCount(0);
+
+  const player = page.getByRole("region", { name: "Lift player" });
+  await player.getByRole("radio", { name: "2" }).click();
+  await player.getByRole("button", { name: "Log set" }).click();
+  await player.getByRole("button", { name: "Finish workout" }).click();
+  const finish = page.getByRole("dialog", { name: "Finish workout" });
+  await finish.getByRole("radio", { name: "8" }).click();
+  await finish.getByRole("button", { name: "Finish", exact: true }).click();
+  await expect(
+    player.getByRole("region", { name: "Workout finished" }),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Week", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Legs A + Legs B, PM, Done" }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Legs B, / })).toHaveCount(0);
+  await page.getByRole("link", { name: "Log", exact: true }).click();
+  await expect(
+    page.getByRole("link", { name: /Legs A \+ Legs B/ }),
+  ).toHaveCount(1);
+});

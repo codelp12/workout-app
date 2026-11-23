@@ -6,6 +6,7 @@ import {
 } from "@workout-app/engine";
 import {
   addDays,
+  liftCombinations,
   sessionLogId,
   DAY_SLOTS,
   weekId,
@@ -17,7 +18,12 @@ import {
   type Week,
 } from "@workout-app/shared";
 import { localDb } from "../sync";
-import { latestMoves, placeSession, type Placement } from "./moves";
+import {
+  latestMoves,
+  placeSession,
+  samePlacement,
+  type Placement,
+} from "./moves";
 
 /** A planned session with what the screens show about it. */
 export type SessionView = {
@@ -31,6 +37,8 @@ export type SessionView = {
   items: PlannedItem[];
   /** Names of the items' exercises, by id. */
   exerciseNames: Map<string, string>;
+  combinedWith?: string;
+  combineCandidate?: { id: string; title: string };
 };
 
 // Item targets are the engine's prescription minus its reasons (#47).
@@ -137,38 +145,53 @@ export function formatLongDate(date: string): string {
   }).format(Date.UTC(y!, m! - 1, d));
 }
 
-type Placed = Pick<SessionView, "session" | "planned" | "inProgress">;
+type Placed = Pick<
+  SessionView,
+  "session" | "planned" | "combinedWith" | "inProgress"
+> & {
+  combinedInto?: string;
+  started: boolean;
+};
 
 /**
  * Marks a planned session `done` once its log is finished. The server owns
  * plan rows, so the client works this out from the log instead of writing it.
  */
-async function placeSessions(sessions: PlannedSession[]): Promise<Placed[]> {
-  const moves = latestMoves(await localDb.rows("plan_override").toArray());
-  const logs = await localDb
-    .rows("session_log")
-    .bulkGet(sessions.map((s) => sessionLogId(s.id)));
-  return sessions.map((s, i) => {
-    const session = placeSession(s, moves);
-    const log = logs[i];
-    const started = s.status === "planned" && log?.deletedAt === null;
+async function placedSessions(includeMoved = false): Promise<Placed[]> {
+  const overrides = await localDb.rows("plan_override").toArray();
+  const logs = await localDb.rows("session_log").toArray();
+  const moves = latestMoves(overrides);
+  const sessions = (await localDb.rows("planned_session").toArray()).filter(
+    (s) => s.deletedAt === null && (includeMoved || s.status !== "moved"),
+  );
+  const byId = new Map(sessions.map((s) => [s.id, s]));
+  const byLogId = new Map(
+    logs.filter((l) => l.deletedAt === null).map((l) => [l.id, l]),
+  );
+  const pairs = liftCombinations(overrides, sessions, logs);
+  const absorbed = new Map(
+    [...pairs].map(([primary, other]) => [other, primary]),
+  );
+  return sessions.map((s) => {
+    const combinedInto = absorbed.get(s.id);
+    const primary = combinedInto ? byId.get(combinedInto)! : s;
+    const log = byLogId.get(sessionLogId(primary.id));
+    const finished = log != null && log.endedAt !== null;
+    const { date, slot } = placeSession(primary, moves);
     return {
-      session:
-        started && log.endedAt !== null
-          ? { ...session, status: "done" }
-          : session,
+      session: {
+        ...s,
+        date,
+        slot,
+        status: finished && s.status === "planned" ? "done" : s.status,
+      },
       planned: { date: s.date, slot: s.slot },
-      inProgress: started && log.endedAt === null,
+      combinedWith: pairs.get(s.id),
+      combinedInto,
+      started: log != null,
+      inProgress: s.status === "planned" && log?.endedAt === null,
     };
   });
-}
-
-/** Live sessions, not marked `moved`, where they sit now. */
-async function placedSessions(): Promise<Placed[]> {
-  const sessions = (await localDb.rows("planned_session").toArray()).filter(
-    (s) => s.deletedAt === null && s.status !== "moved",
-  );
-  return placeSessions(sessions);
 }
 
 const utc = (date: string) => {
@@ -221,16 +244,53 @@ async function views(placed: Placed[]): Promise<SessionView[]> {
   const exerciseNames = new Map(
     exercises.flatMap((e) => (e ? [[e.id, e.name]] : [])),
   );
-  return placed.map(({ session, ...placement }) => ({
+  const titleOf = (s: PlannedSession) =>
+    sessionTitle(s, (s.templateId && names.get(s.templateId)) || null);
+  const available = ({
     session,
-    ...placement,
-    title: sessionTitle(
-      session,
-      (session.templateId && names.get(session.templateId)) || null,
-    ),
-    items: items.filter((i) => i.plannedSessionId === session.id),
-    exerciseNames,
-  }));
+    combinedInto,
+    combinedWith,
+    started,
+  }: Placed) =>
+    session.modality === "lift" &&
+    session.status === "planned" &&
+    !started &&
+    !combinedInto &&
+    !combinedWith;
+  return placed
+    .filter((p) => !p.combinedInto)
+    .map((p) => {
+      const { session, planned, combinedWith, inProgress } = p;
+      const other = combinedWith && sessions.find((s) => s.id === combinedWith);
+      const candidates = available(p)
+        ? placed.filter(
+            (next) =>
+              next !== p &&
+              available(next) &&
+              samePlacement(session, next.session),
+          )
+        : [];
+      const candidate =
+        candidates.length === 1 ? candidates[0]!.session : undefined;
+      return {
+        session,
+        planned,
+        combinedWith,
+        inProgress,
+        combineCandidate: candidate && {
+          id: candidate.id,
+          title: titleOf(candidate),
+        },
+        title: other
+          ? `${titleOf(session)} + ${titleOf(other)}`
+          : titleOf(session),
+        items: [
+          ...items.filter((i) => i.plannedSessionId === session.id),
+          ...items.filter((i) => i.plannedSessionId === combinedWith),
+        ],
+        exerciseNames,
+      };
+    });
 }
 
 export type DayPlan = {
@@ -291,14 +351,26 @@ export async function weekPlan(weekStart: string): Promise<WeekPlan> {
   const logs = (await localDb.rows("session_log").toArray()).filter(
     (l) => l.deletedAt === null && l.endedAt !== null,
   );
+  const absorbed = new Set(
+    placed.filter((p) => p.combinedInto).map((p) => p.session.id),
+  );
   const tally = (start: string): WeekTally => {
     const count = (modality: Modality) => ({
       planned: placed.filter(
         (p) => p.session.modality === modality && inWeek(start, p.session.date),
       ).length,
-      done: logs.filter(
-        (l) => l.modality === modality && inWeek(start, l.localDate),
-      ).length,
+      done: logs.reduce((sum, l) => {
+        if (
+          l.modality !== modality ||
+          !inWeek(start, l.localDate) ||
+          (l.plannedSessionId !== null && absorbed.has(l.plannedSessionId))
+        )
+          return sum;
+        const combined = placed.some(
+          (p) => p.combinedWith && p.session.id === l.plannedSessionId,
+        );
+        return sum + (combined ? 2 : 1);
+      }, 0),
     });
     return {
       lift: count("lift"),
@@ -325,7 +397,13 @@ export async function weekPlan(weekStart: string): Promise<WeekPlan> {
 
 /** A live planned session where it sits now, or `null` if there's no such session. */
 export async function readSession(id: string): Promise<SessionView | null> {
-  const row = await localDb.rows("planned_session").get(id);
-  if (!row || row.deletedAt !== null) return null;
-  return (await views(await placeSessions([row])))[0]!;
+  const placed = await placedSessions(true);
+  const row = placed.find((p) => p.session.id === id);
+  if (!row) return null;
+  const siblings = placed.filter((p) => samePlacement(row.session, p.session));
+  return (
+    (await views(siblings)).find(
+      (v) => v.session.id === (row.combinedInto ?? id),
+    ) ?? null
+  );
 }

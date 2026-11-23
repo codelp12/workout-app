@@ -43,6 +43,7 @@ export const OVERRIDE_KINDS = [
   "trim",
   "swap",
   "add",
+  "combine",
   "provisional_week",
 ] as const;
 export const ASCENT_STYLES = ["flash", "onsight", "send", "attempt"] as const;
@@ -398,6 +399,10 @@ export const addOverrideDataSchema = z.object({
   targets: z.record(z.string(), z.unknown()),
 });
 export type AddOverrideData = z.infer<typeof addOverrideDataSchema>;
+
+export const combineOverrideDataSchema = z.object({
+  otherSessionId: z.uuid(),
+});
 
 // --- Checklists --------------------------------------------------------------
 

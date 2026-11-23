@@ -69,6 +69,7 @@ function SessionButton({
     SLOT_LABELS[view.session.slot],
     status,
     isMoved(view) && "moved",
+    view.combineCandidate && "can combine",
   ]
     .filter(Boolean)
     .join(", ");
@@ -90,6 +91,9 @@ function SessionButton({
       <span className="truncate text-xs text-fg-muted tabular-nums">
         {status ?? sessionSummary(view)}
       </span>
+      {view.combineCandidate && (
+        <span className="truncate text-xs text-fg-muted">Can combine</span>
+      )}
     </button>
   );
 }
