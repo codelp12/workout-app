@@ -604,12 +604,22 @@ export function openRows(
   settings: PlayerSettings,
   drafts: SetDraft[] | undefined,
 ): SetDraft[] {
-  if (drafts?.length)
-    return drafts.map((d) => ({
-      ...settle(card, settings, d),
-      untouchedExtra: d.untouchedExtra,
-    }));
-  return card.sets.length === 0 ? [prefill(card, settings)] : [];
+  const rows = drafts?.length
+    ? drafts
+    : card.sets.length === 0
+      ? [prefill(card, settings)]
+      : [];
+  return rows.map((draft) => {
+    const load =
+      draft.load ??
+      (isWeighted(card)
+        ? card.targets.load
+          ? toWeightUnit(card.targets.load, unitOf(card, settings))
+          : 0
+        : null);
+    const settled = settle(card, settings, { ...draft, load });
+    return { ...draft, ...settled, load: settled.load ?? load };
+  });
 }
 
 /** Whether every set row on the card is logged, and there's at least one. */

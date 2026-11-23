@@ -513,6 +513,38 @@ describe("LiftPlayer", () => {
       ).toBeTruthy();
     });
 
+    it("keeps the remaining draft's load when dumbbells are disabled and re-enabled", async () => {
+      const settings = { ...defaultSettings(deviceTimezone(), 0), ...sync };
+      await localDb.rows("settings").put({
+        ...settings,
+        equipment: { ...settings.equipment, dumbbells: null },
+      });
+      savePosition(legs.id, {
+        card: 0,
+        drafts: {
+          [items[0]!.id]: [
+            { load: 45, band: null, reps: 8, rir: 2 },
+            { load: 50, band: null, reps: 9, rir: 2 },
+          ],
+        },
+      });
+      const user = userEvent.setup();
+      renderPlayer();
+      const card = within(
+        await screen.findByRole("article", { name: "Dumbbell Squat" }),
+      );
+      expect(
+        await card.findAllByText(/No dumbbells in your equipment/),
+      ).toHaveLength(2);
+      await user.click(card.getByRole("button", { name: "Remove set 2" }));
+      await localDb.rows("settings").put(settings);
+      expect(
+        await card.findByRole("button", { name: "Weight: 45 lb" }),
+      ).toBeTruthy();
+      await user.click(card.getByRole("button", { name: "Log set" }));
+      expect(await card.findByText("45 lb × 8 · RIR 2")).toBeTruthy();
+    });
+
     it("says so and won't log when the equipment has no dumbbells", async () => {
       await localDb.rows("settings").put({
         ...defaultSettings(deviceTimezone(), 0),
