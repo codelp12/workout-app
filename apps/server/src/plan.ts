@@ -31,8 +31,11 @@ const owned = <T>(row: T) => ({ ...row, userId: OWNER_USER_ID });
 
 function insertPlan(tx: Tx, plan: ReturnType<typeof planWeek>) {
   if (plan.block) {
+    // An early deload rewrites the current block's length.
+    const row = { ...owned(plan.block), serverSeq: nextSeq(tx) };
     tx.insert(block)
-      .values({ ...owned(plan.block), serverSeq: nextSeq(tx) })
+      .values(row)
+      .onConflictDoUpdate({ target: block.id, set: row })
       .run();
   }
   tx.insert(week)
