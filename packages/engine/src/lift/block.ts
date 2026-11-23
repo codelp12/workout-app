@@ -13,6 +13,7 @@ import type { EngineContext, Reason } from "../types.js";
 import { formatAmount, toWeightUnit } from "../units.js";
 import { modelOf, type SlotScheme } from "./progression.js";
 import {
+  isCalibrating,
   judgeExposure,
   type ExerciseState,
   type LiftEngineState,
@@ -137,7 +138,18 @@ export function weekScheme(
     const outcome =
       last === state?.exposures.at(-1)
         ? state.lastOutcome
-        : judgeExposure(last.sets, last.target, 0, ctx.config.lift);
+        : judgeExposure(
+            last.sets,
+            last.target,
+            isCalibrating(
+              { firstLoggedDate: state?.firstLoggedDate ?? null },
+              last.date,
+              ctx.config.lift,
+            )
+              ? ctx.config.lift.calibration.missToleranceReps
+              : 0,
+            ctx.config.lift,
+          );
     const earned = Math.min(last.target.rampSets ?? 0, config.rampWeeks);
     rampGained =
       position.index <= config.rampWeeks &&

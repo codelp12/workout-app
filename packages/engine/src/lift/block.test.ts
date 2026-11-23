@@ -178,6 +178,15 @@ describe("weekScheme", () => {
       rampGained: true,
     });
 
+    const withinAllowance = fold(
+      log(START, 7),
+      log("2026-11-05", 5, { rampSets: undefined }),
+    );
+    expect(scheme(withinAllowance, 1)).toMatchObject({
+      rampSets: 1,
+      rampGained: true,
+    });
+
     const week3 = fold(log("2026-11-16", 12, { sets: 5, rampSets: 2 }));
     expect(scheme(week3, 3)).toMatchObject({ rampSets: 2, rampGained: false });
 
