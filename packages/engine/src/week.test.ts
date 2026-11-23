@@ -283,6 +283,42 @@ describe("planWeek", () => {
     expect(lift.map((l) => l.sets[0]?.loadValue)).toEqual([50, 60]);
   });
 
+  it("reads ramp-slot targets planned before ramp sets were recorded", () => {
+    const targets = {
+      sets: 3,
+      repMin: 8,
+      repMax: 12,
+      targetRir: 2,
+      load: null,
+    };
+    const { lift } = groupLogs({
+      sessions: [
+        {
+          id: "s",
+          modality: "lift",
+          localDate: "2026-10-27",
+          startedAt: 1,
+          plannedSessionId: "p",
+          deletedAt: null,
+        },
+      ],
+      sets: [],
+      runs: [],
+      ascents: [],
+      items: [
+        {
+          plannedSessionId: "p",
+          exerciseId: "a",
+          targets: { ...targets, ramp: true },
+          deletedAt: null,
+        },
+        { plannedSessionId: "p", exerciseId: "b", targets, deletedAt: null },
+      ],
+    });
+    expect(lift[0]?.targets?.a?.rampSets).toBe(0);
+    expect(lift[0]?.targets?.b?.rampSets).toBeUndefined();
+  });
+
   it("has one spec per key", () => {
     expect(new Set(DEFAULT_WEEK.map((s) => s.key)).size).toBe(
       DEFAULT_WEEK.length,

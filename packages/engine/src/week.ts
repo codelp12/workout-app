@@ -263,7 +263,9 @@ function liftTargetOf(targets: Record<string, unknown>): LiftTarget | null {
     band: typeof targets.band === "string" ? targets.band : null,
     ...(typeof targets.rampSets === "number"
       ? { rampSets: targets.rampSets }
-      : {}),
+      : targets.ramp === true
+        ? { rampSets: 0 }
+        : {}),
   };
 }
 
