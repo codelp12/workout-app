@@ -1,5 +1,5 @@
 import { toWeightUnit, type WeightImplement } from "@workout-app/engine";
-import type { Exercise, SetLog } from "@workout-app/shared";
+import { newId, type Exercise, type SetLog } from "@workout-app/shared";
 import {
   useCallback,
   useEffect,
@@ -24,6 +24,7 @@ import { button, buttonBase, card as cardClass } from "../ui";
 import { useLiveQuery } from "../use-live-query";
 import { DiscardSheet } from "./DiscardSheet";
 import { FinishSheet } from "./FinishSheet";
+import { HoldTimer } from "./HoldTimer";
 import { StretchChecklist } from "./StretchChecklist";
 import { WarmupChecklist } from "./WarmupChecklist";
 import {
@@ -33,6 +34,7 @@ import {
   discardLift,
   implementOf,
   isBodyweight,
+  isTimedHold,
   isWeighted,
   loadChoices,
   loadPosition,
@@ -53,7 +55,7 @@ import {
   type SetDraft,
   type SetValues,
 } from "./lift-log";
-import { latestRest } from "./rest";
+import { holdSeconds, latestRest } from "./rest";
 import { primeRestCue } from "./rest-cue";
 import { RestTimer } from "./RestTimer";
 import { useWakeLock } from "./use-wake-lock";
@@ -73,9 +75,13 @@ const RIR_OPTIONS = ["0", "1", "2", "3", "4"].map((value) => ({
 // A horizontal drag this far (px) flips to the next or previous card.
 const SWIPE = 60;
 
-function lastTimeLine(sets: SetLog[], bodyweight: boolean): string {
+function lastTimeLine(
+  sets: SetLog[],
+  bodyweight: boolean,
+  timed: boolean,
+): string {
   if (sets.length === 0) return "First time";
-  return sets.map((s) => describeSet(s, bodyweight)).join(", ");
+  return sets.map((s) => describeSet(s, bodyweight, timed)).join(", ");
 }
 
 function Finished({ data }: { data: LiftSession }) {
@@ -311,6 +317,8 @@ function SetRow({
   onRemove?: () => void;
 }) {
   const { exercise, targets } = card;
+  const timed = isTimedHold(exercise);
+  const [holdStartedAt, setHoldStartedAt] = useState<number | null>(null);
   const needsRir = targets.targetRir !== null;
   const unit = unitOf(card, settings);
   const weighted = isWeighted(card);
@@ -392,8 +400,23 @@ function SetRow({
       {bands && bands.length === 0 && values.band && (
         <p className="text-fg-muted">Band: {values.band}</p>
       )}
+      {timed && (
+        <HoldTimer
+          startedAt={holdStartedAt}
+          disabled={saving}
+          onStart={() => setHoldStartedAt(Date.now())}
+          onStop={() => {
+            if (holdStartedAt === null) return;
+            onValues({
+              ...values,
+              reps: holdSeconds(holdStartedAt, Date.now()),
+            });
+            setHoldStartedAt(null);
+          }}
+        />
+      )}
       <Stepper
-        label="Reps"
+        label={timed ? "Seconds" : "Reps"}
         value={values.reps}
         onValueChange={(reps) => onValues({ ...values, reps })}
       />
@@ -410,7 +433,11 @@ function SetRow({
         type="button"
         className={`${buttonBase} min-h-tap bg-lift text-bg`}
         disabled={
-          saving || !exercise || unloadable || (needsRir && values.rir === null)
+          saving ||
+          !exercise ||
+          unloadable ||
+          holdStartedAt !== null ||
+          (needsRir && values.rir === null)
         }
         onClick={onLog}
       >
@@ -461,6 +488,7 @@ function ExerciseCard({
   const done = sets.length > 0 && rows.length === 0;
   const unit = unitOf(card, settings);
   const bodyweight = isBodyweight(exercise);
+  const timed = isTimedHold(exercise);
 
   async function log(index: number) {
     primeRestCue();
@@ -542,9 +570,9 @@ function ExerciseCard({
       )}
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 tabular-nums">
         <dt className="text-fg-muted">Target</dt>
-        <dd>{liftDetail(targets)}</dd>
+        <dd>{liftDetail(targets, timed)}</dd>
         <dt className="text-fg-muted">Last time</dt>
-        <dd>{lastTimeLine(card.lastTime, bodyweight)}</dd>
+        <dd>{lastTimeLine(card.lastTime, bodyweight, timed)}</dd>
       </dl>
       {(canSwap || (!skipped && !done)) && (
         <div className="flex gap-2">
@@ -579,7 +607,7 @@ function ExerciseCard({
         {sets.map((set) => (
           <li key={set.id} className="flex justify-between">
             <span className="text-fg-muted">Set {set.index + 1}</span>
-            <span>{describeSet(set, bodyweight)}</span>
+            <span>{describeSet(set, bodyweight, timed)}</span>
           </li>
         ))}
       </ol>
@@ -598,7 +626,7 @@ function ExerciseCard({
         <>
           {rows.map((values, i) => (
             <SetRow
-              key={sets.length + i}
+              key={`${exercise?.id}:${values.id}`}
               rowRef={i === rows.length - 1 ? lastRow : undefined}
               card={card}
               settings={settings}
@@ -607,8 +635,10 @@ function ExerciseCard({
               saving={saving}
               onValues={(next) =>
                 onRows((r) =>
-                  r.map((v, j) =>
-                    j === i ? { ...next, untouchedExtra: undefined } : v,
+                  r.map((v) =>
+                    v.id === values.id
+                      ? { ...next, id: v.id, untouchedExtra: undefined }
+                      : v,
                   ),
                 )
               }
@@ -626,11 +656,13 @@ function ExerciseCard({
               className={`${button} min-h-tap`}
               disabled={saving}
               onClick={() => {
+                const id = newId();
                 revealAddedRow.current = true;
                 onRows((r) => [
                   ...r,
                   {
                     ...(r.at(-1) ?? prefill(card, settings)),
+                    id,
                     untouchedExtra: true,
                   },
                 ]);

@@ -461,6 +461,10 @@ Options considered:
 - **Preview does not start a lift.** It uses the same exercise order, overrides and targets as the player. Start workout creates the existing offline-first session log; no schema change is needed. (§3.1, §6.3)
 - **Today and Week derive In progress from an open log.** Resume bypasses the preview; discarding the log resets the preview, and finishing still marks the planned session done. (§6, §10)
 
+## Count-up timer for timed holds (#160)
+
+- **The lift player identifies Plank, Side Bridge and Kneeling Hip Flexor by their dataset IDs.** A manual hold timer counts elapsed seconds independently of rest. Stop copies those seconds into the set without capping them at the target or changing the existing seconds-as-reps data model. (§3.4, §6.3; owner approved on #160)
+
 ## Lift-player set entry and swap search (#154, #155, #158)
 
 - **Add set reveals the new entry.** Advancing drops extra rows the owner didn't edit or log. Edited drafts still survive navigation and a reload; logged sets are unaffected. (§6.3)

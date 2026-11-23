@@ -10,7 +10,12 @@ import {
 } from "../plan/sessions";
 import { ClimbPlayer } from "../players/ClimbPlayer";
 import { LiftPlayer } from "../players/LiftPlayer";
-import { markActive, readLiftSession, startLift } from "../players/lift-log";
+import {
+  isTimedHold,
+  markActive,
+  readLiftSession,
+  startLift,
+} from "../players/lift-log";
 import { RunPlayer } from "../players/RunPlayer";
 import { readSettings } from "../settings/settings";
 import { localDb, syncSoon } from "../sync";
@@ -75,7 +80,9 @@ function LiftOverview({ view }: { view: SessionView }) {
                 {exercise?.name ?? "Pick an exercise"}
               </span>
               <span className="text-fg-muted tabular-nums">
-                {skipped ? "Skipped" : liftDetail(targets)}
+                {skipped
+                  ? "Skipped"
+                  : liftDetail(targets, isTimedHold(exercise))}
               </span>
             </li>
           ))}
