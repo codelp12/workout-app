@@ -37,6 +37,22 @@ test("a set logs in two taps and the player resumes after a kill", async ({
     .textContent())!;
 
   await context.setOffline(true);
+  if (title === "Push A") {
+    const bench = player.getByRole("article", { name: "Dumbbell Bench Press" });
+    await bench.getByRole("button", { name: "Swap" }).click();
+    const sheet = page.getByRole("dialog", { name: "Swap exercise" });
+    await sheet.getByRole("searchbox").pressSequentially("bench");
+    await expect(sheet.getByRole("list", { name: "Substitutes" })).toHaveCount(
+      0,
+    );
+    await expect(
+      sheet.getByRole("list", { name: "Exercises" }).getByRole("button", {
+        name: "Barbell Bench Press - Medium Grip",
+        exact: true,
+      }),
+    ).toBeInViewport();
+    await sheet.getByRole("button", { name: "Close", exact: true }).click();
+  }
   await first.getByRole("radio", { name: "2" }).click();
   await first.getByRole("button", { name: "Log set" }).click();
   await expect(
