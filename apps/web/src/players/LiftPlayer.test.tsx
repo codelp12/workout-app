@@ -648,7 +648,28 @@ describe("swap, skip, add set and warm-ups", () => {
     const card = await screen.findByRole("article", { name: "Dumbbell Squat" });
     await user.click(within(card).getByRole("button", { name: "Swap" }));
     const sheet = await screen.findByRole("dialog", { name: "Swap exercise" });
+    const search = within(sheet).getByRole("searchbox", {
+      name: "Search exercises",
+    });
+    const substitutes = within(sheet).getByRole("list", {
+      name: "Substitutes",
+    });
+    expect(
+      search.compareDocumentPosition(substitutes) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(within(sheet).queryByRole("list", { name: "Exercises" })).toBeNull();
+    await user.type(search, "zz");
+    expect(within(sheet).getByRole("status").textContent).toBe(
+      "No matching exercises.",
+    );
+    expect(
+      within(sheet).queryByRole("list", { name: "Substitutes" }),
+    ).toBeNull();
+    await user.clear(search);
+    expect(
+      within(sheet).getByRole("list", { name: "Substitutes" }),
+    ).toBeTruthy();
     await user.type(
       within(sheet).getByRole("searchbox", { name: "Search exercises" }),
       "press",
@@ -822,6 +843,32 @@ describe("swap, skip, add set and warm-ups", () => {
       [1, 9],
       [2, 9],
     ]);
+  });
+
+  it("focuses an added set and drops it if untouched when advancing", async () => {
+    const user = userEvent.setup();
+    renderPlayer();
+    const card = await screen.findByRole("article", { name: "Dumbbell Squat" });
+    await user.click(within(card).getByRole("radio", { name: "2" }));
+    await user.click(within(card).getByRole("button", { name: "Log set" }));
+    await logged(card);
+
+    await user.click(within(card).getByRole("button", { name: "Add set" }));
+    expect(document.activeElement).toBe(
+      within(card).getByRole("region", { name: "Set 2" }),
+    );
+    await user.click(
+      within(card).getByRole("button", { name: "Next exercise" }),
+    );
+    const nav = screen.getByRole("navigation", { name: "Exercises" });
+    await user.click(within(nav).getByRole("button", { name: "Previous" }));
+    const returned = await screen.findByRole("article", {
+      name: "Dumbbell Squat",
+    });
+    expect(
+      within(returned).queryByRole("region", { name: "Set 2" }),
+    ).toBeNull();
+    expect(await sessionSets()).toHaveLength(1);
   });
 
   it("collapses the warm-ups and logs them flagged, outside the working sets", async () => {
