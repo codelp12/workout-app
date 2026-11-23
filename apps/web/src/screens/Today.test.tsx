@@ -4,9 +4,11 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   addDays,
+  DEFAULT_EQUIPMENT,
   localDateAt,
   newId,
   sessionLogId,
+  weekStartOf,
   type PlannedItem,
   type PlannedSession,
   type Template,
@@ -14,7 +16,12 @@ import {
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { testExercise } from "../library/test-exercise";
+import { readHistory } from "../history/history";
 import { Navigation } from "../Navigation";
+import { combineLifts } from "../plan/combine";
+import { moveSession } from "../plan/moves";
+import { readSession, weekPlan } from "../plan/sessions";
+import { finishSession, logSet, readLiftSession } from "../players/lift-log";
 import { deviceTimezone } from "../settings/settings";
 import { localDb } from "../sync";
 
@@ -83,9 +90,17 @@ const climb = session({
 
 beforeEach(async () => {
   await Promise.all(
-    (["planned_session", "planned_item", "template", "exercise"] as const).map(
-      (t) => localDb.rows(t).clear(),
-    ),
+    (
+      [
+        "planned_session",
+        "planned_item",
+        "template",
+        "exercise",
+        "session_log",
+        "set_log",
+        "plan_override",
+      ] as const
+    ).map((t) => localDb.rows(t).clear()),
   );
   await localDb.rows("exercise").put(bench);
   await localDb.rows("template").put(pushA);
@@ -126,6 +141,185 @@ const slot = async (name: string) =>
   within(await screen.findByRole("region", { name }));
 
 describe("Today", () => {
+  it("confirms a same-slot lift combination and credits both plans through one log", async () => {
+    const pull = session({ workoutType: "pull_a", slot: "pm" });
+    const row = (await localDb.rows("planned_item").toArray()).find(
+      (i) => i.plannedSessionId === push.id,
+    )!;
+    await localDb.rows("planned_session").put(pull);
+    await localDb
+      .rows("planned_item")
+      .put({ ...row, id: newId(), plannedSessionId: pull.id });
+    expect(await combineLifts(localDb, push.id, pull.id)).toBe(false);
+    await moveSession(localDb, pull, pull, push);
+    const user = userEvent.setup();
+    renderAt(`/session/${push.id}`);
+    const offer = await screen.findByRole("button", {
+      name: "Combine with Pull A",
+    });
+    await user.click(offer);
+    const confirmation = await screen.findByRole("dialog", {
+      name: "Combine workouts?",
+    });
+    expect(confirmation.textContent).toContain("both planned lifts");
+    expect(
+      await localDb
+        .rows("plan_override")
+        .filter((o) => o.kind === "combine")
+        .count(),
+    ).toBe(0);
+    await user.click(
+      within(confirmation).getByRole("button", { name: "Combine workouts" }),
+    );
+    await screen.findByRole("heading", { level: 1, name: "Push A + Pull A" });
+
+    const view = (await readSession(pull.id))!;
+    expect(view.session.id).toBe(push.id);
+    const { cards } = await readLiftSession(localDb, view);
+    expect(cards).toHaveLength(1);
+    expect(cards[0]?.targets.sets).toBe(6);
+    const player = within(screen.getByRole("region", { name: "Lift player" }));
+    await user.click(await player.findByRole("radio", { name: "2" }));
+    await user.click(player.getByRole("button", { name: "Log set" }));
+    await player.findByRole("list", { name: "Sets" });
+    await finishSession(localDb, view, { rpe: 8, notes: null });
+    expect((await weekPlan(weekStartOf(today))).tally.current.lift).toEqual({
+      planned: 2,
+      done: 2,
+    });
+    expect(await readHistory(localDb)).toMatchObject([
+      { log: { plannedSessionId: push.id }, title: "Push A + Pull A" },
+    ]);
+    expect((await readSession(pull.id))?.session.status).toBe("done");
+  });
+
+  it("keeps a completed combination credited if another device logs the absorbed lift", async () => {
+    const pull = session({ workoutType: "pull_a" });
+    await localDb.rows("planned_session").put(pull);
+    const now = Date.now();
+    expect(await combineLifts(localDb, push.id, pull.id, now)).toBe(true);
+    const finished = {
+      ...sync,
+      id: sessionLogId(push.id),
+      plannedSessionId: push.id,
+      modality: "lift" as const,
+      startedAt: now + 1,
+      endedAt: now + 2,
+      localDate: today,
+      timezone: "UTC",
+      rpe: null,
+      notes: null,
+      checked: [],
+    };
+    await localDb
+      .rows("session_log")
+      .bulkPut([
+        finished,
+        { ...finished, id: sessionLogId(pull.id), plannedSessionId: pull.id },
+      ]);
+    expect((await readSession(pull.id))?.session.id).toBe(push.id);
+    expect(
+      (await readHistory(localDb)).find(({ log }) => log.id === finished.id)
+        ?.title,
+    ).toBe("Push A + Pull A");
+    expect((await weekPlan(weekStartOf(today))).tally.current.lift).toEqual({
+      planned: 2,
+      done: 2,
+    });
+  });
+
+  it("keeps both original prescriptions when a combined lift swaps to an existing exercise", async () => {
+    const pull = session({ workoutType: "pull_a" });
+    const curl = testExercise({ name: "Curl", substitutionGroup: "upper" });
+    await localDb
+      .rows("exercise")
+      .bulkPut([{ ...bench, substitutionGroup: "upper" }, curl]);
+    await localDb.rows("planned_session").put(pull);
+    const pushItem = (await localDb.rows("planned_item").toArray()).find(
+      (i) => i.plannedSessionId === push.id,
+    )!;
+    const pullItem = item(
+      pull,
+      "exercise",
+      { ...pushItem.targets, sets: 2 },
+      curl.id,
+    );
+    await localDb.rows("planned_item").put(pullItem);
+    expect(await combineLifts(localDb, push.id, pull.id)).toBe(true);
+
+    const user = userEvent.setup();
+    renderAt(`/session/${push.id}`);
+    async function swap(cardName: string, substitute: RegExp) {
+      const card = within(
+        await screen.findByRole("article", { name: cardName }),
+      );
+      await user.click(card.getByRole("button", { name: "Swap" }));
+      const sheet = within(
+        await screen.findByRole("dialog", { name: "Swap exercise" }),
+      );
+      await user.click(
+        within(sheet.getByRole("list", { name: "Substitutes" })).getByRole(
+          "button",
+          { name: substitute },
+        ),
+      );
+    }
+    await swap(bench.name, /^Curl/);
+    const first = within(await screen.findByRole("article", { name: "Curl" }));
+    expect(first.getByText(/^3 ×/)).toBeTruthy();
+    const view = (await readSession(push.id))!;
+    const { cards } = await readLiftSession(localDb, view);
+    expect(
+      cards.map((c) => [c.itemId, c.exercise?.id, c.targets.sets]),
+    ).toEqual([
+      [pushItem.id, curl.id, 3],
+      [pullItem.id, curl.id, 2],
+    ]);
+
+    const nav = within(screen.getByRole("navigation", { name: "Exercises" }));
+    await user.click(nav.getByRole("button", { name: /^Next$/ }));
+    await screen.findByText(/^2 ×/);
+    await user.click(nav.getByRole("button", { name: "Previous" }));
+    await screen.findByText(/^3 ×/);
+    await swap("Curl", /^Dumbbell Bench Press/);
+    await screen.findByRole("article", { name: bench.name });
+    expect(
+      (await readLiftSession(localDb, view)).cards.map((c) => c.exercise?.id),
+    ).toEqual([bench.id, curl.id]);
+
+    await swap(bench.name, /^Curl/);
+    await screen.findByRole("article", { name: "Curl" });
+    await user.click(nav.getByRole("button", { name: /^Next$/ }));
+    await screen.findByText(/^2 ×/);
+    const second = within(screen.getByRole("article", { name: "Curl" }));
+    await user.click(second.getByRole("radio", { name: "2" }));
+    await user.click(second.getByRole("button", { name: "Log set" }));
+    await second.findByRole("list", { name: "Sets" });
+    await user.click(nav.getByRole("button", { name: "Previous" }));
+    await screen.findByText(/^3 ×/);
+  });
+
+  it("rejects pairs on different dates or once either lift has started", async () => {
+    const pull = session({ workoutType: "pull_a", date: addDays(today, 1) });
+    await localDb.rows("planned_session").put(pull);
+    expect(await combineLifts(localDb, push.id, pull.id)).toBe(false);
+    await moveSession(localDb, pull, pull, push);
+    const view = (await readSession(push.id))!;
+    const { cards } = await readLiftSession(localDb, view);
+    await logSet(
+      localDb,
+      view,
+      cards[0]!,
+      { load: 50, band: null, reps: 8, rir: 2 },
+      {
+        weightUnit: "lb",
+        timezone: deviceTimezone(),
+        equipment: DEFAULT_EQUIPMENT,
+      },
+    );
+    expect(await combineLifts(localDb, push.id, pull.id)).toBe(false);
+    expect(await combineLifts(localDb, pull.id, push.id)).toBe(false);
+  });
   it("lists today's sessions by slot with a coach note", async () => {
     renderAt("/");
     const am = await slot("AM");

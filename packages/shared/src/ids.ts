@@ -72,6 +72,10 @@ export function moveOverrideId(sessionId: string): string {
   return v5(`move-override:${sessionId}`, LIBRARY_NAMESPACE);
 }
 
+export function combineOverrideId(sessionId: string): string {
+  return v5(`combine-override:${sessionId}`, LIBRARY_NAMESPACE);
+}
+
 /**
  * The id of the `swap` override for a planned item: one per item, so swapping
  * again updates the same row.
