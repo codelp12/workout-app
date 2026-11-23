@@ -19,7 +19,6 @@ import { testExercise } from "../library/test-exercise";
 import { readHistory } from "../history/history";
 import { Navigation } from "../Navigation";
 import { combineLifts } from "../plan/combine";
-import { swapExercise } from "../plan/item-overrides";
 import { moveSession } from "../plan/moves";
 import { readSession, weekPlan } from "../plan/sessions";
 import { finishSession, logSet, readLiftSession } from "../players/lift-log";
@@ -231,8 +230,10 @@ describe("Today", () => {
 
   it("keeps both original prescriptions when a combined lift swaps to an existing exercise", async () => {
     const pull = session({ workoutType: "pull_a" });
-    const curl = testExercise({ name: "Curl" });
-    await localDb.rows("exercise").put(curl);
+    const curl = testExercise({ name: "Curl", substitutionGroup: "upper" });
+    await localDb
+      .rows("exercise")
+      .bulkPut([{ ...bench, substitutionGroup: "upper" }, curl]);
     await localDb.rows("planned_session").put(pull);
     const pushItem = (await localDb.rows("planned_item").toArray()).find(
       (i) => i.plannedSessionId === push.id,
@@ -246,7 +247,26 @@ describe("Today", () => {
     await localDb.rows("planned_item").put(pullItem);
     expect(await combineLifts(localDb, push.id, pull.id)).toBe(true);
 
-    await swapExercise(localDb, pushItem, push, curl.id);
+    const user = userEvent.setup();
+    renderAt(`/session/${push.id}`);
+    async function swap(cardName: string, substitute: RegExp) {
+      const card = within(
+        await screen.findByRole("article", { name: cardName }),
+      );
+      await user.click(card.getByRole("button", { name: "Swap" }));
+      const sheet = within(
+        await screen.findByRole("dialog", { name: "Swap exercise" }),
+      );
+      await user.click(
+        within(sheet.getByRole("list", { name: "Substitutes" })).getByRole(
+          "button",
+          { name: substitute },
+        ),
+      );
+    }
+    await swap(bench.name, /^Curl/);
+    const first = within(await screen.findByRole("article", { name: "Curl" }));
+    expect(first.getByText(/^3 ×/)).toBeTruthy();
     const view = (await readSession(push.id))!;
     const { cards } = await readLiftSession(localDb, view);
     expect(
@@ -256,10 +276,27 @@ describe("Today", () => {
       [pullItem.id, curl.id, 2],
     ]);
 
-    await swapExercise(localDb, cards[0]!.item, push, bench.id);
+    const nav = within(screen.getByRole("navigation", { name: "Exercises" }));
+    await user.click(nav.getByRole("button", { name: /^Next$/ }));
+    await screen.findByText(/^2 ×/);
+    await user.click(nav.getByRole("button", { name: "Previous" }));
+    await screen.findByText(/^3 ×/);
+    await swap("Curl", /^Dumbbell Bench Press/);
+    await screen.findByRole("article", { name: bench.name });
     expect(
       (await readLiftSession(localDb, view)).cards.map((c) => c.exercise?.id),
     ).toEqual([bench.id, curl.id]);
+
+    await swap(bench.name, /^Curl/);
+    await screen.findByRole("article", { name: "Curl" });
+    await user.click(nav.getByRole("button", { name: /^Next$/ }));
+    await screen.findByText(/^2 ×/);
+    const second = within(screen.getByRole("article", { name: "Curl" }));
+    await user.click(second.getByRole("radio", { name: "2" }));
+    await user.click(second.getByRole("button", { name: "Log set" }));
+    await second.findByRole("list", { name: "Sets" });
+    await user.click(nav.getByRole("button", { name: "Previous" }));
+    await screen.findByText(/^3 ×/);
   });
 
   it("rejects pairs on different dates or once either lift has started", async () => {
