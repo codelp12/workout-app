@@ -9,3 +9,4 @@ export * from "./types.js";
 export * from "./units.js";
 export * from "./week.js";
 export * from "./lift/progression.js";
+export * from "./lift/block.js";

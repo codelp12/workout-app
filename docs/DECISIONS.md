@@ -475,3 +475,14 @@ Options considered:
 
 - **Two unstarted lifts in the same date and AM/PM slot can be combined after confirmation.** Opening either lift lets the owner combine it with the other. A synced `combine` plan override records the pair; the selected lift owns the single log, and both original plans get completion credit. No database migration is needed. (§3.1, §5.4 exception approved by the owner)
 - **The selected lift comes first.** When both include the same exercise, it appears once with the active set targets added together and the first active prescription's other targets. The selected lift supplies the session-level warm-up and stretch checklists.
+
+## 2026-11-23: Blocks and deloads on the global calendar (#146)
+
+- **`planWeek` applies the block to every lift slot** (`lift/block.ts`, §5.1 Block structure). Main lifts (`e1rm_rir`) step RIR 3 → 2 → 1, spread over longer blocks (`blockRir`); `double_progression` slots keep their template RIR. Deload weeks halve sets (rounded up) at 3+ RIR and load 90% of the exercise's week-1 load. The tunables are in `ENGINE_CONFIG.lift.block` and `ENGINE_CONFIG.lift.layoff`. Plans, blocks and weeks now carry `engine_version` `plan-2`.
+- **Ramp sets.** A `ramp` slot gains one set in loading weeks 2 and 3 when its exercise's last exposure this block met its targets (`top`, `beat` or `done`); a missed week holds the earned sets. Readiness is always green until Phase 5. Ramp sets are granted in week order and never push a primary muscle past 20 hard sets a week; template sets always count in full.
+- **Early deload.** When two or more main lifts stalled since the block started, the current week becomes the deload and the block's `weekCount` shrinks to end there, so the next block starts the week after for every modality.
+- **Lift logs carry their planned targets.** `groupLogs` takes `planned_item` rows and attaches each lift log's targets via its `plannedSessionId`, so ramp sets and stalls work from synced data. An absorbed lift of a combined workout has no targets yet.
+- **Outside the spec, owner sign-off needed:**
+  - Layoff cuts use the midpoints of the spec's ranges: 7.5% for the first session after 7–13 days off, 17.5% for every lift session within 7 days of the first one after 14+ days off. Days off are counted from the last lift session's date to the planned session's date.
+  - After 14+ days off, a weaker first session replaces the e1RM instead of being smoothed ("e1RM recalibrated"); later sessions smooth as usual.
+  - Deload and layoff loads round to the nearest loadable weight but always at least one step lighter when the equipment allows.

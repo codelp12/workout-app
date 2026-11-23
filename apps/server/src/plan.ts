@@ -1,4 +1,4 @@
-import { groupLogs, planWeek, type LiftExercise } from "@workout-app/engine";
+import { groupLogs, planWeek, type PlanExercise } from "@workout-app/engine";
 import {
   defaultSettings,
   localDateAt,
@@ -31,8 +31,11 @@ const owned = <T>(row: T) => ({ ...row, userId: OWNER_USER_ID });
 
 function insertPlan(tx: Tx, plan: ReturnType<typeof planWeek>) {
   if (plan.block) {
+    // An early deload rewrites the current block's length.
+    const row = { ...owned(plan.block), serverSeq: nextSeq(tx) };
     tx.insert(block)
-      .values({ ...owned(plan.block), serverSeq: nextSeq(tx) })
+      .values(row)
+      .onConflictDoUpdate({ target: block.id, set: row })
       .run();
   }
   tx.insert(week)
@@ -80,7 +83,7 @@ export function planCurrentWeek(db: Db, now: number): boolean {
       .get();
     if (existing) return false;
 
-    const exercises: LiftExercise[] = tx
+    const exercises: PlanExercise[] = tx
       .select()
       .from(exercise)
       .all()
@@ -99,6 +102,7 @@ export function planCurrentWeek(db: Db, now: number): boolean {
           sets: tx.select().from(setLog).all(),
           runs: tx.select().from(runLog).all(),
           ascents: tx.select().from(ascent).all(),
+          items: tx.select().from(plannedItem).all(),
         }),
       }),
     );

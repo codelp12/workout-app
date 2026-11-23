@@ -8,11 +8,14 @@ import {
   type Template,
 } from "@workout-app/shared";
 import { describe, expect, it } from "vitest";
-import type { LiftExercise } from "./stubs/lift.js";
+import type { LiftSessionLog } from "./stubs/lift.js";
 import {
   DEFAULT_WEEK,
   groupLogs,
+  PLAN_VERSION,
   planWeek,
+  type PlanExercise,
+  type WeekPlan,
   type WeekPlanInput,
 } from "./week.js";
 
@@ -50,14 +53,17 @@ const templates: Template[] = Object.entries(TEMPLATE_NAMES).map(
     })),
   }),
 );
-const exercises: LiftExercise[] = [
-  ...new Set(templates.flatMap((t) => t.slots.map((s) => s.exerciseId!))),
-].map((id) => ({
-  id,
-  name: id,
-  equipment: ["dumbbell"],
-  substitutionGroup: null,
-}));
+const slotId = (key: string, i: number) => weekId(`${key}-${i}`);
+const exercises: PlanExercise[] = Object.keys(TEMPLATE_NAMES).flatMap((key) =>
+  [0, 1, 2, 3, 4, 5].map((i) => ({
+    id: slotId(key, i),
+    name: `${key}-${i}`,
+    equipment: ["dumbbell"],
+    substitutionGroup: null,
+    progressionModel: i === 0 ? "e1rm_rir" : null,
+    primaryMuscles: [],
+  })),
+);
 
 const input = (fields: Partial<WeekPlanInput> = {}): WeekPlanInput => ({
   weekStart: MONDAY,
@@ -277,9 +283,213 @@ describe("planWeek", () => {
     expect(lift.map((l) => l.sets[0]?.loadValue)).toEqual([50, 60]);
   });
 
+  it("reads ramp-slot targets planned before ramp sets were recorded", () => {
+    const targets = {
+      sets: 3,
+      repMin: 8,
+      repMax: 12,
+      targetRir: 2,
+      load: null,
+    };
+    const { lift } = groupLogs({
+      sessions: [
+        {
+          id: "s",
+          modality: "lift",
+          localDate: "2026-10-27",
+          startedAt: 1,
+          plannedSessionId: "p",
+          deletedAt: null,
+        },
+      ],
+      sets: [],
+      runs: [],
+      ascents: [],
+      items: [
+        {
+          plannedSessionId: "p",
+          exerciseId: "a",
+          targets: { ...targets, ramp: true },
+          deletedAt: null,
+        },
+        { plannedSessionId: "p", exerciseId: "b", targets, deletedAt: null },
+      ],
+    });
+    expect(lift[0]?.targets?.a?.rampSets).toBe(0);
+    expect(lift[0]?.targets?.b?.rampSets).toBeUndefined();
+  });
+
   it("has one spec per key", () => {
     expect(new Set(DEFAULT_WEEK.map((s) => s.key)).size).toBe(
       DEFAULT_WEEK.length,
+    );
+  });
+});
+
+describe("block calendar", () => {
+  const first = planWeek(input());
+  const saved = (block: NonNullable<WeekPlan["block"]>) => ({
+    ...block,
+    userId: 1,
+    serverSeq: 1,
+  });
+  const blocks = [saved(first.block!)];
+  const weekAt = (n: number, fields: Partial<WeekPlanInput> = {}) =>
+    planWeek(input({ weekStart: addDays(MONDAY, 7 * n), blocks, ...fields }));
+  const item = (plan: WeekPlan, key: string, i = 0) =>
+    plan.items.find((it) => it.exerciseId === slotId(key, i))!;
+  const lifted = (
+    date: string,
+    key: string,
+    reps: number,
+    { sets = 3, load = 50 } = {},
+  ): LiftSessionLog => ({
+    session: { localDate: date },
+    sets: Array.from({ length: sets }, (_, index) => ({
+      exerciseId: slotId(key, 0),
+      index,
+      loadValue: load,
+      loadUnit: "lb" as const,
+      band: null,
+      reps,
+      rir: 2,
+      isWarmup: false,
+    })),
+    targets: {
+      [slotId(key, 0)]: {
+        load: { value: load, unit: "lb" },
+        band: null,
+        sets,
+        repMin: 8,
+        repMax: 12,
+        targetRir: 2,
+        rampSets: 0,
+      },
+    },
+  });
+  const logs = (...lift: LiftSessionLog[]) => ({ lift, run: [], climb: [] });
+
+  it("writes blocks and weeks with the engine version", () => {
+    expect(first.block?.engineVersion).toBe(PLAN_VERSION);
+    expect(first.week.engineVersion).toBe(PLAN_VERSION);
+  });
+
+  it("steps main lifts' RIR across a block of any length, then restarts at 3", () => {
+    for (const weekCount of [3, 4, 5, 6]) {
+      const long = [saved({ ...first.block!, weekCount })];
+      const plans = Array.from({ length: weekCount + 1 }, (_, n) =>
+        weekAt(n, { blocks: long }),
+      );
+      expect(plans.map((p) => p.week.type)).toEqual([
+        ...Array<string>(weekCount - 1).fill("loading"),
+        "deload",
+        "loading",
+      ]);
+      const rir = plans.map((p) => item(p, "push_a").targets.targetRir);
+      const loading = {
+        3: [3, 1],
+        4: [3, 2, 1],
+        5: [3, 2, 2, 1],
+        6: [3, 2, 2, 1, 1],
+      }[weekCount]!;
+      expect(rir).toEqual([...loading, 3, 3]);
+      expect(plans.map((p) => item(p, "push_a", 2).targets.targetRir)).toEqual([
+        ...Array<number>(weekCount - 1).fill(2),
+        3,
+        2,
+      ]);
+    }
+  });
+
+  it("halves the sets and takes about 90% of week 1's load on the deload", () => {
+    const deload = weekAt(3, {
+      logs: logs(
+        lifted(MONDAY, "push_a", 12, { load: 50 }),
+        lifted(addDays(MONDAY, 8), "push_a", 12, { load: 55 }),
+        lifted(addDays(MONDAY, 16), "push_a", 12, { load: 60 }),
+      ),
+    });
+    const bench = item(deload, "push_a");
+    expect(bench.targets).toMatchObject({
+      sets: 2,
+      targetRir: 3,
+      load: { value: 45, unit: "lb" },
+    });
+    expect(bench.reasons).toContain("45 lb, about 90% of week 1's weight.");
+    expect(item(deload, "push_a", 3).targets).toMatchObject({ sets: 2 });
+  });
+
+  it("adds a ramp set after met targets, within the hard-set cap", () => {
+    const met = weekAt(1, { logs: logs(lifted(MONDAY, "push_a", 12)) });
+    expect(item(met, "push_a").targets).toMatchObject({ sets: 4, rampSets: 1 });
+    expect(item(met, "push_a").reasons).toContain(
+      "Met last week's targets, so 4 sets this week.",
+    );
+    expect(item(met, "push_b").targets.sets).toBe(3);
+
+    const missed = weekAt(1, { logs: logs(lifted(MONDAY, "push_a", 5)) });
+    expect(item(missed, "push_a").targets.sets).toBe(3);
+
+    const chest = exercises.map((e) =>
+      e.name.startsWith("push") ? { ...e, primaryMuscles: ["chest"] } : e,
+    );
+    const capped = weekAt(1, {
+      exercises: chest,
+      logs: logs(lifted(MONDAY, "push_a", 12)),
+    });
+    expect(item(capped, "push_a").targets.sets).toBe(3);
+    expect(item(capped, "push_a").reasons).toContain(
+      "3 sets: chest is at its cap of 20 hard sets this week.",
+    );
+  });
+
+  it("deloads early when two main lifts stall, moving the calendar", () => {
+    const stall = (key: string, days: number[]) =>
+      days.map((d) => lifted(addDays(MONDAY, d), key, 5));
+    const early = weekAt(1, {
+      logs: logs(...stall("push_a", [0, 3]), ...stall("legs_a", [2, 6])),
+    });
+    expect(early.week).toMatchObject({ index: 1, type: "deload" });
+    expect(early.block).toMatchObject({
+      id: first.block!.id,
+      startDate: MONDAY,
+      weekCount: 2,
+      engineVersion: PLAN_VERSION,
+    });
+    expect(
+      item(early, "push_a").reasons.some((r) => r.startsWith("Early deload")),
+    ).toBe(true);
+    const next = planWeek(
+      input({ weekStart: addDays(MONDAY, 14), blocks: [saved(early.block!)] }),
+    );
+    expect(next.week.index).toBe(0);
+    expect(next.block?.startDate).toBe(addDays(MONDAY, 14));
+
+    const one = weekAt(1, { logs: logs(...stall("push_a", [0, 3])) });
+    expect([one.week.type, one.block]).toEqual(["loading", null]);
+  });
+
+  it("lightens the first session back after a layoff", () => {
+    const after = (days: number) =>
+      planWeek(
+        input({
+          logs: logs(
+            lifted(addDays(MONDAY, -days), "push_a", 10),
+            lifted(addDays(MONDAY, -days), "legs_b", 10),
+          ),
+        }),
+      );
+    const loads = (plan: WeekPlan) =>
+      ["push_a", "legs_b"].map(
+        (key) => (item(plan, key).targets.load as { value: number }).value,
+      );
+    expect(loads(after(6))).toEqual([50, 50]);
+    expect(loads(after(7))).toEqual([45, 50]);
+    expect(loads(after(13))).toEqual([45, 50]);
+    expect(loads(after(14))).toEqual([40, 40]);
+    expect(loads(after(20))).toEqual([40, 40]);
+    expect(item(after(20), "legs_b").reasons).toContain(
+      "First week back since 2026-11-02: 17.5% lighter.",
     );
   });
 });

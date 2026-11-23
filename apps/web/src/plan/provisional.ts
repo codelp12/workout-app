@@ -1,4 +1,4 @@
-import { groupLogs, planWeek, type LiftExercise } from "@workout-app/engine";
+import { groupLogs, planWeek, type PlanExercise } from "@workout-app/engine";
 import {
   defaultSettings,
   localDateAt,
@@ -51,7 +51,7 @@ export function planProvisionalWeek(
       const weekStart = weekStartOf(localDateAt(settings.timezone, now));
       if (await db.rows("week").get(weekId(weekStart))) return false;
 
-      const exercises: LiftExercise[] = (
+      const exercises: PlanExercise[] = (
         await db.rows("exercise").toArray()
       ).filter((e) => e.deletedAt === null && isTemplateModality(e.modality));
       const plan = planWeek({
@@ -66,6 +66,7 @@ export function planProvisionalWeek(
           sets: await db.rows("set_log").toArray(),
           runs: await db.rows("run_log").toArray(),
           ascents: await db.rows("ascent").toArray(),
+          items: await db.rows("planned_item").toArray(),
         }),
       });
       const local = <T>(row: T) => ({
