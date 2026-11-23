@@ -148,13 +148,13 @@ describe("weekScheme", () => {
     expect(scheme(met, 1, { ...slot, ramp: false }).rampSets).toBe(0);
     expect(scheme(met, 0).rampSets).toBe(0);
 
-    const week2met = fold(log("2026-11-09", 12, { sets: 4 }));
-    const week2missed = fold(log("2026-11-09", 5, { sets: 4 }));
+    const week2met = fold(log("2026-11-09", 12, { sets: 4, rampSets: 1 }));
+    const week2missed = fold(log("2026-11-09", 5, { sets: 4, rampSets: 1 }));
     expect(scheme(week2met, 2)).toMatchObject({
       rampSets: 2,
       rampGained: true,
     });
-    const week2short = log("2026-11-09", 12, { sets: 4 });
+    const week2short = log("2026-11-09", 12, { sets: 4, rampSets: 1 });
     expect(
       scheme(fold({ ...week2short, sets: week2short.sets.slice(0, 2) }), 2),
     ).toMatchObject({ rampSets: 1, rampGained: false });
@@ -163,10 +163,15 @@ describe("weekScheme", () => {
       rampGained: false,
     });
 
-    const week3 = fold(log("2026-11-16", 12, { sets: 5 }));
+    const lowered = log(START, 12, { sets: 4, rampSets: 0 });
+    expect(
+      scheme(fold({ ...lowered, sets: lowered.sets.slice(0, 2) }), 1).rampSets,
+    ).toBe(0);
+
+    const week3 = fold(log("2026-11-16", 12, { sets: 5, rampSets: 2 }));
     expect(scheme(week3, 3)).toMatchObject({ rampSets: 2, rampGained: false });
 
-    const lastBlock = fold(log("2026-10-26", 12, { sets: 5 }));
+    const lastBlock = fold(log("2026-10-26", 12, { sets: 5, rampSets: 2 }));
     expect(scheme(lastBlock, 1).rampSets).toBe(0);
   });
 });

@@ -54,6 +54,8 @@ export type LiftItem = {
   restSec: number;
   /** Whether the first exercise of a movement pattern ramps up with warm-ups. */
   ramp?: boolean;
+  /** Sets the block's ramp has added over the template this week. */
+  rampSets?: number;
   reasons: Reason[];
 };
 
@@ -62,7 +64,7 @@ export type LiftPrescription = { items: LiftItem[]; reasons: Reason[] };
 /** The part of a planned item a logged exposure is judged against. */
 export type LiftTarget = Pick<
   LiftItem,
-  "load" | "band" | "sets" | "repMin" | "repMax" | "targetRir"
+  "load" | "band" | "sets" | "repMin" | "repMax" | "targetRir" | "rampSets"
 >;
 
 export type LiftSessionLog = {

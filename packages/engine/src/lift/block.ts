@@ -128,10 +128,7 @@ export function weekScheme(
     last.target &&
     last.date >= position.startDate
   ) {
-    const earned = Math.min(
-      Math.max(last.target.sets - slot.sets, 0),
-      config.rampWeeks,
-    );
+    const earned = Math.min(last.target.rampSets ?? 0, config.rampWeeks);
     rampGained =
       position.index <= config.rampWeeks &&
       earned < position.index &&
