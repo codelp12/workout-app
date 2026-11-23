@@ -86,11 +86,11 @@ const formatRest = (sec: number) =>
   `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
 
 /** `3 × 6–10 · 60 lb · RIR 2 · rest 2:30` */
-export function liftDetail(t: LiftTargets): string {
+export function liftDetail(t: LiftTargets, timed = false): string {
   const reps =
     t.repMin === t.repMax ? `${t.repMin}` : `${t.repMin}–${t.repMax}`;
   return [
-    `${t.sets} × ${reps}`,
+    `${t.sets} × ${reps}${timed ? " s" : ""}`,
     t.load && formatAmount(t.load.value, t.load.unit),
     t.band,
     t.targetRir !== null && `RIR ${t.targetRir}`,

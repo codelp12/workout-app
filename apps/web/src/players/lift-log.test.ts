@@ -191,7 +191,9 @@ describe("set rows and added weight", () => {
 
   it("opens one row until a set is logged, then only the rows added", () => {
     const c = card(["dumbbell"], { load: { value: 50, unit: "lb" } });
-    expect(openRows(c, settings, undefined)).toEqual([prefill(c, settings)]);
+    expect(openRows(c, settings, undefined)).toEqual([
+      { ...prefill(c, settings), id: "draft-0" },
+    ]);
     const logged = { ...c, sets: [{} as LiftCard["sets"][number]] };
     expect(openRows(logged, settings, undefined)).toEqual([]);
     expect(openRows(logged, settings, [])).toEqual([]);

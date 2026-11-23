@@ -456,6 +456,10 @@ Options considered:
   - A double increment that would exceed +5% falls back to one step.
   - Three stalls start the plateau handler for 28 days, rotating rep scheme (range shifted by 3 reps), a back-off set at 85%, and a same-group variation (a back-off set when there's none).
 
+## Count-up timer for timed holds (#160)
+
+- **The lift player identifies Plank, Side Bridge and Kneeling Hip Flexor by their dataset IDs.** A manual hold timer counts elapsed seconds independently of rest. Stop copies those seconds into the set without capping them at the target or changing the existing seconds-as-reps data model. (§3.4, §6.3; owner approved on #160)
+
 ## Lift-player set entry and swap search (#154, #155, #158)
 
 - **Add set reveals the new entry.** Advancing drops extra rows the owner didn't edit or log. Edited drafts still survive navigation and a reload; logged sets are unaffected. (§6.3)

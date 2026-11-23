@@ -92,6 +92,35 @@ test("a set logs in two taps and the player resumes after a kill", async ({
   ).toHaveAttribute("aria-valuenow", reps!);
 });
 
+test("a timed hold counts past the target and fills actual seconds", async ({
+  page,
+}, testInfo) => {
+  const title = testInfo.project.name === "chromium" ? "Legs A" : "Legs B";
+  await page.goto("/week?show=lift");
+  await page.getByLabel("Password").fill(E2E_PASSWORD);
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page.getByTestId("sync-chip")).toHaveText("Synced");
+  await expect(page.getByText("No exercises yet")).toHaveCount(0);
+  await page.getByRole("button", { name: new RegExp(`^${title}, `) }).click();
+  await page
+    .getByRole("dialog", { name: title })
+    .getByRole("button", { name: "Open session" })
+    .click();
+  const player = page.getByRole("region", { name: "Lift player" });
+  const next = player.getByRole("button", { name: "Next", exact: true });
+  for (let i = 0; i < (title === "Legs A" ? 4 : 2); i++) await next.click();
+  const card = player.getByRole("article", { name: "Side Bridge" });
+  await expect(card.getByText(/2 × 20–30 s/)).toBeVisible();
+  await page.clock.install();
+  await card.getByRole("button", { name: "Start hold" }).click();
+  await page.clock.fastForward(45_000);
+  await expect(card.getByRole("timer")).toHaveText("0:45");
+  await card.getByRole("button", { name: "Stop hold" }).click();
+  await expect(
+    card.getByRole("spinbutton", { name: "Seconds" }),
+  ).toHaveAttribute("aria-valuenow", "45");
+});
+
 type PullPage = {
   changes: {
     row: {

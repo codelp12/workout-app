@@ -33,7 +33,7 @@ export type SetValues = {
   rir: number | null;
 };
 
-export type SetDraft = SetValues & { untouchedExtra?: true };
+export type SetDraft = SetValues & { id: string; untouchedExtra?: true };
 
 /** One exercise of the session, as the player shows it. */
 export type LiftCard = {
@@ -209,6 +209,7 @@ function mergeDuplicateCards(cards: LiftCard[]): LiftCard[] {
 export function describeSet(
   set: Pick<SetLog, "loadValue" | "loadUnit" | "band" | "reps" | "rir">,
   bodyweight = false,
+  timed = false,
 ): string {
   const load =
     set.loadValue !== null && set.loadUnit
@@ -220,8 +221,13 @@ export function describeSet(
       : bodyweight
         ? `Bodyweight + ${load}`
         : load;
-  return `${what} × ${set.reps}${set.rir === null ? "" : ` · RIR ${set.rir}`}`;
+  return `${what} × ${set.reps}${timed ? " s" : ""}${set.rir === null ? "" : ` · RIR ${set.rir}`}`;
 }
+
+const TIMED_HOLDS = new Set(["Plank", "Side_Bridge", "Kneeling_Hip_Flexor"]);
+
+export const isTimedHold = (exercise: Exercise | null) =>
+  exercise?.sourceId != null && TIMED_HOLDS.has(exercise.sourceId);
 
 /** The implement an exercise is loaded on, if it's loaded by weight. */
 export function implementOf(exercise: Exercise | null): WeightImplement | null {
@@ -645,7 +651,7 @@ export function openRows(
   const rows = drafts?.length
     ? drafts
     : card.sets.length === 0
-      ? [prefill(card, settings)]
+      ? [{ ...prefill(card, settings), id: "draft-0" }]
       : [];
   return rows.map((draft) => {
     const load =
@@ -676,7 +682,11 @@ export function loadPosition(sessionId: string): PlayerPosition {
       const drafts = Object.fromEntries(
         Object.entries(saved.drafts).map(([id, d]) => [
           id,
-          (Array.isArray(d) ? d : [d]) as SetDraft[],
+          (
+            (Array.isArray(d) ? d : [d]) as (Omit<SetDraft, "id"> & {
+              id?: string;
+            })[]
+          ).map((row, index) => ({ ...row, id: row.id ?? `draft-${index}` })),
         ]),
       );
       return { card: saved.card, drafts };
