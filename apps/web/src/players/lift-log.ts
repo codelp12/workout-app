@@ -165,15 +165,21 @@ export async function readLiftSession(
 }
 
 function mergeDuplicateCards(cards: LiftCard[]): LiftCard[] {
+  const keyOf = (card: LiftCard) =>
+    card.item.exerciseId && card.exercise
+      ? `${card.item.exerciseId}:${card.exercise.id}`
+      : null;
   const byExercise = new Map<string, LiftCard[]>();
   for (const card of cards) {
-    if (!card.exercise) continue;
-    const group = byExercise.get(card.exercise.id);
+    const key = keyOf(card);
+    if (!key) continue;
+    const group = byExercise.get(key);
     if (group) group.push(card);
-    else byExercise.set(card.exercise.id, [card]);
+    else byExercise.set(key, [card]);
   }
   return cards.flatMap((card) => {
-    const group = card.exercise && byExercise.get(card.exercise.id);
+    const key = keyOf(card);
+    const group = key && byExercise.get(key);
     if (!group || group.length === 1) return [card];
     if (group[0] !== card) return [];
     const active = group.filter((c) => !c.skipped);

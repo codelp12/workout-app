@@ -19,6 +19,7 @@ import { testExercise } from "../library/test-exercise";
 import { readHistory } from "../history/history";
 import { Navigation } from "../Navigation";
 import { combineLifts } from "../plan/combine";
+import { swapExercise } from "../plan/item-overrides";
 import { moveSession } from "../plan/moves";
 import { readSession, weekPlan } from "../plan/sessions";
 import { finishSession, logSet, readLiftSession } from "../players/lift-log";
@@ -226,6 +227,39 @@ describe("Today", () => {
       planned: 2,
       done: 2,
     });
+  });
+
+  it("keeps both original prescriptions when a combined lift swaps to an existing exercise", async () => {
+    const pull = session({ workoutType: "pull_a" });
+    const curl = testExercise({ name: "Curl" });
+    await localDb.rows("exercise").put(curl);
+    await localDb.rows("planned_session").put(pull);
+    const pushItem = (await localDb.rows("planned_item").toArray()).find(
+      (i) => i.plannedSessionId === push.id,
+    )!;
+    const pullItem = item(
+      pull,
+      "exercise",
+      { ...pushItem.targets, sets: 2 },
+      curl.id,
+    );
+    await localDb.rows("planned_item").put(pullItem);
+    expect(await combineLifts(localDb, push.id, pull.id)).toBe(true);
+
+    await swapExercise(localDb, pushItem, push, curl.id);
+    const view = (await readSession(push.id))!;
+    const { cards } = await readLiftSession(localDb, view);
+    expect(
+      cards.map((c) => [c.itemId, c.exercise?.id, c.targets.sets]),
+    ).toEqual([
+      [pushItem.id, curl.id, 3],
+      [pullItem.id, curl.id, 2],
+    ]);
+
+    await swapExercise(localDb, cards[0]!.item, push, bench.id);
+    expect(
+      (await readLiftSession(localDb, view)).cards.map((c) => c.exercise?.id),
+    ).toEqual([bench.id, curl.id]);
   });
 
   it("rejects pairs on different dates or once either lift has started", async () => {
