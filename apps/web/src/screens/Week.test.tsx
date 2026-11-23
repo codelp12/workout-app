@@ -7,6 +7,7 @@ import {
   localDateAt,
   moveOverrideId,
   newId,
+  sessionLogId,
   weekStartOf,
   type PlannedSession,
   type PlanOverride,
@@ -216,6 +217,32 @@ describe("Week", () => {
       .rows("plan_override")
       .get(moveOverrideId(push.id));
     expect(removed?.deletedAt).not.toBeNull();
+  });
+
+  it("labels an open log and offers to resume it", async () => {
+    await localDb.rows("session_log").put(
+      log({
+        id: sessionLogId(push.id),
+        plannedSessionId: push.id,
+        endedAt: null,
+      }),
+    );
+    const user = userEvent.setup();
+    renderAt("/week");
+    await user.click(
+      await screen.findByRole("button", { name: "Push A, AM, In progress" }),
+    );
+    await user.click(
+      within(await screen.findByRole("dialog")).getByRole("button", {
+        name: "Resume session",
+      }),
+    );
+    expect(
+      await screen.findByRole("region", { name: "Lift player" }),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("region", { name: "Workout overview" }),
+    ).toBeNull();
   });
 
   it("keeps finished sessions in place", async () => {

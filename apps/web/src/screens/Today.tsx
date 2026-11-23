@@ -24,6 +24,11 @@ function SessionCard({ view }: { view: SessionView }) {
   const { session, title } = view;
   const style = modalityStyles[session.modality];
   const summary = sessionSummary(view);
+  const action = view.inProgress
+    ? "Resume"
+    : session.modality === "lift"
+      ? "Preview"
+      : "Start";
   return (
     <li
       className={`${card} ${style.accent} flex items-center gap-3`}
@@ -37,6 +42,7 @@ function SessionCard({ view }: { view: SessionView }) {
         {summary && (
           <span className="text-fg-muted tabular-nums">{summary}</span>
         )}
+        {view.inProgress && <span className="font-medium">In progress</span>}
         {view.combineCandidate && (
           <span className="text-sm text-fg-muted">
             Can combine with {view.combineCandidate.title}
@@ -47,10 +53,10 @@ function SessionCard({ view }: { view: SessionView }) {
         <button
           type="button"
           className={`${buttonBase} min-h-tap ${style.fill}`}
-          aria-label={`Start ${title}`}
+          aria-label={`${action} ${title}`}
           onClick={() => void navigate(`/session/${session.id}`)}
         >
-          Start
+          {action}
         </button>
       ) : (
         <span className="font-medium text-fg-muted">

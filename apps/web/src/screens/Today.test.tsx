@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import "fake-indexeddb/auto";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   addDays,
@@ -21,7 +27,12 @@ import { Navigation } from "../Navigation";
 import { combineLifts } from "../plan/combine";
 import { moveSession } from "../plan/moves";
 import { readSession, weekPlan } from "../plan/sessions";
-import { finishSession, logSet, readLiftSession } from "../players/lift-log";
+import {
+  finishSession,
+  logSet,
+  readLiftSession,
+  startLift,
+} from "../players/lift-log";
 import { deviceTimezone } from "../settings/settings";
 import { localDb } from "../sync";
 
@@ -152,8 +163,12 @@ describe("Today", () => {
       .put({ ...row, id: newId(), plannedSessionId: pull.id });
     expect(await combineLifts(localDb, push.id, pull.id)).toBe(false);
     await moveSession(localDb, pull, pull, push);
+    const staleView = (await readSession(pull.id))!;
     const user = userEvent.setup();
-    renderAt(`/session/${push.id}`);
+    renderAt("/");
+    await user.click(
+      await screen.findByRole("button", { name: "Preview Push A" }),
+    );
     const offer = await screen.findByRole("button", {
       name: "Combine with Pull A",
     });
@@ -178,10 +193,31 @@ describe("Today", () => {
     const { cards } = await readLiftSession(localDb, view);
     expect(cards).toHaveLength(1);
     expect(cards[0]?.targets.sets).toBe(6);
-    const player = within(screen.getByRole("region", { name: "Lift player" }));
+    const preview = within(
+      screen.getByRole("region", { name: "Workout overview" }),
+    );
+    expect(await preview.findByText(bench.name)).toBeTruthy();
+    expect(preview.getByText(/^6 ×/)).toBeTruthy();
+    expect(await localDb.rows("session_log").count()).toBe(0);
+    await user.click(preview.getByRole("button", { name: "Start workout" }));
+    await screen.findByRole("region", { name: "Lift player" });
+    expect(await localDb.rows("session_log").toArray()).toMatchObject([
+      { plannedSessionId: push.id, endedAt: null },
+    ]);
+    expect((await readSession(pull.id))?.inProgress).toBe(true);
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Resume Push A + Pull A" }),
+    );
+    const player = within(
+      await screen.findByRole("region", { name: "Lift player" }),
+    );
     await user.click(await player.findByRole("radio", { name: "2" }));
     await user.click(player.getByRole("button", { name: "Log set" }));
     await player.findByRole("list", { name: "Sets" });
+    await startLift(localDb, staleView, { timezone: "UTC" });
+    expect((await readSession(pull.id))?.session.id).toBe(push.id);
+    expect((await readSession(push.id))?.combinedWith).toBe(pull.id);
     await finishSession(localDb, view, { rpe: 8, notes: null });
     expect((await weekPlan(weekStartOf(today))).tally.current.lift).toEqual({
       planned: 2,
@@ -249,6 +285,11 @@ describe("Today", () => {
 
     const user = userEvent.setup();
     renderAt(`/session/${push.id}`);
+    const start = await screen.findByRole<HTMLButtonElement>("button", {
+      name: "Start workout",
+    });
+    await waitFor(() => expect(start.disabled).toBe(false));
+    await user.click(start);
     async function swap(cardName: string, substitute: RegExp) {
       const card = within(
         await screen.findByRole("article", { name: cardName }),
@@ -337,16 +378,54 @@ describe("Today", () => {
     const user = userEvent.setup();
     renderAt("/");
     await user.click(
-      await screen.findByRole("button", { name: "Start Push A" }),
+      await screen.findByRole("button", { name: "Preview Push A" }),
     );
     expect(
       await screen.findByRole("heading", { level: 1, name: "Push A" }),
     ).toBeTruthy();
-    const lift = within(screen.getByRole("region", { name: "Lift player" }));
+    const preview = within(
+      screen.getByRole("region", { name: "Workout overview" }),
+    );
+    expect(await preview.findByText("Dumbbell Bench Press")).toBeTruthy();
+    expect(
+      preview.getByText("3 × 6–10 · 50 lb · RIR 2 · rest 3:00"),
+    ).toBeTruthy();
+    expect(
+      await localDb.rows("session_log").get(sessionLogId(push.id)),
+    ).toBeUndefined();
+    await user.click(preview.getByRole("button", { name: "Start workout" }));
+    const lift = within(
+      await screen.findByRole("region", { name: "Lift player" }),
+    );
     expect(await lift.findByText("Dumbbell Bench Press")).toBeTruthy();
     expect(lift.getByText("3 × 6–10 · 50 lb · RIR 2 · rest 3:00")).toBeTruthy();
 
     await user.click(screen.getByRole("button", { name: "Back" }));
+    const resume = await screen.findByRole("button", { name: "Resume Push A" });
+    const am = await slot("AM");
+    expect(am.getByText("In progress")).toBeTruthy();
+    await user.click(resume);
+    expect(
+      await screen.findByRole("region", { name: "Lift player" }),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("region", { name: "Workout overview" }),
+    ).toBeNull();
+    await user.click(
+      await screen.findByRole("button", { name: "Discard workout" }),
+    );
+    await user.click(
+      within(await screen.findByRole("dialog")).getByRole("button", {
+        name: "Discard workout",
+      }),
+    );
+    expect(
+      await screen.findByRole("region", { name: "Workout overview" }),
+    ).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    expect(
+      await screen.findByRole("button", { name: "Preview Push A" }),
+    ).toBeTruthy();
     await user.click(
       await screen.findByRole("button", { name: "Start Easy run" }),
     );

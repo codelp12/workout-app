@@ -21,13 +21,15 @@ import {
   type SessionLog,
   type SetLog,
 } from "@workout-app/shared";
-import { MemoryRouter, Route, Routes } from "react-router";
+import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { testExercise } from "../library/test-exercise";
-import { Session } from "../screens/Session";
+import { readSession } from "../plan/sessions";
 import { deviceTimezone } from "../settings/settings";
 import { localDb } from "../sync";
+import { useLiveQuery } from "../use-live-query";
 import { openWorkout, savePosition } from "./lift-log";
+import { LiftPlayer } from "./LiftPlayer";
 
 const today = localDateAt(deviceTimezone(), Date.now());
 const sync = {
@@ -123,12 +125,17 @@ const lastSet = (index: number, reps: number): SetLog => ({
   completedAt: 2,
 });
 
+const readLegs = () => readSession(legs.id);
+
+function TestPlayer() {
+  const view = useLiveQuery(readLegs, null);
+  return view && <LiftPlayer view={view} />;
+}
+
 function renderPlayer() {
   return render(
     <MemoryRouter initialEntries={[`/session/${legs.id}`]}>
-      <Routes>
-        <Route path="/session/:id" element={<Session />} />
-      </Routes>
+      <TestPlayer />
     </MemoryRouter>,
   );
 }

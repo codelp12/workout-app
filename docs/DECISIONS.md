@@ -456,6 +456,11 @@ Options considered:
   - A double increment that would exceed +5% falls back to one step.
   - Three stalls start the plateau handler for 28 days, rotating rep scheme (range shifted by 3 reps), a back-off set at 85%, and a same-group variation (a back-off set when there's none).
 
+## Lift workout preview and resume (#156, #159)
+
+- **Preview does not start a lift.** It uses the same exercise order, overrides and targets as the player. Start workout creates the existing offline-first session log; no schema change is needed. (§3.1, §6.3)
+- **Today and Week derive In progress from an open log.** Resume bypasses the preview; discarding the log resets the preview, and finishing still marks the planned session done. (§6, §10)
+
 ## Count-up timer for timed holds (#160)
 
 - **The lift player identifies Plank, Side Bridge and Kneeling Hip Flexor by their dataset IDs.** A manual hold timer counts elapsed seconds independently of rest. Stop copies those seconds into the set without capping them at the target or changing the existing seconds-as-reps data model. (§3.4, §6.3; owner approved on #160)

@@ -31,6 +31,7 @@ export type SessionView = {
   session: PlannedSession;
   /** Where the plan put it. */
   planned: Placement;
+  inProgress: boolean;
   title: string;
   /** Live items, in order. */
   items: PlannedItem[];
@@ -144,7 +145,10 @@ export function formatLongDate(date: string): string {
   }).format(Date.UTC(y!, m! - 1, d));
 }
 
-type Placed = Pick<SessionView, "session" | "planned" | "combinedWith"> & {
+type Placed = Pick<
+  SessionView,
+  "session" | "planned" | "combinedWith" | "inProgress"
+> & {
   combinedInto?: string;
   started: boolean;
 };
@@ -164,7 +168,12 @@ async function placedSessions(includeMoved = false): Promise<Placed[]> {
   const byLogId = new Map(
     logs.filter((l) => l.deletedAt === null).map((l) => [l.id, l]),
   );
-  const pairs = liftCombinations(overrides, sessions, logs);
+  const pairs = liftCombinations(
+    overrides,
+    sessions,
+    logs,
+    await localDb.rows("set_log").toArray(),
+  );
   const absorbed = new Map(
     [...pairs].map(([primary, other]) => [other, primary]),
   );
@@ -185,6 +194,7 @@ async function placedSessions(includeMoved = false): Promise<Placed[]> {
       combinedWith: pairs.get(s.id),
       combinedInto,
       started: log != null,
+      inProgress: s.status === "planned" && log?.endedAt === null,
     };
   });
 }
@@ -255,7 +265,7 @@ async function views(placed: Placed[]): Promise<SessionView[]> {
   return placed
     .filter((p) => !p.combinedInto)
     .map((p) => {
-      const { session, planned, combinedWith } = p;
+      const { session, planned, combinedWith, inProgress } = p;
       const other = combinedWith && sessions.find((s) => s.id === combinedWith);
       const candidates = available(p)
         ? placed.filter(
@@ -271,6 +281,7 @@ async function views(placed: Placed[]): Promise<SessionView[]> {
         session,
         planned,
         combinedWith,
+        inProgress,
         combineCandidate: candidate && {
           id: candidate.id,
           title: titleOf(candidate),

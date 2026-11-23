@@ -1,16 +1,25 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 import { Loading, Skeleton } from "../components/Skeleton";
 import { modalityStyles } from "../modality";
 import {
   formatLongDate,
+  liftDetail,
   readSession,
   type SessionView,
 } from "../plan/sessions";
 import { ClimbPlayer } from "../players/ClimbPlayer";
 import { LiftPlayer } from "../players/LiftPlayer";
+import {
+  isTimedHold,
+  markActive,
+  readLiftSession,
+  startLift,
+} from "../players/lift-log";
 import { RunPlayer } from "../players/RunPlayer";
-import { button, card } from "../ui";
+import { readSettings } from "../settings/settings";
+import { localDb, syncSoon } from "../sync";
+import { button, buttonBase, card } from "../ui";
 import { useLiveQuery } from "../use-live-query";
 import { CombineWorkouts } from "./CombineWorkouts";
 import { Screen } from "./Screen";
@@ -31,10 +40,74 @@ function BackButton() {
   );
 }
 
+function LiftOverview({ view }: { view: SessionView }) {
+  const query = useCallback(() => readLiftSession(localDb, view), [view]);
+  const data = useLiveQuery(query, undefined);
+  const settings = useLiveQuery(readSettings, null);
+  const [starting, setStarting] = useState(false);
+
+  async function start() {
+    if (!settings) return;
+    setStarting(true);
+    try {
+      await startLift(localDb, view, settings);
+      markActive(view.session.id);
+      syncSoon();
+    } finally {
+      setStarting(false);
+    }
+  }
+
+  return (
+    <section
+      aria-label="Workout overview"
+      className={`${card} flex flex-col gap-3`}
+    >
+      <h2 className="text-lg font-semibold">Workout overview</h2>
+      {!data ? (
+        <Loading label="Loading exercises">
+          <Skeleton className="h-12 w-full" />
+        </Loading>
+      ) : data.cards.length === 0 ? (
+        <p className="text-fg-muted">
+          Nothing is planned for this session yet.
+        </p>
+      ) : (
+        <ol className="flex flex-col gap-2">
+          {data.cards.map(({ itemId, exercise, targets, skipped }) => (
+            <li key={itemId} className="flex flex-col">
+              <span className="font-medium">
+                {exercise?.name ?? "Pick an exercise"}
+              </span>
+              <span className="text-fg-muted tabular-nums">
+                {skipped
+                  ? "Skipped"
+                  : liftDetail(targets, isTimedHold(exercise))}
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+      <button
+        type="button"
+        className={`${buttonBase} min-h-tap ${modalityStyles.lift.fill}`}
+        disabled={!data || !settings || starting}
+        onClick={() => void start()}
+      >
+        Start workout
+      </button>
+    </section>
+  );
+}
+
 function Player({ view }: { view: SessionView }) {
   switch (view.session.modality) {
     case "lift":
-      return <LiftPlayer view={view} />;
+      return view.session.status === "planned" && !view.inProgress ? (
+        <LiftOverview view={view} />
+      ) : (
+        <LiftPlayer view={view} />
+      );
     case "run":
       return <RunPlayer view={view} />;
     case "climb":
@@ -48,7 +121,7 @@ function Player({ view }: { view: SessionView }) {
   }
 }
 
-/** A planned session, opened from Today's Start button in its modality's player. */
+/** A planned session's preview or player. */
 export function Session() {
   const { id = "" } = useParams();
   const query = useCallback(() => readSession(id), [id]);

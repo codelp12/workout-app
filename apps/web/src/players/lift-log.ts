@@ -463,23 +463,18 @@ export function warmupCards(cards: readonly LiftCard[]): Set<string> {
   return result;
 }
 
-/**
- * Saves a set, starting the session's log with the first one. Each set goes
- * through the outbox on its own, so a killed app loses nothing (SPEC §3.1).
- * Warm-ups are numbered apart from working sets and kept out of their stats.
- */
-export async function logSet(
+/** Starts an offline workout without changing any existing log. */
+export async function startLift(
   db: LocalDb,
   view: SessionView,
-  card: LiftCard,
-  values: SetValues,
-  settings: PlayerSettings,
+  settings: Pick<Settings, "timezone">,
   now = Date.now(),
-  warmup = false,
-): Promise<void> {
+): Promise<string> {
   const id = sessionLogId(view.session.id);
-  const existing = await db.rows("session_log").get(id);
-  if (!existing || existing.deletedAt !== null) {
+  const logs = db.rows("session_log");
+  await db.transaction("rw", logs, db.outbox, async () => {
+    const existing = await logs.get(id);
+    if (existing?.deletedAt === null) return;
     await saveRow(
       db,
       "session_log",
@@ -500,9 +495,27 @@ export async function logSet(
       },
       now,
     );
-  }
+  });
+  return id;
+}
+
+/**
+ * Saves a set, starting the session's log if needed. Each set goes through
+ * the outbox on its own, so a killed app loses nothing (SPEC §3.1).
+ * Warm-ups are numbered apart from working sets and kept out of their stats.
+ */
+export async function logSet(
+  db: LocalDb,
+  view: SessionView,
+  card: LiftCard,
+  values: SetValues,
+  settings: PlayerSettings,
+  now = Date.now(),
+  warmup = false,
+): Promise<void> {
   const exerciseId = card.exercise?.id;
   if (!exerciseId) throw new Error("A set needs an exercise");
+  const id = await startLift(db, view, settings, now);
   await saveRow(
     db,
     "set_log",

@@ -2,6 +2,7 @@ import {
   combineOverrideId,
   MAX_PUSH_OPS,
   newId,
+  sessionLogId,
   type EntityName,
   type PullResponse,
   type PushResponse,
@@ -131,6 +132,50 @@ class Client {
 }
 
 describe("POST /api/sync/push", () => {
+  it("preserves a finished lift when a stale device pushes a start before pulling", async () => {
+    const plannedSessionId = newId();
+    const stale = {
+      id: sessionLogId(plannedSessionId),
+      createdAt: T0 + 2,
+      updatedAt: T0 + 2,
+      deletedAt: null,
+      plannedSessionId,
+      modality: "lift",
+      startedAt: T0 + 2,
+      endedAt: null,
+      localDate: "2026-10-31",
+      timezone: "UTC",
+      rpe: null,
+      notes: null,
+      checked: [],
+    } satisfies UpsertData<"session_log">;
+    const finished = {
+      ...stale,
+      createdAt: T0,
+      updatedAt: T0 + 1,
+      startedAt: T0,
+      endedAt: T0 + 1,
+      rpe: 8,
+      notes: "Finished",
+      checked: ["warm-up"],
+    };
+    const first = new Client();
+    const second = new Client();
+    first.queue(upsert("session_log", finished));
+    await first.push();
+    second.queue(upsert("session_log", stale));
+    await second.push();
+    await second.pull();
+    expect(second.rows.get(stale.id)).toMatchObject(finished);
+
+    second.queue(upsert("session_log", { ...stale, checked: ["wall-slides"] }));
+    await second.push();
+    await first.pull();
+    expect(first.rows.get(stale.id)).toMatchObject({
+      ...finished,
+      checked: ["warm-up", "wall-slides"],
+    });
+  });
   it("round-trips a combine override to another device", async () => {
     const first = new Client();
     const second = new Client();

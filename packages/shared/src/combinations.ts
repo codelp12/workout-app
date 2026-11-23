@@ -3,6 +3,7 @@ import {
   type PlanOverride,
   type PlannedSession,
   type SessionLog,
+  type SetLog,
 } from "./entities.js";
 
 /** Active pairs, keyed by the plan that owns the shared log. */
@@ -10,6 +11,7 @@ export function liftCombinations(
   overrides: readonly PlanOverride[],
   plans: readonly PlannedSession[],
   logs: readonly SessionLog[],
+  sets: readonly Pick<SetLog, "sessionLogId" | "deletedAt">[],
 ): Map<string, string> {
   const lifts = new Map(
     plans
@@ -22,7 +24,14 @@ export function liftCombinations(
       .map((p) => [p.id, p]),
   );
   const liveLogs = logs.filter((l) => l.deletedAt === null);
-  const logged = new Set(liveLogs.map((l) => l.plannedSessionId));
+  const withSets = new Set(
+    sets.filter((s) => s.deletedAt === null).map((s) => s.sessionLogId),
+  );
+  const logged = new Set(
+    liveLogs
+      .filter((l) => l.endedAt !== null || withSets.has(l.id))
+      .map((l) => l.plannedSessionId),
+  );
   const finished = new Set(
     liveLogs.filter((l) => l.endedAt !== null).map((l) => l.plannedSessionId),
   );

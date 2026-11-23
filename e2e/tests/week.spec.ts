@@ -93,6 +93,16 @@ test("same-slot lifts combine offline after confirmation and appear once in hist
     page.getByRole("heading", { name: "Legs A + Legs B", exact: true }),
   ).toBeVisible();
 
+  const preview = page.getByRole("region", { name: "Workout overview" });
+  await preview.getByRole("button", { name: "Start workout" }).click();
+  await expect(page.getByRole("region", { name: "Lift player" })).toBeVisible();
+  await page.getByRole("link", { name: "Week", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Legs A + Legs B, PM, In progress" })
+    .click();
+  await page.getByRole("button", { name: "Resume session" }).click();
+  await expect(preview).toHaveCount(0);
+
   const player = page.getByRole("region", { name: "Lift player" });
   await player.getByRole("radio", { name: "2" }).click();
   await player.getByRole("button", { name: "Log set" }).click();
