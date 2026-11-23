@@ -595,8 +595,10 @@ export async function openWorkout(
 export type PlayerPosition = {
   card: number;
   /** The set rows not yet logged, by planned item. */
-  drafts: Record<string, SetValues[]>;
+  drafts: Record<string, SetDraft[]>;
 };
+
+export type SetDraft = SetValues & { id: string };
 
 /**
  * The card's set rows not yet logged: the saved ones, or one prefilled row
@@ -606,17 +608,20 @@ export type PlayerPosition = {
 export function openRows(
   card: LiftCard,
   settings: PlayerSettings,
-  drafts: SetValues[] | undefined,
-): SetValues[] {
-  if (drafts) return drafts.map((d) => settle(card, settings, d));
-  return card.sets.length === 0 ? [prefill(card, settings)] : [];
+  drafts: SetDraft[] | undefined,
+): SetDraft[] {
+  if (drafts)
+    return drafts.map((d) => ({ ...settle(card, settings, d), id: d.id }));
+  return card.sets.length === 0
+    ? [{ ...prefill(card, settings), id: "draft-0" }]
+    : [];
 }
 
 /** Whether every set row on the card is logged, and there's at least one. */
 export const cardDone = (
   card: LiftCard,
   settings: PlayerSettings,
-  drafts: SetValues[] | undefined,
+  drafts: SetDraft[] | undefined,
 ) => card.sets.length > 0 && openRows(card, settings, drafts).length === 0;
 
 // Device-local, like the onboarding flag: it only has to survive a kill.
@@ -633,7 +638,9 @@ export function loadPosition(sessionId: string): PlayerPosition {
       const drafts = Object.fromEntries(
         Object.entries(saved.drafts).map(([id, d]) => [
           id,
-          (Array.isArray(d) ? d : [d]) as SetValues[],
+          ((Array.isArray(d) ? d : [d]) as (SetValues & { id?: string })[]).map(
+            (row, index) => ({ ...row, id: row.id ?? `draft-${index}` }),
+          ),
         ]),
       );
       return { card: saved.card, drafts };

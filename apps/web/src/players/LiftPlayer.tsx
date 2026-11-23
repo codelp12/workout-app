@@ -1,5 +1,5 @@
 import { toWeightUnit, type WeightImplement } from "@workout-app/engine";
-import type { Exercise, SetLog } from "@workout-app/shared";
+import { newId, type Exercise, type SetLog } from "@workout-app/shared";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Link } from "react-router";
 import { BottomSheet } from "../components/BottomSheet";
@@ -45,6 +45,7 @@ import {
   type LiftCard,
   type LiftSession,
   type PlayerPosition,
+  type SetDraft,
   type SetValues,
 } from "./lift-log";
 import { holdSeconds, latestRest } from "./rest";
@@ -433,10 +434,10 @@ function ExerciseCard({
   card: LiftCard;
   settings: SettingsData;
   /** The set rows not yet logged. */
-  rows: SetValues[];
+  rows: SetDraft[];
   /** Whether the card ramps up with warm-ups. */
   warmups: boolean;
-  onRows: (update: (rows: SetValues[]) => SetValues[]) => void;
+  onRows: (update: (rows: SetDraft[]) => SetDraft[]) => void;
   /** Missing on the last card. */
   onNext?: () => void;
   onSkipped: (skipped: boolean) => void;
@@ -578,14 +579,18 @@ function ExerciseCard({
         <>
           {rows.map((values, i) => (
             <SetRow
-              key={`${exercise?.id}:${sets.length + i}`}
+              key={`${exercise?.id}:${values.id}`}
               card={card}
               settings={settings}
               number={sets.length + i + 1}
               values={values}
               saving={saving}
               onValues={(next) =>
-                onRows((r) => r.map((v, j) => (j === i ? next : v)))
+                onRows((r) =>
+                  r.map((v) =>
+                    v.id === values.id ? { ...next, id: v.id } : v,
+                  ),
+                )
               }
               onLog={() => void log(i)}
               onRemove={
@@ -600,9 +605,13 @@ function ExerciseCard({
               type="button"
               className={`${button} min-h-tap`}
               disabled={saving}
-              onClick={() =>
-                onRows((r) => [...r, r.at(-1) ?? prefill(card, settings)])
-              }
+              onClick={() => {
+                const id = newId();
+                onRows((r) => [
+                  ...r,
+                  { ...(r.at(-1) ?? prefill(card, settings)), id },
+                ]);
+              }}
             >
               Add set
             </button>

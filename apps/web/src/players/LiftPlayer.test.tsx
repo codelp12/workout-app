@@ -501,7 +501,9 @@ describe("LiftPlayer", () => {
       savePosition(legs.id, {
         card: 0,
         drafts: {
-          [items[0]!.id]: [{ load: 45, band: null, reps: 8, rir: null }],
+          [items[0]!.id]: [
+            { id: "draft-0", load: 45, band: null, reps: 8, rir: null },
+          ],
         },
       });
       renderPlayer();
@@ -951,6 +953,38 @@ describe("discarding", () => {
 });
 
 describe("timed holds", () => {
+  it("keeps a running hold attached to the remaining row after an earlier row is removed", async () => {
+    await localDb.rows("exercise").put({ ...plank, sourceId: "Plank" });
+    const user = userEvent.setup();
+    renderPlayer();
+    await user.click(
+      within(
+        await screen.findByRole("navigation", { name: "Exercises" }),
+      ).getByRole("button", { name: /^Next$/ }),
+    );
+    const card = within(await screen.findByRole("article", { name: "Plank" }));
+    await user.click(card.getByRole("button", { name: "Add set" }));
+    const second = within(card.getByRole("region", { name: "Set 2" }));
+    const start = Date.now();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(start);
+    try {
+      await user.click(second.getByRole("button", { name: "Start hold" }));
+      await user.click(card.getByRole("button", { name: "Remove set 1" }));
+      const first = within(card.getByRole("region", { name: "Set 1" }));
+      clock.mockReturnValue(start + 12_000);
+      fireEvent(document, new Event("visibilitychange"));
+      expect(first.getByRole("timer").textContent).toBe("0:12");
+      await user.click(first.getByRole("button", { name: "Stop hold" }));
+      expect(
+        first
+          .getByRole("spinbutton", { name: "Seconds" })
+          .getAttribute("aria-valuenow"),
+      ).toBe("12");
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
   it("uses the full elapsed seconds after the app returns to the foreground", async () => {
     await localDb.rows("exercise").put({ ...plank, sourceId: "Plank" });
     const user = userEvent.setup();
