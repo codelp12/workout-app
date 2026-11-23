@@ -12,7 +12,11 @@ import { implementOf, topSet, type LiftExercise } from "../stubs/lift.js";
 import type { EngineContext, Reason } from "../types.js";
 import { formatAmount, toWeightUnit } from "../units.js";
 import { modelOf, type SlotScheme } from "./progression.js";
-import type { ExerciseState, LiftEngineState } from "./state.js";
+import {
+  judgeExposure,
+  type ExerciseState,
+  type LiftEngineState,
+} from "./state.js";
 
 type Lift = EngineConfig["lift"];
 
@@ -62,8 +66,9 @@ const MET = new Set(["top", "beat", "done"]);
  * A slot's scheme for its week of the block (§5.1 Block structure). Deload
  * weeks halve the sets (rounded up) at 3+ RIR. Loading weeks step main lifts'
  * (`e1rm_rir`) RIR down the block, and `ramp` slots gain a set in weeks 2
- * and 3 when the exercise's last exposure this block logged every prescribed
- * set and met its targets; otherwise they keep the sets already earned.
+ * and 3 when the exercise's last ramp-slot exposure this block logged every
+ * prescribed set and met its targets; otherwise they keep the sets already
+ * earned.
  */
 export function weekScheme(
   slot: Pick<TemplateSlot, "sets" | "repMin" | "repMax" | "targetRir" | "ramp">,
@@ -120,20 +125,25 @@ export function weekScheme(
 
   let rampSets = 0;
   let rampGained = false;
-  const last = state?.exposures.at(-1);
+  const last = state?.exposures.findLast(
+    (e) => e.source === "log" && e.target?.rampSets !== undefined,
+  );
   if (
     slot.ramp &&
     position.index > 0 &&
-    last?.source === "log" &&
-    last.target &&
+    last?.target &&
     last.date >= position.startDate
   ) {
+    const outcome =
+      last === state?.exposures.at(-1)
+        ? state.lastOutcome
+        : judgeExposure(last.sets, last.target, 0, ctx.config.lift);
     const earned = Math.min(last.target.rampSets ?? 0, config.rampWeeks);
     rampGained =
       position.index <= config.rampWeeks &&
       earned < position.index &&
       last.sets.length >= last.target.sets &&
-      MET.has(state?.lastOutcome ?? "");
+      MET.has(outcome ?? "");
     rampSets = earned + (rampGained ? 1 : 0);
   }
   return { ...base, targetRir, rampSets, rampGained, reasons };

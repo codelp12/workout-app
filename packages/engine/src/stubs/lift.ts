@@ -54,7 +54,7 @@ export type LiftItem = {
   restSec: number;
   /** Whether the first exercise of a movement pattern ramps up with warm-ups. */
   ramp?: boolean;
-  /** Sets the block's ramp has added over the template this week. */
+  /** Ramp slots only: sets the block's ramp has added over the template this week. */
   rampSets?: number;
   reasons: Reason[];
 };

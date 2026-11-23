@@ -48,6 +48,7 @@ const target = (fields: Partial<LiftTarget> = {}): LiftTarget => ({
   repMin: 8,
   repMax: 12,
   targetRir: 2,
+  rampSets: 0,
   ...fields,
 });
 
@@ -167,6 +168,15 @@ describe("weekScheme", () => {
     expect(
       scheme(fold({ ...lowered, sets: lowered.sets.slice(0, 2) }), 1).rampSets,
     ).toBe(0);
+
+    const thenAccessory = fold(
+      log("2026-11-09", 12, { sets: 4, rampSets: 1 }),
+      log("2026-11-12", 5, { rampSets: undefined }),
+    );
+    expect(scheme(thenAccessory, 2)).toMatchObject({
+      rampSets: 2,
+      rampGained: true,
+    });
 
     const week3 = fold(log("2026-11-16", 12, { sets: 5, rampSets: 2 }));
     expect(scheme(week3, 3)).toMatchObject({ rampSets: 2, rampGained: false });

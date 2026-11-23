@@ -327,6 +327,7 @@ describe("block calendar", () => {
         repMin: 8,
         repMax: 12,
         targetRir: 2,
+        rampSets: 0,
       },
     },
   });
@@ -384,7 +385,7 @@ describe("block calendar", () => {
 
   it("adds a ramp set after met targets, within the hard-set cap", () => {
     const met = weekAt(1, { logs: logs(lifted(MONDAY, "push_a", 12)) });
-    expect(item(met, "push_a").targets.sets).toBe(4);
+    expect(item(met, "push_a").targets).toMatchObject({ sets: 4, rampSets: 1 });
     expect(item(met, "push_a").reasons).toContain(
       "Met last week's targets, so 4 sets this week.",
     );

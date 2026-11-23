@@ -261,7 +261,9 @@ function liftTargetOf(targets: Record<string, unknown>): LiftTarget | null {
         ? { value: load.value, unit: load.unit }
         : null,
     band: typeof targets.band === "string" ? targets.band : null,
-    rampSets: num(targets.rampSets) ?? 0,
+    ...(typeof targets.rampSets === "number"
+      ? { rampSets: targets.rampSets }
+      : {}),
   };
 }
 
@@ -573,7 +575,11 @@ export function planWeek(input: WeekPlanInput): WeekPlan {
           targets.push({
             kind: "exercise",
             exerciseId,
-            targets: { ...rest, load, rampSets: planned[i]?.rampSets ?? 0 },
+            targets: {
+              ...rest,
+              load,
+              ...(rest.ramp ? { rampSets: planned[i]?.rampSets ?? 0 } : {}),
+            },
             reasons: [...reasons, ...extra],
           });
         });
