@@ -604,7 +604,7 @@ export function openRows(
   settings: PlayerSettings,
   drafts: SetDraft[] | undefined,
 ): SetDraft[] {
-  if (drafts)
+  if (drafts?.length)
     return drafts.map((d) => ({
       ...settle(card, settings, d),
       untouchedExtra: d.untouchedExtra,

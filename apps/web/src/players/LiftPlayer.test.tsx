@@ -871,6 +871,27 @@ describe("swap, skip, add set and warm-ups", () => {
     expect(await sessionSets()).toHaveLength(1);
   });
 
+  it("keeps an editable first set after leaving an exercise with only an untouched extra", async () => {
+    const user = userEvent.setup();
+    renderPlayer();
+    const card = within(
+      await screen.findByRole("article", { name: "Dumbbell Squat" }),
+    );
+    await user.click(card.getByRole("button", { name: "Add set" }));
+    await user.click(card.getByRole("button", { name: "Remove set 1" }));
+    const nav = within(screen.getByRole("navigation", { name: "Exercises" }));
+    await user.click(nav.getByRole("button", { name: /^Next$/ }));
+    await screen.findByRole("article", { name: "Plank" });
+    await user.click(nav.getByRole("button", { name: "Previous" }));
+    const returned = within(
+      await screen.findByRole("article", { name: "Dumbbell Squat" }),
+    );
+    await user.click(returned.getByRole("radio", { name: "2" }));
+    await user.click(returned.getByRole("button", { name: "Log set" }));
+    await logged(screen.getByRole("article", { name: "Dumbbell Squat" }));
+    expect(await sessionSets()).toHaveLength(1);
+  });
+
   it("collapses the warm-ups and logs them flagged, outside the working sets", async () => {
     const user = userEvent.setup();
     // An earlier warm-up stays out of "Last time".

@@ -767,7 +767,9 @@ export function LiftPlayer({ view }: { view: SessionView }) {
             ...p,
             drafts: {
               ...p.drafts,
-              [current.itemId]: update(p.drafts[current.itemId] ?? rows),
+              [current.itemId]: update(
+                openRows(current, settings, p.drafts[current.itemId]),
+              ),
             },
           }))
         }
