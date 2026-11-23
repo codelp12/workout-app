@@ -1,5 +1,6 @@
 import type {
   Exercise,
+  Equipment,
   Onboarding,
   SessionLog,
   SetLog,
@@ -97,21 +98,67 @@ export const equipmentRank = (exercise: Pick<LiftExercise, "equipment">) => {
   return Number.isFinite(best) ? best : PREFERENCE.length;
 };
 
+/** Lower is preferred: owned dumbbell, band, bodyweight, then other equipment. */
+function ownedRank(
+  exercise: Pick<LiftExercise, "equipment">,
+  equipment: Equipment,
+) {
+  const rank = exercise.equipment.reduce(
+    (best, kind) =>
+      (kind === "dumbbell" && equipment.dumbbells !== null) ||
+      (kind === "band" && equipment.bands.length > 0) ||
+      kind === "bodyweight"
+        ? Math.min(best, PREFERENCE.indexOf(kind))
+        : best,
+    PREFERENCE.length,
+  );
+  return rank;
+}
+
 /** The exercise a slot resolves to: its own, or its group's most equipment-friendly. */
 export function resolveSlot(
   slot: TemplateSlot,
   exercises: readonly LiftExercise[],
+  equipment: Equipment,
 ): LiftExercise | null {
   if (slot.exerciseId !== null) {
-    return exercises.find((e) => e.id === slot.exerciseId) ?? null;
+    const exercise = exercises.find((e) => e.id === slot.exerciseId);
+    if (
+      !exercise ||
+      slot.pinned ||
+      exercise.substitutionGroup === null ||
+      !exercise.equipment.some((kind) =>
+        ["barbell", "cable", "machine"].includes(kind),
+      )
+    ) {
+      return exercise ?? null;
+    }
+    const candidates = exercises
+      .filter(
+        (candidate) =>
+          candidate.substitutionGroup === exercise.substitutionGroup &&
+          candidate.id !== exercise.id &&
+          !candidate.equipment.some((kind) =>
+            ["barbell", "cable", "machine"].includes(kind),
+          ) &&
+          ownedRank(candidate, equipment) <= 1,
+      )
+      .sort(
+        (a, b) =>
+          ownedRank(a, equipment) - ownedRank(b, equipment) ||
+          a.name.localeCompare(b.name),
+      );
+    return candidates[0] ?? exercise;
   }
   const group = exercises.filter(
     (e) => e.substitutionGroup === slot.substitutionGroup,
   );
-  return group.reduce<LiftExercise | null>(
-    (best, e) =>
-      best === null || equipmentRank(e) < equipmentRank(best) ? e : best,
-    null,
+  return (
+    group.sort(
+      (a, b) =>
+        ownedRank(a, equipment) - ownedRank(b, equipment) ||
+        a.name.localeCompare(b.name),
+    )[0] ?? null
   );
 }
 
@@ -180,7 +227,7 @@ function prescribeSlot(
   exercises: readonly LiftExercise[],
   ctx: EngineContext,
 ): LiftItem {
-  const exercise = resolveSlot(slot, exercises);
+  const exercise = resolveSlot(slot, exercises, ctx.equipment);
   const reasons: Reason[] = [];
   const item: LiftItem = {
     exerciseId: exercise?.id ?? null,
@@ -205,6 +252,15 @@ function prescribeSlot(
     reasons.push({
       code: "substituted",
       text: `${exercise.name} fills the ${slot.substitutionGroup ?? ""} slot with your equipment.`,
+    });
+  } else if (exercise.id !== slot.exerciseId) {
+    const original = exercises.find((e) => e.id === slot.exerciseId)!;
+    const kind = exercise.equipment.includes("dumbbell")
+      ? "dumbbells"
+      : "bands";
+    reasons.push({
+      code: "substituted",
+      text: `${exercise.name} replaces ${original.name} so you can use your ${kind}. Turn on "Keep this exercise" in the template to keep ${original.name}.`,
     });
   }
   const exposure = state.exposures[exercise.id];

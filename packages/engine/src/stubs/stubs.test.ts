@@ -53,6 +53,12 @@ const exercises: LiftExercise[] = [
     equipment: ["bodyweight"],
     substitutionGroup: "horizontal_push_chest",
   },
+  {
+    id: "00000000-0000-4000-8000-000000000003",
+    name: "Band squat",
+    equipment: ["band"],
+    substitutionGroup: "squat_quads",
+  },
 ];
 
 const slot = (over: Partial<TemplateSlot>): TemplateSlot => ({
@@ -182,6 +188,108 @@ describe("lift stub", () => {
     ]);
     expect(missing?.exerciseId).toBeNull();
     expect(codes(missing?.reasons ?? [])).toEqual(["no_exercise"]);
+  });
+
+  it("swaps an unpinned explicit barbell exercise to an owned dumbbell", () => {
+    const intent: LiftIntent = {
+      ...pushA,
+      slots: [slot({ exerciseId: exercises[5]?.id ?? null })],
+    };
+    const [item] = liftStub.prescribe(
+      liftStub.initState(null),
+      intent,
+      ctx,
+    ).items;
+    expect(item?.exerciseId).toBe(squat);
+    expect(item?.reasons[0]).toEqual({
+      code: "substituted",
+      text: 'Dumbbell squat replaces Barbell squat so you can use your dumbbells. Turn on "Keep this exercise" in the template to keep Barbell squat.',
+    });
+  });
+
+  it("keeps a pinned explicit barbell exercise", () => {
+    const intent: LiftIntent = {
+      ...pushA,
+      slots: [slot({ exerciseId: exercises[5]?.id ?? null, pinned: true })],
+    };
+    const [item] = liftStub.prescribe(
+      liftStub.initState(null),
+      intent,
+      ctx,
+    ).items;
+    expect(item?.exerciseId).toBe(exercises[5]?.id);
+    expect(codes(item?.reasons ?? [])).not.toContain("substituted");
+  });
+
+  it("keeps an explicit barbell exercise without owned dumbbells or bands", () => {
+    const intent: LiftIntent = {
+      ...pushA,
+      slots: [slot({ exerciseId: exercises[5]?.id ?? null })],
+    };
+    const [item] = liftStub.prescribe(liftStub.initState(null), intent, {
+      ...ctx,
+      equipment: { ...DEFAULT_EQUIPMENT, dumbbells: null, bands: [] },
+    }).items;
+    expect(item?.exerciseId).toBe(exercises[5]?.id);
+  });
+
+  it("swaps to a band exercise when dumbbells are unavailable", () => {
+    const intent: LiftIntent = {
+      ...pushA,
+      slots: [slot({ exerciseId: exercises[5]?.id ?? null })],
+    };
+    const [item] = liftStub.prescribe(liftStub.initState(null), intent, {
+      ...ctx,
+      equipment: { ...DEFAULT_EQUIPMENT, dumbbells: null },
+    }).items;
+    expect(item?.exerciseId).toBe(exercises[7]?.id);
+  });
+
+  it("never swaps an explicit dumbbell exercise", () => {
+    const intent: LiftIntent = {
+      ...pushA,
+      slots: [slot({ exerciseId: squat! })],
+    };
+    const [item] = liftStub.prescribe(
+      liftStub.initState(null),
+      intent,
+      ctx,
+    ).items;
+    expect(item?.exerciseId).toBe(squat);
+    expect(codes(item?.reasons ?? [])).not.toContain("substituted");
+  });
+
+  it("chooses bodyweight over dumbbells in a group when dumbbells are unavailable", () => {
+    const intent: LiftIntent = {
+      ...pushA,
+      slots: [slot({ substitutionGroup: "horizontal_push_chest" })],
+    };
+    const [item] = liftStub.prescribe(liftStub.initState(null), intent, {
+      ...ctx,
+      equipment: { ...DEFAULT_EQUIPMENT, dumbbells: null },
+    }).items;
+    expect(item?.exerciseId).toBe("00000000-0000-4000-8000-000000000002");
+  });
+
+  it("breaks equipment-rank ties by exercise name", () => {
+    const tied: LiftIntent = {
+      ...pushA,
+      exercises: [
+        ...exercises,
+        {
+          id: "00000000-0000-4000-8000-000000000004",
+          name: "A band squat",
+          equipment: ["band"],
+          substitutionGroup: "squat_quads",
+        },
+      ],
+      slots: [slot({ substitutionGroup: "squat_quads" })],
+    };
+    const [item] = liftStub.prescribe(liftStub.initState(null), tied, {
+      ...ctx,
+      equipment: { ...DEFAULT_EQUIPMENT, dumbbells: null },
+    }).items;
+    expect(item?.exerciseId).toBe("00000000-0000-4000-8000-000000000004");
   });
 });
 

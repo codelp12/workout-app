@@ -25,8 +25,18 @@ beforeAll(() => {
     });
 });
 
-const bench = testExercise({ name: "Dumbbell Bench Press" });
-const press = testExercise({ name: "Seated Dumbbell Press" });
+const bench = testExercise({
+  name: "Dumbbell Bench Press",
+  equipment: ["dumbbell"],
+});
+const press = testExercise({
+  name: "Seated Dumbbell Press",
+  equipment: ["dumbbell"],
+});
+const barbellSquat = testExercise({
+  name: "Barbell Squat",
+  equipment: ["barbell"],
+});
 const curl = testExercise({ name: "Hammer Curls", repMin: 8, repMax: 12 });
 const stretch = testExercise({ name: "Hammer Stretch", modality: "mobility" });
 
@@ -61,7 +71,9 @@ beforeEach(async () => {
       (t) => t.clear(),
     ),
   );
-  await localDb.rows("exercise").bulkPut([bench, press, curl, stretch]);
+  await localDb
+    .rows("exercise")
+    .bulkPut([bench, press, barbellSquat, curl, stretch]);
   await localDb.rows("template").put(pushA);
 });
 afterEach(cleanup);
@@ -190,6 +202,44 @@ describe("template editor", () => {
     await user.type(max, "4{Enter}");
     await waitFor(async () =>
       expect((await saved())?.slots[0]).toMatchObject({ repMin: 4, repMax: 4 }),
+    );
+  });
+
+  it("pins and unpins a barbell exercise but not dumbbell exercises", async () => {
+    await localDb.rows("template").put({
+      ...pushA,
+      slots: [slot(barbellSquat.id, false), slot(bench.id, false)],
+    });
+    const user = userEvent.setup();
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={[`/settings/templates/${pushA.id}`]}>
+          <Navigation />
+        </MemoryRouter>
+      </ToastProvider>,
+    );
+    const barbellCard = await screen.findByRole("region", {
+      name: /Barbell Squat/,
+    });
+    const keep = within(barbellCard).getByRole("button", {
+      name: "Keep this exercise",
+    });
+    expect(keep.getAttribute("aria-pressed")).toBe("false");
+    expect(
+      within(
+        screen.getByRole("region", { name: /Dumbbell Bench Press/ }),
+      ).queryByRole("button", { name: "Keep this exercise" }),
+    ).toBeNull();
+
+    await user.click(keep);
+    await waitFor(async () =>
+      expect((await saved())?.slots[0]?.pinned).toBe(true),
+    );
+    await user.click(
+      within(barbellCard).getByRole("button", { name: "Keep this exercise" }),
+    );
+    await waitFor(async () =>
+      expect((await saved())?.slots[0]?.pinned).toBe(false),
     );
   });
 

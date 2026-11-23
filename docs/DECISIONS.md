@@ -486,3 +486,10 @@ Options considered:
   - Layoff cuts use the midpoints of the spec's ranges: 7.5% for the first session after 7–13 days off, 17.5% for every lift session within 7 days of the first one after 14+ days off. Days off are counted from the last lift session's date to the planned session's date.
   - After 14+ days off, a weaker first session replaces the e1RM instead of being smoothed ("e1RM recalibrated"); later sessions smooth as usual.
   - Deload and layoff loads round to the nearest loadable weight but always at least one step lighter when the equipment allows.
+
+## Equipment-first substitution (#147)
+
+- **A template slot can be pinned with "Keep this exercise"** (`pinned` on the slot, absent means off). The toggle only shows for barbell, cable and machine exercises, the only ones the planner swaps. It's per slot, not per exercise, so the same lift can be kept on one day and swapped on another. (§5.1; owner approved on #147)
+- **An unpinned barbell, cable or machine exercise is planned as the first dumbbell or band exercise in its substitution group that the inventory covers**, by `ownedRank` then name; "closest" means same substitution group. With no such variant it stays. Its reason says what it replaced and how to keep it. (§5.1)
+- **"Owned" means the inventory has dumbbells or at least one band; bodyweight always counts.** Group-only slots use the same order, so without dumbbells they pick a band or bodyweight exercise first. The player's swap list keeps plain `equipmentRank`. (§5.1)
+- **The warm-up ramp needed no change**: #54's player already rounds 40/60/80% to loadable weights and skips later cards sharing a movement pattern. (§5.1)

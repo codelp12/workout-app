@@ -119,6 +119,52 @@ describe("planWeek", () => {
     expect(plan.items.every((i) => ids.has(i.plannedSessionId))).toBe(true);
   });
 
+  it("plans an equipment-first substitute named in the template slot", () => {
+    const barbellId = weekId("barbell-squat");
+    const dumbbellId = weekId("dumbbell-squat");
+    const pushA = templates.find((template) => template.name === "Push A")!;
+    const next = planWeek(
+      input({
+        templates: templates.map((template) =>
+          template === pushA
+            ? {
+                ...template,
+                slots: [
+                  { ...template.slots[0]!, exerciseId: barbellId },
+                  ...template.slots.slice(1),
+                ],
+              }
+            : template,
+        ),
+        exercises: [
+          ...exercises,
+          {
+            id: barbellId,
+            name: "Barbell squat",
+            equipment: ["barbell"],
+            substitutionGroup: "squat_quads",
+            progressionModel: "e1rm_rir",
+            primaryMuscles: [],
+          },
+          {
+            id: dumbbellId,
+            name: "Dumbbell squat",
+            equipment: ["dumbbell"],
+            substitutionGroup: "squat_quads",
+            progressionModel: "e1rm_rir",
+            primaryMuscles: [],
+          },
+        ],
+      }),
+    );
+    const item = next.items.find(
+      (planned) => planned.exerciseId === dumbbellId,
+    );
+    expect(item?.reasons).toContain(
+      'Dumbbell squat replaces Barbell squat so you can use your dumbbells. Turn on "Keep this exercise" in the template to keep Barbell squat.',
+    );
+  });
+
   it("is deterministic, including its ids", () => {
     expect(planWeek(input())).toEqual(plan);
   });
