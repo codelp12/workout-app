@@ -116,7 +116,19 @@ function SwapSheet({
 }) {
   const [open, setOpen] = useState(false);
   async function swap(exerciseId: string) {
-    await swapExercise(localDb, card.item, view.session, exerciseId);
+    if (exerciseId !== card.exercise?.id) {
+      await localDb.transaction(
+        "rw",
+        localDb.rows("plan_override"),
+        localDb.outbox,
+        () =>
+          Promise.all(
+            [card.item, ...(card.duplicateItems ?? [])].map((item) =>
+              swapExercise(localDb, item, view.session, exerciseId),
+            ),
+          ),
+      );
+    }
     syncSoon();
     setOpen(false);
     onSwapped();
@@ -464,7 +476,17 @@ function ExerciseCard({
   }
 
   async function skip(next: boolean) {
-    await skipItem(localDb, card.item, view.session, next);
+    await localDb.transaction(
+      "rw",
+      localDb.rows("plan_override"),
+      localDb.outbox,
+      () =>
+        Promise.all(
+          [card.item, ...(card.duplicateItems ?? [])].map((item) =>
+            skipItem(localDb, item, view.session, next),
+          ),
+        ),
+    );
     syncSoon();
     onSkipped(next);
   }

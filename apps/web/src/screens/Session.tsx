@@ -12,6 +12,7 @@ import { LiftPlayer } from "../players/LiftPlayer";
 import { RunPlayer } from "../players/RunPlayer";
 import { button, card } from "../ui";
 import { useLiveQuery } from "../use-live-query";
+import { CombineWorkouts } from "./CombineWorkouts";
 import { Screen } from "./Screen";
 
 function BackButton() {
@@ -83,7 +84,10 @@ export function Session() {
           {formatLongDate(session.date)}, {session.slot.toUpperCase()}
         </span>
       </p>
-      <Player view={view} />
+      {view.combineCandidate && (
+        <CombineWorkouts view={view} other={view.combineCandidate} />
+      )}
+      <Player key={session.id} view={view} />
     </Screen>
   );
 }

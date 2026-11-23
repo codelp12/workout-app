@@ -1,4 +1,5 @@
 import {
+  liftCombinations,
   type Ascent,
   type ClimbDiscipline,
   type RunLog,
@@ -131,12 +132,22 @@ async function titles(
   logs: SessionLog[],
   runs: RunLog[],
 ): Promise<Map<string, string>> {
-  const planned = await db
-    .rows("planned_session")
-    .bulkGet(
-      logs.flatMap((l) => (l.plannedSessionId ? [l.plannedSessionId] : [])),
-    );
-  const sessions = new Map(planned.flatMap((s) => (s ? [[s.id, s]] : [])));
+  const [planned, overrides, allLogs] = await Promise.all([
+    db.rows("planned_session").toArray(),
+    db.rows("plan_override").toArray(),
+    db.rows("session_log").toArray(),
+  ]);
+  const combinations = liftCombinations(overrides, planned, allLogs);
+  const planIds = new Set(
+    logs.flatMap((l) => {
+      if (!l.plannedSessionId) return [];
+      const other = combinations.get(l.plannedSessionId);
+      return other ? [l.plannedSessionId, other] : [l.plannedSessionId];
+    }),
+  );
+  const sessions = new Map(
+    planned.filter((s) => planIds.has(s.id)).map((s) => [s.id, s]),
+  );
   const templates = await db
     .rows("template")
     .bulkGet(
@@ -166,7 +177,15 @@ async function titles(
                   null,
               )
             : `${modalityStyles[log.modality].label} session`;
-      return [log.id, title];
+      const otherId =
+        log.plannedSessionId && combinations.get(log.plannedSessionId);
+      const other = otherId && sessions.get(otherId);
+      return [
+        log.id,
+        other
+          ? `${title} + ${sessionTitle(other, (other.templateId && templateNames.get(other.templateId)) || null)}`
+          : title,
+      ];
     }),
   );
 }
