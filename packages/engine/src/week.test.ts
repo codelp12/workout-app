@@ -165,6 +165,58 @@ describe("planWeek", () => {
     );
   });
 
+  it("keeps a barbell slot when its dumbbell substitute is already in the workout", () => {
+    const barbellId = weekId("barbell-squat");
+    const dumbbellId = weekId("dumbbell-squat");
+    const pushA = templates.find((template) => template.name === "Push A")!;
+    const next = planWeek(
+      input({
+        templates: templates.map((template) =>
+          template === pushA
+            ? {
+                ...template,
+                slots: [
+                  { ...template.slots[0]!, exerciseId: dumbbellId },
+                  { ...template.slots[0]!, exerciseId: barbellId },
+                  ...template.slots.slice(1),
+                ],
+              }
+            : template,
+        ),
+        exercises: [
+          ...exercises,
+          {
+            id: barbellId,
+            name: "Barbell squat",
+            equipment: ["barbell"],
+            substitutionGroup: "squat_quads",
+            progressionModel: "e1rm_rir",
+            primaryMuscles: [],
+          },
+          {
+            id: dumbbellId,
+            name: "Dumbbell squat",
+            equipment: ["dumbbell"],
+            substitutionGroup: "squat_quads",
+            progressionModel: "e1rm_rir",
+            primaryMuscles: [],
+          },
+        ],
+      }),
+    );
+    const dumbbellItem = next.items.find(
+      (planned) => planned.exerciseId === dumbbellId,
+    );
+    const barbellItem = next.items.find(
+      (planned) => planned.exerciseId === barbellId,
+    );
+    expect(dumbbellItem).toBeDefined();
+    expect(barbellItem?.exerciseId).not.toBe(dumbbellItem?.exerciseId);
+    expect(
+      barbellItem?.reasons.some((reason) => reason.includes("replaces")),
+    ).toBe(false);
+  });
+
   it("is deterministic, including its ids", () => {
     expect(planWeek(input())).toEqual(plan);
   });

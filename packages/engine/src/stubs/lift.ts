@@ -139,53 +139,99 @@ function ownedRank(
   return rank;
 }
 
-/** The exercise a slot resolves to: its own, or its group's most equipment-friendly. */
-export function resolveSlot(
+function keepsOwnExercise(slot: TemplateSlot, exercise: LiftExercise) {
+  return (
+    slot.pinned ||
+    exercise.substitutionGroup === null ||
+    !exercise.equipment.some((kind) =>
+      ["barbell", "cable", "machine"].includes(kind),
+    )
+  );
+}
+
+function explicitCandidates(
+  exercise: LiftExercise,
+  exercises: readonly LiftExercise[],
+  equipment: Equipment,
+) {
+  return exercises
+    .filter(
+      (candidate) =>
+        candidate.substitutionGroup === exercise.substitutionGroup &&
+        candidate.id !== exercise.id &&
+        !candidate.equipment.some((kind) =>
+          ["barbell", "cable", "machine"].includes(kind),
+        ) &&
+        ownedRank(candidate, equipment) <= 1,
+    )
+    .sort(
+      (a, b) =>
+        ownedRank(a, equipment) - ownedRank(b, equipment) ||
+        nameSimilarity(b.name, exercise.name) -
+          nameSimilarity(a.name, exercise.name) ||
+        a.name.localeCompare(b.name),
+    );
+}
+
+function groupCandidates(
   slot: TemplateSlot,
   exercises: readonly LiftExercise[],
   equipment: Equipment,
-): LiftExercise | null {
-  if (slot.exerciseId !== null) {
-    const exercise = exercises.find((e) => e.id === slot.exerciseId);
-    if (
-      !exercise ||
-      slot.pinned ||
-      exercise.substitutionGroup === null ||
-      !exercise.equipment.some((kind) =>
-        ["barbell", "cable", "machine"].includes(kind),
-      )
-    ) {
-      return exercise ?? null;
-    }
-    const candidates = exercises
-      .filter(
-        (candidate) =>
-          candidate.substitutionGroup === exercise.substitutionGroup &&
-          candidate.id !== exercise.id &&
-          !candidate.equipment.some((kind) =>
-            ["barbell", "cable", "machine"].includes(kind),
-          ) &&
-          ownedRank(candidate, equipment) <= 1,
-      )
-      .sort(
-        (a, b) =>
-          ownedRank(a, equipment) - ownedRank(b, equipment) ||
-          nameSimilarity(b.name, exercise.name) -
-            nameSimilarity(a.name, exercise.name) ||
-          a.name.localeCompare(b.name),
-      );
-    return candidates[0] ?? exercise;
-  }
-  const group = exercises.filter(
-    (e) => e.substitutionGroup === slot.substitutionGroup,
-  );
-  return (
-    group.sort(
+) {
+  return exercises
+    .filter((e) => e.substitutionGroup === slot.substitutionGroup)
+    .sort(
       (a, b) =>
         ownedRank(a, equipment) - ownedRank(b, equipment) ||
         a.name.localeCompare(b.name),
-    )[0] ?? null
+    );
+}
+
+/** Resolves all slots together so substitutions don't duplicate exercises. */
+export function resolveSlots(
+  slots: readonly TemplateSlot[],
+  exercises: readonly LiftExercise[],
+  equipment: Equipment,
+): (LiftExercise | null)[] {
+  const byId = new Map(exercises.map((exercise) => [exercise.id, exercise]));
+  const originals = slots.map((slot) =>
+    slot.exerciseId === null ? null : (byId.get(slot.exerciseId) ?? null),
   );
+  const swappable = slots.map((slot, index) => {
+    const exercise = originals[index];
+    return (
+      exercise !== null &&
+      exercise !== undefined &&
+      !keepsOwnExercise(slot, exercise)
+    );
+  });
+  const used = new Set<string>();
+  slots.forEach((slot, index) => {
+    const exercise = originals[index];
+    if (slot.exerciseId !== null && exercise && !swappable[index]) {
+      used.add(exercise.id);
+    }
+  });
+  return slots.map((slot, index) => {
+    const exercise = originals[index];
+    if (slot.exerciseId !== null) {
+      if (!exercise) return null;
+      const resolved = swappable[index]
+        ? (explicitCandidates(exercise, exercises, equipment).find(
+            (candidate) => !used.has(candidate.id),
+          ) ?? exercise)
+        : exercise;
+      used.add(resolved.id);
+      return resolved;
+    }
+    const candidates = groupCandidates(slot, exercises, equipment);
+    const resolved =
+      candidates.find((candidate) => !used.has(candidate.id)) ??
+      candidates[0] ??
+      null;
+    if (resolved) used.add(resolved.id);
+    return resolved;
+  });
 }
 
 /** How an exercise is loaded by weight, or null for bands and bodyweight. */
@@ -250,10 +296,10 @@ function prefillLoad(
 function prescribeSlot(
   state: LiftState,
   slot: TemplateSlot,
+  exercise: LiftExercise | null,
   exercises: readonly LiftExercise[],
   ctx: EngineContext,
 ): LiftItem {
-  const exercise = resolveSlot(slot, exercises, ctx.equipment);
   const reasons: Reason[] = [];
   const item: LiftItem = {
     exerciseId: exercise?.id ?? null,
@@ -370,17 +416,30 @@ export const liftStub: ModalityEngine<
   modality: "lift",
   version: "stub-1",
   initState,
-  prescribe: (state, intent, ctx) => ({
-    items: intent.slots.map((slot) =>
-      prescribeSlot(state, slot, intent.exercises, ctx),
-    ),
-    reasons: [
-      {
-        code: "static_template",
-        text: `${intent.name} as written; progression arrives with the lifting engine.`,
-      },
-    ],
-  }),
+  prescribe: (state, intent, ctx) => {
+    const resolved = resolveSlots(
+      intent.slots,
+      intent.exercises,
+      ctx.equipment,
+    );
+    return {
+      items: intent.slots.map((slot, index) =>
+        prescribeSlot(
+          state,
+          slot,
+          resolved[index] ?? null,
+          intent.exercises,
+          ctx,
+        ),
+      ),
+      reasons: [
+        {
+          code: "static_template",
+          text: `${intent.name} as written; progression arrives with the lifting engine.`,
+        },
+      ],
+    };
+  },
   update,
   reviewWeek: (_state, logs) => ({
     reasons: [
