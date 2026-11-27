@@ -15,6 +15,7 @@ import {
   equipmentRank,
   implementOf,
   topSet,
+  type LiftExposure,
   type LiftSet,
   type LiftTarget,
 } from "../stubs/lift.js";
@@ -96,6 +97,20 @@ function heaviestLoggedLoad(
     }
   }
   return heaviest;
+}
+
+function lastWorkingLoad(
+  last: LiftExposure,
+  target: LiftTarget | null,
+  loading: Loading,
+  ctx: EngineContext,
+): Weight | null {
+  return (
+    target?.load ??
+    (loading.kind === "weight"
+      ? heaviestLoggedLoad(last.sets, ctx.weightUnit)
+      : null)
+  );
 }
 
 /** `load` in the context's unit, rounded to what the equipment can make. */
@@ -233,13 +248,14 @@ export function progressExercise(
     });
     item = base;
   } else if (state.lastOutcome === "missed" && target !== null) {
+    const lastLoad = lastWorkingLoad(last, target, loading, ctx);
     reasons.push({
       code: "hold_after_miss",
       text: `Missed ${target.repMin} reps last time (${last.date}), so the same weight and effort again.`,
     });
     item = {
       ...base,
-      load: target.load && loadable(target.load, loading, ctx),
+      load: lastLoad && loadable(lastLoad, loading, ctx),
       band: target.band,
       targetRir: target.targetRir,
     };
@@ -368,11 +384,7 @@ function doubleProgression(
   const last = state.exposures.at(-1)!;
   const target = last.target ?? null;
   const top = topSet(last.sets);
-  const lastLoad =
-    target?.load ??
-    (loading.kind === "weight"
-      ? heaviestLoggedLoad(last.sets, ctx.weightUnit)
-      : null);
+  const lastLoad = lastWorkingLoad(last, target, loading, ctx);
   const lastBand = target ? target.band : (top?.band ?? null);
   // Extra reps or sets from a step that was too big carry over until it's taken.
   const extended =
