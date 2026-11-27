@@ -5,9 +5,11 @@ import {
   defaultTemplateId,
   isoWeekday,
   weekId,
+  type Onboarding,
   type Template,
 } from "@workout-app/shared";
 import { describe, expect, it } from "vitest";
+import { LIFT_ENGINE_VERSION } from "./lift/state.js";
 import type { LiftSessionLog } from "./stubs/lift.js";
 import {
   DEFAULT_WEEK,
@@ -20,6 +22,12 @@ import {
 } from "./week.js";
 
 const MONDAY = "2026-11-02";
+const now = () =>
+  (
+    globalThis as typeof globalThis & {
+      performance: { now: () => number };
+    }
+  ).performance.now();
 
 const TEMPLATE_NAMES = {
   push_a: "Push A",
@@ -61,6 +69,7 @@ const exercises: PlanExercise[] = Object.keys(TEMPLATE_NAMES).flatMap((key) =>
     equipment: ["dumbbell"],
     substitutionGroup: null,
     progressionModel: i === 0 ? "e1rm_rir" : null,
+    increment: null,
     primaryMuscles: [],
   })),
 );
@@ -119,6 +128,47 @@ describe("planWeek", () => {
     expect(plan.items.every((i) => ids.has(i.plannedSessionId))).toBe(true);
   });
 
+  it("records one versioned decision for every lift item", () => {
+    const liftSessionIds = new Set(
+      plan.sessions
+        .filter((session) => session.modality === "lift")
+        .map((s) => s.id),
+    );
+    const liftItems = plan.items.filter((item) =>
+      liftSessionIds.has(item.plannedSessionId),
+    );
+    expect(plan.decisions).toHaveLength(liftItems.length);
+    expect(
+      plan.decisions.map((decision) => decision.plannedItemId).sort(),
+    ).toEqual(liftItems.map((item) => item.id).sort());
+    for (const decision of plan.decisions) {
+      const item = liftItems.find(
+        (candidate) => candidate.id === decision.plannedItemId,
+      )!;
+      expect(decision.engineVersion).toBe(LIFT_ENGINE_VERSION);
+      expect(decision.outputs.reasons).toEqual(item.reasons);
+      expect(decision.rules).toHaveLength(item.reasons.length);
+    }
+    const firstPush = plan.sessions.find(
+      (session) => session.workoutType === "push_a",
+    )!;
+    const mainItem = liftItems.find(
+      (item) => item.plannedSessionId === firstPush.id && item.position === 0,
+    )!;
+    expect(
+      plan.decisions.find((decision) => decision.plannedItemId === mainItem.id)!
+        .rules,
+    ).toEqual(["no_history", "block_rir"]);
+    expect(
+      plan.decisions.every((decision) =>
+        liftSessionIds.has(
+          plan.items.find((item) => item.id === decision.plannedItemId)!
+            .plannedSessionId,
+        ),
+      ),
+    ).toBe(true);
+  });
+
   it("plans an equipment-first substitute named in the template slot", () => {
     const barbellId = weekId("barbell-squat");
     const dumbbellId = weekId("dumbbell-squat");
@@ -144,6 +194,7 @@ describe("planWeek", () => {
             equipment: ["barbell"],
             substitutionGroup: "squat_quads",
             progressionModel: "e1rm_rir",
+            increment: null,
             primaryMuscles: [],
           },
           {
@@ -152,6 +203,7 @@ describe("planWeek", () => {
             equipment: ["dumbbell"],
             substitutionGroup: "squat_quads",
             progressionModel: "e1rm_rir",
+            increment: null,
             primaryMuscles: [],
           },
         ],
@@ -191,6 +243,7 @@ describe("planWeek", () => {
             equipment: ["barbell"],
             substitutionGroup: "squat_quads",
             progressionModel: "e1rm_rir",
+            increment: null,
             primaryMuscles: [],
           },
           {
@@ -199,6 +252,7 @@ describe("planWeek", () => {
             equipment: ["dumbbell"],
             substitutionGroup: "squat_quads",
             progressionModel: "e1rm_rir",
+            increment: null,
             primaryMuscles: [],
           },
         ],
@@ -440,11 +494,11 @@ describe("block calendar", () => {
     date: string,
     key: string,
     reps: number,
-    { sets = 3, load = 50 } = {},
+    { sets = 3, load = 50, exerciseIndex = 0 } = {},
   ): LiftSessionLog => ({
     session: { localDate: date },
     sets: Array.from({ length: sets }, (_, index) => ({
-      exerciseId: slotId(key, 0),
+      exerciseId: slotId(key, exerciseIndex),
       index,
       loadValue: load,
       loadUnit: "lb" as const,
@@ -454,7 +508,7 @@ describe("block calendar", () => {
       isWarmup: false,
     })),
     targets: {
-      [slotId(key, 0)]: {
+      [slotId(key, exerciseIndex)]: {
         load: { value: load, unit: "lb" },
         band: null,
         sets,
@@ -466,6 +520,162 @@ describe("block calendar", () => {
     },
   });
   const logs = (...lift: LiftSessionLog[]) => ({ lift, run: [], climb: [] });
+
+  it("plans e1rm_rir lifts from onboarding e1RM", () => {
+    const exerciseId = slotId("push_a", 0);
+    const onboarding: Onboarding = {
+      completedAt: Date.parse("2026-10-01T00:00:00Z"),
+      lifts: [
+        {
+          exerciseId,
+          load: { value: 100, unit: "lb" },
+          reps: 8,
+          rir: 2,
+        },
+      ],
+      run: null,
+      climb: null,
+    };
+    const plan = weekAt(0, {
+      settings: { ...input().settings, onboarding },
+    });
+    const planned = item(plan, "push_a");
+    expect(planned.targets.load).not.toBeNull();
+    expect(planned.reasons.some((reason) => reason.includes("e1RM"))).toBe(
+      true,
+    );
+  });
+
+  it("does not plan heavier than a missed target", () => {
+    const missed = lifted(MONDAY, "push_a", 5, { load: 50 });
+    const plan = weekAt(1, { logs: logs(missed) });
+    const plannedLoad = (item(plan, "push_a").targets.load as { value: number })
+      .value;
+    expect(plannedLoad).toBeLessThanOrEqual(50);
+  });
+
+  it("steps double progression up after reaching the top on every set", () => {
+    const doubleProgressionExercises = exercises.map((exercise) =>
+      exercise.id === slotId("push_a", 1)
+        ? { ...exercise, progressionModel: "double_progression" as const }
+        : exercise,
+    );
+    const plan = weekAt(1, {
+      exercises: doubleProgressionExercises,
+      logs: logs(
+        lifted(addDays(MONDAY, 6), "push_a", 12, {
+          exerciseIndex: 1,
+          load: 20,
+        }),
+      ),
+    });
+    const planned = item(plan, "push_a", 1);
+    expect((planned.targets.load as { value: number }).value).toBeGreaterThan(
+      20,
+    );
+  });
+
+  it("puts an active variation plateau into the plan", () => {
+    const exerciseId = slotId("push_a", 0);
+    const group = "plateau-test";
+    const exercisesWithVariation = exercises.map((exercise) =>
+      exercise.id === exerciseId
+        ? { ...exercise, substitutionGroup: group }
+        : exercise,
+    );
+    const variation: PlanExercise = {
+      ...exercisesWithVariation.find((exercise) => exercise.id === exerciseId)!,
+      id: weekId("plateau-variation"),
+      name: "Plateau variation",
+      progressionModel: "double_progression",
+      increment: null,
+    };
+    const history = Array.from({ length: 18 }, (_, index) =>
+      lifted(addDays(MONDAY, index - 18), "push_a", 5, { load: 50 }),
+    );
+    const plan = weekAt(0, {
+      exercises: [...exercisesWithVariation, variation],
+      logs: logs(...history),
+    });
+    const session = plan.sessions.find(
+      (candidate) => candidate.workoutType === "push_a",
+    )!;
+    const planned = plan.items.find(
+      (candidate) =>
+        candidate.plannedSessionId === session.id && candidate.position === 0,
+    )!;
+    expect(planned.exerciseId).toBe(variation.id);
+    expect(planned.reasons[0]).toContain(
+      `${variation.name} in place of ${exercisesWithVariation.find((exercise) => exercise.id === exerciseId)!.name}`,
+    );
+  });
+
+  it("starts the next block from e1RM after a logged deload", () => {
+    const onboarding: Onboarding = {
+      completedAt: Date.parse("2026-10-01T00:00:00Z"),
+      lifts: [
+        {
+          exerciseId: slotId("push_a", 0),
+          load: { value: 100, unit: "lb" },
+          reps: 8,
+          rir: 2,
+        },
+      ],
+      run: null,
+      climb: null,
+    };
+    const settings = { ...input().settings, onboarding };
+    const firstLog = lifted(MONDAY, "push_a", 12, { load: 100 });
+    const deloadDate = addDays(MONDAY, 21);
+    const deload = planWeek(
+      input({
+        weekStart: deloadDate,
+        blocks,
+        settings,
+        logs: logs(firstLog),
+      }),
+    );
+    const deloadLoad = (
+      item(deload, "push_a").targets.load as { value: number }
+    ).value;
+    const deloadLog = lifted(deloadDate, "push_a", 12, { load: deloadLoad });
+    const next = planWeek(
+      input({
+        weekStart: addDays(MONDAY, 28),
+        blocks,
+        settings,
+        logs: logs(firstLog, deloadLog),
+      }),
+    );
+    const nextItem = item(next, "push_a");
+    const nextLoad = (nextItem.targets.load as { value: number }).value;
+    expect(nextLoad).toBeGreaterThan(deloadLoad);
+    expect(nextItem.reasons.some((reason) => reason.includes("e1RM"))).toBe(
+      true,
+    );
+  });
+
+  it("plans a year's worth of lift history under the per-session budget", () => {
+    const weekdays = [0, 1, 2, 4, 5, 6];
+    const keys = Object.keys(TEMPLATE_NAMES);
+    const history = Array.from({ length: 52 }, (_, week) =>
+      keys.map((key, index) =>
+        lifted(
+          addDays(MONDAY, -7 * (52 - week) + (weekdays[index] ?? 0)),
+          key,
+          10,
+          { load: 50 },
+        ),
+      ),
+    ).flat();
+    const start = now();
+    const plan = planWeek(input({ logs: logs(...history) }));
+    const duration = now() - start;
+    const liftSessions = plan.sessions.filter(
+      (session) => session.modality === "lift",
+    );
+    expect(duration / liftSessions.length).toBeLessThan(50);
+  });
 
   it("writes blocks and weeks with the engine version", () => {
     expect(first.block?.engineVersion).toBe(PLAN_VERSION);

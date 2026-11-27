@@ -42,21 +42,28 @@ import {
 import {
   initLiftEngineState,
   updateLiftEngineState,
+  type ExerciseState,
   type LiftEngineState,
+  LIFT_ENGINE_VERSION,
 } from "./lift/state.js";
 import { climbStub, type ClimbSessionLog } from "./stubs/climb.js";
 import {
-  liftStub,
   resolveSlots,
+  slotReasons,
   type LiftExercise,
   type LiftSessionLog,
   type LiftTarget,
 } from "./stubs/lift.js";
+import {
+  progressExercise,
+  type ProgressionExercise,
+  type SlotScheme,
+} from "./lift/progression.js";
 import { runStub, type RunSessionLog } from "./stubs/run.js";
 import type { EngineContext, Reason } from "./types.js";
 
 /** Stored as `engineVersion` on generated blocks and weeks. */
-export const PLAN_VERSION = "plan-2";
+export const PLAN_VERSION = "plan-3";
 
 type SessionSpec = {
   /** Stable within a week; part of the session's id. */
@@ -271,7 +278,7 @@ function liftTargetOf(targets: Record<string, unknown>): LiftTarget | null {
 
 /** A lift exercise with what the block calendar needs (main lift, muscles). */
 export type PlanExercise = LiftExercise &
-  Pick<Exercise, "progressionModel" | "primaryMuscles">;
+  Pick<Exercise, "progressionModel" | "primaryMuscles" | "increment">;
 
 export type WeekPlanInput = {
   /** The Monday of the week to plan. */
@@ -302,6 +309,28 @@ export type WeekPlan = {
   week: UpsertData<"week">;
   sessions: UpsertData<"planned_session">[];
   items: UpsertData<"planned_item">[];
+  decisions: EngineDecision[];
+};
+
+export type EngineDecision = {
+  plannedItemId: string;
+  engineVersion: string;
+  inputs: {
+    date: string;
+    weekType: WeekType;
+    blockIndex: number;
+    slot: Template["slots"][number];
+    scheme: SlotScheme;
+    exerciseId: string | null;
+    state: ExerciseState | null;
+    layoffCut: number | null;
+  };
+  rules: string[];
+  outputs: {
+    exerciseId: string | null;
+    targets: Record<string, unknown>;
+    reasons: string[];
+  };
 };
 
 const weekTypeAt = (index: number, weekCount: number): WeekType =>
@@ -459,10 +488,10 @@ const templateFor = (input: WeekPlanInput, key: string) =>
 
 /**
  * Plans a week (SPEC §3.2, §5.4): the block calendar position, then
- * {@link DEFAULT_WEEK}'s sessions from the stubs, with lifting's block
- * scheme, deload loads and layoff re-entry applied, and reasons. Pure, and the
- * same inputs give the same ids, so the phone's provisional week and the
- * server's line up.
+ * {@link DEFAULT_WEEK}'s sessions with lift progression and the run/climb
+ * engines, plus block, deload and layoff adjustments. Pure, and the same
+ * inputs give the same ids, so the phone's provisional week and server line
+ * up.
  */
 export function planWeek(input: WeekPlanInput): WeekPlan {
   const config = input.config ?? ENGINE_CONFIG;
@@ -486,8 +515,6 @@ export function planWeek(input: WeekPlanInput): WeekPlan {
     engineVersion: PLAN_VERSION,
   };
 
-  let lift = liftStub.initState(settings.onboarding);
-  for (const log of input.logs.lift) lift = liftStub.update(lift, log);
   let run = runStub.initState(settings.onboarding);
   for (const log of input.logs.run) run = runStub.update(run, log);
   let climb = climbStub.initState(settings.onboarding);
@@ -511,6 +538,7 @@ export function planWeek(input: WeekPlanInput): WeekPlan {
   const taken = new Set<string>();
   const sessions: UpsertData<"planned_session">[] = [];
   const items: UpsertData<"planned_item">[] = [];
+  const decisions: EngineDecision[] = [];
 
   for (const spec of DEFAULT_WEEK) {
     const date = addDays(weekStart, spec.weekday - 1);
@@ -521,6 +549,7 @@ export function planWeek(input: WeekPlanInput): WeekPlan {
       exerciseId: string | null;
       targets: Record<string, unknown>;
       reasons: Reason[];
+      decision?: Omit<EngineDecision, "plannedItemId">;
     }[] = [];
     let workoutType: string;
     let intent: Intent;
@@ -531,43 +560,86 @@ export function planWeek(input: WeekPlanInput): WeekPlan {
       const template = templateFor(input, spec.template);
       workoutType = spec.key;
       intent = template?.intent ?? "support";
-      version = liftStub.version;
+      version = LIFT_ENGINE_VERSION;
       if (template) {
         templateId = template.id;
         const planned = template.slots.map((_, i) =>
           slots.get(`${spec.key}:${i}`),
         );
-        const prescription = liftStub.prescribe(
-          lift,
-          {
-            name: template.name,
-            slots: template.slots.map((slot, i) => ({
-              ...slot,
-              sets: planned[i]?.sets ?? slot.sets,
-              targetRir: planned[i]?.targetRir ?? slot.targetRir,
-            })),
-            exercises: input.exercises,
-          },
-          ctx,
+        const resolved = resolveSlots(
+          template.slots,
+          input.exercises,
+          ctx.equipment,
+        );
+        const resolvedIds = new Set(
+          resolved.flatMap((exercise) => (exercise ? [exercise.id] : [])),
         );
         const reentry = layoffReentry(liftDates, date, config.lift.layoff);
         liftDates.push(date);
-        prescription.items.forEach(({ exerciseId, reasons, ...rest }, i) => {
-          const exercise =
-            exerciseId === null ? null : (byId.get(exerciseId) ?? null);
-          const extra = [...(planned[i]?.reasons ?? [])];
-          let load = rest.load;
+        template.slots.forEach((slot, i) => {
+          const selected = resolved[i];
+          const exercise = selected ? (byId.get(selected.id) ?? null) : null;
+          const plannedSlot = planned[i];
+          const scheme: SlotScheme = {
+            sets: plannedSlot?.sets ?? slot.sets,
+            repMin: slot.repMin,
+            repMax: slot.repMax,
+            targetRir: plannedSlot?.targetRir ?? slot.targetRir,
+          };
+          const state = exercise
+            ? (liftState.exercises[exercise.id] ?? null)
+            : null;
+          const candidates: ProgressionExercise[] = exercise?.substitutionGroup
+            ? input.exercises.filter(
+                (candidate) =>
+                  candidate.substitutionGroup === exercise.substitutionGroup &&
+                  !resolvedIds.has(candidate.id),
+              )
+            : [];
+          let progression = exercise
+            ? progressExercise(
+                state ?? undefined,
+                exercise,
+                scheme,
+                ctx,
+                candidates,
+              )
+            : null;
+          let itemExercise = exercise;
+          let progressionReasons = progression?.reasons ?? [];
+          if (progression?.swapTo) {
+            const swap = byId.get(progression.swapTo);
+            if (swap) {
+              const variation = progressExercise(
+                liftState.exercises[swap.id],
+                swap,
+                scheme,
+                ctx,
+              );
+              progressionReasons = [
+                ...progression.reasons.filter(
+                  (reason) => reason.code === "plateau_variation",
+                ),
+                ...variation.reasons,
+              ];
+              progression = variation;
+              itemExercise = swap;
+            }
+          }
+          const exerciseId = itemExercise?.id ?? null;
+          let load = progression?.load ?? null;
+          const extra: Reason[] = [];
           if (load && type === "deload") {
             const share = config.lift.block.deloadLoad;
             load = scaleLoad(
               weekOneLoad(
-                exerciseId === null
+                itemExercise === null
                   ? undefined
-                  : liftState.exercises[exerciseId],
+                  : liftState.exercises[itemExercise.id],
                 position.startDate,
               ) ?? load,
               share,
-              exercise,
+              itemExercise,
               ctx,
             );
             extra.push({
@@ -576,18 +648,51 @@ export function planWeek(input: WeekPlanInput): WeekPlan {
             });
           }
           if (load && reentry) {
-            load = scaleLoad(load, 1 - reentry.cut, exercise, ctx);
+            load = scaleLoad(load, 1 - reentry.cut, itemExercise, ctx);
             extra.push(reentry.reason);
           }
+          const targetValues = {
+            load,
+            band: progression?.band ?? null,
+            sets: progression?.sets ?? scheme.sets,
+            repMin: progression?.repMin ?? scheme.repMin,
+            repMax: progression?.repMax ?? scheme.repMax,
+            targetRir: progression?.targetRir ?? scheme.targetRir,
+            restSec: slot.restSec,
+            ramp: slot.ramp,
+            ...(slot.ramp ? { rampSets: plannedSlot?.rampSets ?? 0 } : {}),
+            ...(progression?.backOff ? { backOff: progression.backOff } : {}),
+          };
+          const reasons = [
+            ...slotReasons(slot, exercise, input.exercises),
+            ...progressionReasons,
+            ...(plannedSlot?.reasons ?? []),
+            ...extra,
+          ];
           targets.push({
             kind: "exercise",
             exerciseId,
-            targets: {
-              ...rest,
-              load,
-              ...(rest.ramp ? { rampSets: planned[i]?.rampSets ?? 0 } : {}),
+            targets: targetValues,
+            reasons,
+            decision: {
+              engineVersion: LIFT_ENGINE_VERSION,
+              inputs: {
+                date,
+                weekType: type,
+                blockIndex: position.index,
+                slot,
+                scheme,
+                exerciseId: exercise?.id ?? null,
+                state,
+                layoffCut: reentry?.cut ?? null,
+              },
+              rules: reasons.map((reason) => reason.code),
+              outputs: {
+                exerciseId,
+                targets: targetValues,
+                reasons: reasons.map((reason) => reason.text),
+              },
             },
-            reasons: [...reasons, ...extra],
           });
         });
       }
@@ -644,9 +749,10 @@ export function planWeek(input: WeekPlanInput): WeekPlan {
       status: "planned",
       generatedBy: `engine@${version}`,
     });
-    targets.forEach((t, position) =>
+    targets.forEach((t, position) => {
+      const plannedId = plannedItemId(id, position);
       items.push({
-        id: plannedItemId(id, position),
+        id: plannedId,
         createdAt: now,
         updatedAt: now,
         deletedAt: null,
@@ -656,11 +762,14 @@ export function planWeek(input: WeekPlanInput): WeekPlan {
         exerciseId: t.exerciseId,
         targets: t.targets,
         reasons: t.reasons.map((r) => r.text),
-      }),
-    );
+      });
+      if (t.decision) {
+        decisions.push({ ...t.decision, plannedItemId: plannedId });
+      }
+    });
   }
 
-  return { block: block.row, week, sessions, items };
+  return { block: block.row, week, sessions, items, decisions };
 }
 
 /** The spec's slot, or the day's other slot if only that one is free and available. */

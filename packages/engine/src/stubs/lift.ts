@@ -187,6 +187,38 @@ function groupCandidates(
     );
 }
 
+export function slotReasons(
+  slot: TemplateSlot,
+  exercise: LiftExercise | null,
+  exercises: readonly LiftExercise[],
+): Reason[] {
+  if (exercise === null) {
+    return [
+      {
+        code: "no_exercise",
+        text: `No exercise in the ${slot.substitutionGroup ?? "slot's"} group; pick one.`,
+      },
+    ];
+  }
+  if (slot.exerciseId === null) {
+    return [
+      {
+        code: "substituted",
+        text: `${exercise.name} fills the ${slot.substitutionGroup ?? ""} slot with your equipment.`,
+      },
+    ];
+  }
+  if (exercise.id === slot.exerciseId) return [];
+  const original = exercises.find((e) => e.id === slot.exerciseId)!;
+  const kind = exercise.equipment.includes("dumbbell") ? "dumbbells" : "bands";
+  return [
+    {
+      code: "substituted",
+      text: `${exercise.name} replaces ${original.name} so you can use your ${kind}. Turn on "Keep this exercise" in the template to keep ${original.name}.`,
+    },
+  ];
+}
+
 /** Resolves all slots together so substitutions don't duplicate exercises. */
 export function resolveSlots(
   slots: readonly TemplateSlot[],
@@ -300,7 +332,7 @@ function prescribeSlot(
   exercises: readonly LiftExercise[],
   ctx: EngineContext,
 ): LiftItem {
-  const reasons: Reason[] = [];
+  const reasons = slotReasons(slot, exercise, exercises);
   const item: LiftItem = {
     exerciseId: exercise?.id ?? null,
     sets: slot.sets,
@@ -313,28 +345,7 @@ function prescribeSlot(
     ramp: slot.ramp,
     reasons,
   };
-  if (exercise === null) {
-    reasons.push({
-      code: "no_exercise",
-      text: `No exercise in the ${slot.substitutionGroup ?? "slot's"} group; pick one.`,
-    });
-    return item;
-  }
-  if (slot.exerciseId === null) {
-    reasons.push({
-      code: "substituted",
-      text: `${exercise.name} fills the ${slot.substitutionGroup ?? ""} slot with your equipment.`,
-    });
-  } else if (exercise.id !== slot.exerciseId) {
-    const original = exercises.find((e) => e.id === slot.exerciseId)!;
-    const kind = exercise.equipment.includes("dumbbell")
-      ? "dumbbells"
-      : "bands";
-    reasons.push({
-      code: "substituted",
-      text: `${exercise.name} replaces ${original.name} so you can use your ${kind}. Turn on "Keep this exercise" in the template to keep ${original.name}.`,
-    });
-  }
+  if (exercise === null) return item;
   const exposure = state.exposures[exercise.id];
   const last = exposure && topSet(exposure.sets);
   if (!exposure || !last) {

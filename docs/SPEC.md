@@ -96,7 +96,7 @@ All rows carry `id`, `user_id`, `created_at`, `updated_at`, `deleted_at` and `se
 - `template`: reusable session definitions (for example Push A) with ordered slots: exercise or substitution group, sets, rep range, target RIR, rest, `ramp` flag. Each template also carries an intensity class (heavy, moderate or light) and an intent (key, support or recovery) for the scheduler.
 - `block` and `week`: the single global calendar shared by every modality (loading, deload, taper, test) and `engine_version`.
 - `planned_session` (date, slot, modality, workout type, intent key/support/recovery, status planned/done/skipped/moved, generated-by) and `planned_item` (an exercise, run segment or climbing block, with targets and `reasons[]`).
-- `plan_override`: client-owned provisional plan changes (move, trim, swap, add, provisional week) with the op that created them; superseded when the server regenerates the affected plan rows.
+- `plan_override`: client-owned provisional plan changes (move, trim, swap, add, provisional week) with the op that created them; kept on top of the server's regenerated plan rows (#148).
 - `session_log` (modality, start and end, session RPE 1–10, notes, link to plan) with children `set_log` (exercise, index, load, unit, reps, RIR, warm-up flag), `run_log` (distance, duration, optional heart rate and elevation, RPE, workout type, splits) and `ascent` (grade, style flash/onsight/send/attempt, attempts, tags, project).
 - `project`: climbing projects with attempts across sessions.
 - `readiness_checkin`: date, sleep, energy, soreness by region, pain flags (body region from the `stress_tags` list, severity 0–10), optional resting HR, HRV and bodyweight.

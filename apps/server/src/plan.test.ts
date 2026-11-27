@@ -9,9 +9,10 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "./app.js";
 import { setPassword } from "./auth.js";
 import { openDb, runMigrations, type Db } from "./db.js";
-import { planCurrentWeek } from "./plan.js";
+import { planCurrentWeek, replanLifts } from "./plan.js";
 import {
   block,
+  engineDecision,
   plannedItem,
   plannedSession,
   settings,
@@ -45,6 +46,11 @@ beforeEach(() => {
 });
 
 describe("planCurrentWeek", () => {
+  it("does not replan until the current week exists", () => {
+    const now = Date.UTC(2026, 10, 4, 15);
+    expect(db.transaction((tx) => replanLifts(tx, now))).toBe(0);
+  });
+
   it("plans a week once, with the seeded templates", () => {
     seedExercises(db, 0);
     seedTemplates(db, 0);
@@ -58,7 +64,21 @@ describe("planCurrentWeek", () => {
     const sessions = db.select().from(plannedSession).all();
     expect(sessions).toHaveLength(11);
     expect(sessions.every((s) => s.weekId === weekId("2026-11-02"))).toBe(true);
-    expect(db.select().from(plannedItem).all()).toHaveLength(33);
+    const items = db.select().from(plannedItem).all();
+    expect(items).toHaveLength(33);
+    const liftIds = new Set(
+      sessions
+        .filter((session) => session.modality === "lift")
+        .map((s) => s.id),
+    );
+    const liftItems = items.filter((item) =>
+      liftIds.has(item.plannedSessionId),
+    );
+    const decisions = db.select().from(engineDecision).all();
+    expect(decisions).toHaveLength(liftItems.length);
+    expect(new Set(decisions.map((decision) => decision.id))).toEqual(
+      new Set(liftItems.map((item) => item.id)),
+    );
   });
 
   it.each([

@@ -493,3 +493,9 @@ Options considered:
 - **An unpinned barbell, cable or machine exercise is planned as the first dumbbell or band exercise in its substitution group that the inventory covers**, by `ownedRank`, then the most similar name (shared words, ignoring equipment words), then name; "closest" means same substitution group and most similar name. With no such variant it stays. Its reason says what it replaced and how to keep it. A swap never picks an exercise another slot in the same workout already uses; with no unused variant the original stays. (§5.1)
 - **"Owned" means the inventory has dumbbells or at least one band; bodyweight always counts.** Group-only slots use the same order, so without dumbbells they pick a band or bodyweight exercise first. The player's swap list keeps plain `equipmentRank`. (§5.1)
 - **The warm-up ramp needed no change**: #54's player already rounds 40/60/80% to loadable weights and skips later cards sharing a movement pattern. (§5.1)
+
+## Server lift planning (#148)
+
+- **`planWeek` uses the real lift progression engine** for prescriptions, plateau variations and back-off sets, while retaining deload and layoff adjustments. Back-off sets are stored in targets and surfaced as a reason until the player supports them.
+- **After a push with lift-planning inputs, the server replans only this week's unstarted lift sessions from owner-local today onward.** The week/block/type guard prevents moving the calendar mid-week. Existing `plan_override` rows stay on top of regenerated plan rows rather than being superseded (owner-approved exception to §4).
+- **`engine_decision` is server-only**, with one row per lift planned item; regeneration overwrites its inputs, rules and outputs. `PLAN_VERSION` is `plan-3`, and the 50 ms per-lift-session budget is checked in an engine test.

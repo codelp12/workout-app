@@ -18,7 +18,7 @@ import { z } from "zod";
 import type { Db } from "./db.js";
 import { entityTables } from "./entity-tables.js";
 import { refreshFitnessState } from "./fitness.js";
-import { planCurrentWeek } from "./plan.js";
+import { planCurrentWeek, replanLifts } from "./plan.js";
 import { opReceipt, sessionLog, syncCounter } from "./schema.js";
 
 /** Single-user app (SPEC §1): every row belongs to the one account. */
@@ -51,6 +51,15 @@ const FITNESS_INPUTS = new Set<EntityName>([
   "settings",
   "session_log",
   "set_log",
+]);
+
+/** Synced entities that can change the current week's lift prescriptions. */
+const LIFT_PLAN_INPUTS = new Set<EntityName>([
+  "settings",
+  "session_log",
+  "set_log",
+  "template",
+  "exercise",
 ]);
 
 /** Claims the next global `serverSeq`. */
@@ -190,6 +199,14 @@ export function syncRoutes(
           ),
       );
       if (liftInputsChanged) refreshFitnessState(tx, receivedAt);
+      const planInputsChanged = results.some(
+        (result, i) =>
+          result.status === "applied" &&
+          LIFT_PLAN_INPUTS.has(
+            (body.data.ops[i] as { entity?: unknown }).entity as EntityName,
+          ),
+      );
+      if (planInputsChanged) replanLifts(tx, receivedAt);
       return { results, cursor: currentSeq(tx) };
     });
     return c.json(response);

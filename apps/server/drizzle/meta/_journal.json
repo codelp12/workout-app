@@ -71,6 +71,13 @@
       "when": 1795120671822,
       "tag": "0009_fitness_state",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1795791144719,
+      "tag": "0010_engine_decision",
+      "breakpoints": true
     }
   ]
 }
