@@ -25,7 +25,7 @@ import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { testExercise } from "../library/test-exercise";
 import { combineLifts } from "../plan/combine";
-import { skipItem } from "../plan/item-overrides";
+import { skipItem, swapExercise } from "../plan/item-overrides";
 import { readSession } from "../plan/sessions";
 import { deviceTimezone } from "../settings/settings";
 import { localDb } from "../sync";
@@ -685,6 +685,23 @@ describe("swap, skip, add set and warm-ups", () => {
       "A shared reason.",
       "The first prescription reason.",
       "The second prescription reason.",
+    ]);
+  });
+
+  it("omits rep reasons when a planned target is swapped to a timed hold", async () => {
+    const timed = testExercise({
+      name: "Timed Plank",
+      equipment: ["bodyweight"],
+      sourceId: "Plank",
+      substitutionGroup: squat.substitutionGroup,
+    });
+    await localDb.rows("exercise").put(timed);
+    await swapExercise(localDb, items[0]!, legs, timed.id);
+
+    const view = (await readSession(legs.id))!;
+    const { cards } = await readLiftSession(localDb, view);
+    expect(cards[0]?.reasons).toEqual([
+      "You swapped in Timed Plank for Dumbbell Squat.",
     ]);
   });
 

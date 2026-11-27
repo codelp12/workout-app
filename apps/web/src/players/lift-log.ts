@@ -151,7 +151,9 @@ export async function readLiftSession(
       ? [
           `You swapped in ${exercise?.name ?? "another exercise"} for ${planned?.name ?? "the planned exercise"}.`,
           ...(plannedItem &&
-          JSON.stringify(item.targets) === JSON.stringify(plannedItem.targets)
+          JSON.stringify(item.targets) ===
+            JSON.stringify(plannedItem.targets) &&
+          isTimedHold(exercise) === isTimedHold(planned)
             ? plannedItem.reasons
             : []),
         ]
