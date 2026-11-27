@@ -201,17 +201,16 @@ function mergeDuplicateCards(cards: LiftCard[]): LiftCard[] {
     if (!group || group.length === 1) return [card];
     if (group[0] !== card) return [];
     const active = group.filter((c) => !c.skipped);
+    const contributing = active.length > 0 ? active : group;
     const first = active[0] ?? card;
     return [
       {
         ...first,
         duplicateItems: group.filter((c) => c !== first).map((c) => c.item),
+        reasons: [...new Set(contributing.flatMap((c) => c.reasons))],
         targets: {
           ...first.targets,
-          sets: (active.length > 0 ? active : group).reduce(
-            (sum, c) => sum + c.targets.sets,
-            0,
-          ),
+          sets: contributing.reduce((sum, c) => sum + c.targets.sets, 0),
         },
       },
     ];

@@ -24,11 +24,13 @@ import {
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { testExercise } from "../library/test-exercise";
+import { combineLifts } from "../plan/combine";
+import { skipItem } from "../plan/item-overrides";
 import { readSession } from "../plan/sessions";
 import { deviceTimezone } from "../settings/settings";
 import { localDb } from "../sync";
 import { useLiveQuery } from "../use-live-query";
-import { openWorkout, savePosition } from "./lift-log";
+import { openWorkout, readLiftSession, savePosition } from "./lift-log";
 import { LiftPlayer } from "./LiftPlayer";
 
 const today = localDateAt(deviceTimezone(), Date.now());
@@ -649,6 +651,42 @@ describe("swap, skip, add set and warm-ups", () => {
     (await localDb.rows("set_log").toArray())
       .filter((s) => s.sessionLogId === sessionLogId(legs.id))
       .sort((a, b) => a.completedAt! - b.completedAt!);
+
+  it("merges reasons from contributing duplicate cards without repeats", async () => {
+    const pull: PlannedSession = {
+      ...legs,
+      id: newId(),
+      workoutType: "pull_a",
+    };
+    const first = {
+      ...items[0]!,
+      reasons: ["A shared reason.", "The first prescription reason."],
+    };
+    const second = item(2, squat.id, { ...items[0]!.targets, sets: 1 }, [
+      "A shared reason.",
+      "The second prescription reason.",
+    ]);
+    const skipped = {
+      ...items[0]!,
+      id: newId(),
+      plannedSessionId: pull.id,
+      reasons: ["A skipped prescription reason."],
+    };
+    await localDb.rows("planned_item").bulkPut([first, second, skipped]);
+    await localDb.rows("planned_session").put(pull);
+    expect(await combineLifts(localDb, legs.id, pull.id)).toBe(true);
+    await skipItem(localDb, skipped, pull, true);
+
+    const view = (await readSession(legs.id))!;
+    const { cards } = await readLiftSession(localDb, view);
+    const merged = cards.find((card) => card.exercise?.id === squat.id)!;
+    expect(merged.targets.sets).toBe(3);
+    expect(merged.reasons).toEqual([
+      "A shared reason.",
+      "The first prescription reason.",
+      "The second prescription reason.",
+    ]);
+  });
 
   it("shows the empty-reasons fallback", async () => {
     const user = userEvent.setup();
