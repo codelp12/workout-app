@@ -292,6 +292,12 @@ export function progressExercise(
     item = doubleProgression(state, exercise, base, slot, loading, ctx);
   }
 
+  if (state?.blockStall?.status === "counted") {
+    item.reasons.unshift({
+      code: "block_stall",
+      text: "No weight or rep increase all block, so this counts as a stall.",
+    });
+  }
   if (state && isCalibrating(state, ctx.date, config)) {
     item.reasons.push({
       code: "calibrating",
@@ -427,7 +433,10 @@ function doubleProgression(
   const what = (load: Weight | null, band: string | null) =>
     load ? fmt(load) : (band ?? "bodyweight");
 
-  if (state.lastOutcome === "stalled") {
+  if (
+    state.lastOutcome === "stalled" ||
+    state.blockStall?.status === "counted"
+  ) {
     reasons.push({
       code: "cut_after_stall",
       text: `Second miss in a row: lighter for a fresh run at ${base.repMin}–${base.repMax} reps.`,

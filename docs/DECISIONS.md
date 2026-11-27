@@ -460,7 +460,12 @@ Options considered:
 
 - **e1RM-derived working loads round down** to the heaviest loadable weight at or below the raw prescription, falling back to the lightest available weight when none is low enough. This is the owner's choice; SPEC §5.1 only says to round to a loadable weight. Warm-ups still use nearest-load rounding. Deload and layoff scaling remain nearest-rounded and at least one step lighter where possible.
 - **Double progression uses the latest logged working-set load** when its latest planned target has a null load, so holds, increments and stall cuts have a load to work from. It remains null when no working-set load was logged; band progression is unchanged.
-- The lift engine and plan versions are `lift-2` and `plan-4`.
+- The lift engine and plan versions are `lift-3` and `plan-5`.
+
+## Block-level stalls (owner spec addition)
+
+- **Deload exposures do not affect miss or stall bookkeeping.** They leave the miss streak, stall count, last-stall date and plateau unchanged, set `lastOutcome` to null, and still update e1RM.
+- **A double-progression lift stalls once for a completed block with no weight or repMax increase**, provided it had at least two loading-week targets. Compare each target to the prior loading-week target; set-count changes do not count as progress, and active plateaus are ignored. The stall date is the lift's last loading-week exposure, so it does not trigger an early deload in the next block.
 
 ## Lift workout preview and resume (#156, #159)
 

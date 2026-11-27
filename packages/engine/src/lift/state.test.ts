@@ -19,6 +19,7 @@ import {
   sessionEstimate,
   smoothE1rm,
   updateLiftEngineState,
+  type LiftEngineState,
 } from "./state.js";
 
 const config = ENGINE_CONFIG.lift;
@@ -282,6 +283,7 @@ describe("lift engine state", () => {
       missStreak: 0,
       plateaus: 0,
       plateau: null,
+      blockStall: null,
     });
     expect(initLiftEngineState(null, config)).toEqual({ exercises: {} });
   });
@@ -368,6 +370,85 @@ describe("lift engine state", () => {
     expect(state.exercises[squat]?.e1rm).toEqual(start.exercises[squat]?.e1rm);
     expect(state.exercises[squat]?.confidence).toBe(0.3);
     expect(state.exercises[squat]?.exposures).toHaveLength(2);
+  });
+
+  it("does not let a deload top reset stall bookkeeping", () => {
+    const initial = initLiftEngineState(onboarding, config).exercises[squat]!;
+    const start: LiftEngineState = {
+      exercises: {
+        [squat]: {
+          ...initial,
+          stallCount: 2,
+          lastStallDate: "2026-11-02",
+          lastOutcome: "stalled",
+          missStreak: 1,
+          plateau: { action: "back_off", startedOn: "2026-10-20" },
+        },
+      },
+    };
+    const target = {
+      sets: 1,
+      repMin: 8,
+      repMax: 12,
+      targetRir: 2,
+      load: { value: 60, unit: "lb" as const },
+      band: null,
+    };
+    const state = updateLiftEngineState(
+      start,
+      {
+        ...session("2026-11-09", squat, [{ load: 60, reps: 12, rir: 2 }]),
+        targets: { [squat]: target },
+      },
+      config,
+      { weekTypeOf: () => "deload" },
+    );
+    const updated = updateLiftEngineState(
+      state,
+      {
+        ...session("2026-11-16", squat, [{ load: 60, reps: 10, rir: 2 }]),
+        targets: { [squat]: target },
+      },
+      config,
+      { weekTypeOf: () => "deload" },
+    );
+    expect(state.exercises[squat]).toMatchObject({
+      stallCount: 2,
+      lastStallDate: "2026-11-02",
+      lastOutcome: null,
+      missStreak: 1,
+      plateau: { action: "back_off", startedOn: "2026-10-20" },
+    });
+    expect(updated.exercises[squat]?.e1rm?.value).toBeGreaterThan(
+      initial.e1rm!.value,
+    );
+  });
+
+  it("does not start a miss streak from a deload miss", () => {
+    const start = initLiftEngineState(null, config);
+    const target = {
+      sets: 1,
+      repMin: 8,
+      repMax: 12,
+      targetRir: 2,
+      load: { value: 60, unit: "lb" as const },
+      band: null,
+    };
+    const state = updateLiftEngineState(
+      start,
+      {
+        ...session("2026-11-09", squat, [{ load: 60, reps: 6, rir: 0 }]),
+        targets: { [squat]: target },
+      },
+      config,
+      { weekTypeOf: () => "deload" },
+    );
+    expect(state.exercises[squat]).toMatchObject({
+      missStreak: 0,
+      stallCount: 0,
+      lastOutcome: null,
+      lastStallDate: null,
+    });
   });
 
   it("keeps the last few exposures", () => {
