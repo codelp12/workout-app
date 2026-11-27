@@ -5,19 +5,27 @@ import {
   type DaySlot,
   type Modality,
 } from "@workout-app/shared";
+import { formatAmount, type LiftReview } from "@workout-app/engine";
 import { useCallback, useId, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { BottomSheet } from "../components/BottomSheet";
 import { ChipGroup } from "../components/ChipGroup";
 import { Loading, Skeleton } from "../components/Skeleton";
+import { vocabLabel } from "../library/filter";
 import { modalityStyles } from "../modality";
+import {
+  readWeeklyLiftReview,
+  type WeeklyLiftReview,
+} from "../plan/lift-review";
 import { moveSession, samePlacement, type Placement } from "../plan/moves";
 import {
   formatLongDate,
   formatShortDay,
   formatWeekRange,
+  liftDetail,
   sessionSummary,
   weekPlan,
+  type LiftTargets,
   type SessionView,
   type WeekPlan,
   type WeekTally,
@@ -199,6 +207,113 @@ function Tally({
   );
 }
 
+function LastWeekLiftReview({ weekStart }: { weekStart: string }) {
+  const id = useId();
+  const query = useCallback(() => readWeeklyLiftReview(weekStart), [weekStart]);
+  const review = useLiveQuery<WeeklyLiftReview | undefined>(query, undefined);
+  const e1rmSummary = (exercise: LiftReview["exercises"][number]) => {
+    if (exercise.e1rmAfter === null) return "e1RM —";
+    const change = exercise.e1rmChange
+      ? ` (${exercise.e1rmChange.value >= 0 ? "+" : "-"}${formatAmount(
+          Math.abs(exercise.e1rmChange.value),
+          exercise.e1rmChange.unit,
+        )})`
+      : "";
+    return `e1RM ${formatAmount(exercise.e1rmAfter.value, exercise.e1rmAfter.unit)}${change}`;
+  };
+  return (
+    <section aria-labelledby={id} className={`${card} flex flex-col gap-3`}>
+      <h2 id={id} className="font-semibold">
+        Last week's lifting
+      </h2>
+      {review ? (
+        <>
+          {review.exercises.length === 0 ? (
+            <p className="text-fg-muted">No lifting logged last week.</p>
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {review.exercises.map((exercise) => {
+                const timed = review.timedExerciseIds.includes(
+                  exercise.exerciseId,
+                );
+                return (
+                  <li
+                    key={exercise.exerciseId}
+                    className="flex flex-col gap-1 border-b border-border pb-3 last:border-0 last:pb-0"
+                  >
+                    <h3 className="font-medium">{exercise.name}</h3>
+                    <p className="text-sm">
+                      Top set{" "}
+                      {exercise.topSet.load
+                        ? formatAmount(
+                            exercise.topSet.load.value,
+                            exercise.topSet.load.unit,
+                          )
+                        : (exercise.topSet.band ?? "Bodyweight")}{" "}
+                      × {exercise.topSet.reps}
+                      {timed ? " s" : ""} · {exercise.workingSets} sets ·{" "}
+                      {exercise.totalReps}
+                      {timed ? " s total" : " reps"}
+                    </p>
+                    <p className="text-sm">{e1rmSummary(exercise)}</p>
+                    {exercise.thisWeek ? (
+                      <>
+                        <p className="text-sm">
+                          This week:{" "}
+                          {liftDetail(
+                            exercise.thisWeek.targets as LiftTargets,
+                            timed,
+                          )}
+                        </p>
+                        {exercise.thisWeek.reasons.length > 0 && (
+                          <ul className="list-disc pl-5 text-sm text-fg-muted">
+                            {exercise.thisWeek.reasons.map((reason, index) => (
+                              <li key={`${index}:${reason}`}>{reason}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-sm text-fg-muted">
+                        Not planned this week
+                      </p>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <div className="flex flex-col gap-2">
+            <h3 className="font-medium">Hard sets per muscle</h3>
+            {review.muscles.length > 0 ? (
+              <ul className="flex flex-col gap-1 text-sm">
+                {review.muscles.map(({ muscle, hardSets, cap }) => (
+                  <li
+                    key={muscle}
+                    className="flex flex-wrap items-baseline justify-between gap-x-3"
+                  >
+                    <span>{vocabLabel(muscle)}</span>
+                    <span className="tabular-nums">
+                      {hardSets} / {cap}
+                      {hardSets > cap && (
+                        <span className="ml-2 font-medium">Over cap</span>
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-fg-muted">No hard sets to count.</p>
+            )}
+          </div>
+        </>
+      ) : (
+        <Skeleton className="h-24 w-full" />
+      )}
+    </section>
+  );
+}
+
 function MoveForm({
   view,
   weekStart,
@@ -373,6 +488,9 @@ function Plan({ weekStart, today }: { weekStart: string; today: string }) {
             ))}
           </ol>
         </div>
+      )}
+      {(filter === "all" || filter === "lift") && (
+        <LastWeekLiftReview weekStart={weekStart} />
       )}
       <BottomSheet
         title={selected?.title ?? ""}
