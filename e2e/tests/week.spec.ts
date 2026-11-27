@@ -139,6 +139,10 @@ test("lift target reasons are available from Today and the player offline", asyn
 
   await page.goto("/");
   await expect(page.getByRole("region", { name: "Coach note" })).toBeVisible();
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+  });
+  await page.reload();
   await expect
     .poll(() => page.evaluate(() => !!navigator.serviceWorker.controller))
     .toBe(true);
