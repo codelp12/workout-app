@@ -74,12 +74,13 @@ const target = (
 type Session = {
   target: LiftTarget;
   sets: [number | string | null, number, number | null][];
+  loadUnit?: "lb" | "kg";
 };
 
 const session = (
   exerciseId: string,
   date: string,
-  { target: t, sets }: Session,
+  { target: t, sets, loadUnit = "lb" }: Session,
 ): LiftSessionLog => ({
   session: { localDate: date },
   targets: { [exerciseId]: t },
@@ -87,7 +88,7 @@ const session = (
     exerciseId,
     index,
     loadValue: typeof load === "number" ? load : null,
-    loadUnit: typeof load === "number" ? "lb" : null,
+    loadUnit: typeof load === "number" ? loadUnit : null,
     band: typeof load === "string" ? load : null,
     reps,
     rir,
@@ -357,6 +358,27 @@ describe("double_progression", () => {
       sets: sets(3, 90, 10),
     });
     expect(prescribe(state, weightedPullUp).load).toBeNull();
+  });
+
+  it("holds a kettlebell goblet squat at its logged load after a top set", () => {
+    const gobletSquat: ProgressionExercise = {
+      ...curl,
+      id: "goblet-squat",
+      name: "Goblet squat",
+      equipment: ["kettlebell"],
+    };
+    const state = history("goblet-squat", {
+      target: target(null),
+      sets: sets(3, 16, 12),
+      loadUnit: "kg",
+    });
+    const item = progressExercise(state, gobletSquat, accessory, {
+      ...ctx(),
+      weightUnit: "kg",
+    });
+    expect(state.lastOutcome).toBe("top");
+    expect(item.load).toEqual({ value: 16, unit: "kg" });
+    expect(item.reasons.map((reason) => reason.code)).not.toContain("increase");
   });
 
   it("holds the logged load after a miss with a null target load", () => {

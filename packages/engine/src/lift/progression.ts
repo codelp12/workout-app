@@ -102,12 +102,13 @@ function heaviestLoggedLoad(
 function lastWorkingLoad(
   last: LiftExposure,
   target: LiftTarget | null,
+  exercise: ProgressionExercise,
   loading: Loading,
   ctx: EngineContext,
 ): Weight | null {
   return (
     target?.load ??
-    (loading.kind === "weight"
+    (loading.kind === "weight" || exercise.equipment.includes("kettlebell")
       ? heaviestLoggedLoad(last.sets, ctx.weightUnit)
       : null)
   );
@@ -264,7 +265,7 @@ export function progressExercise(
     });
     item = base;
   } else if (state.lastOutcome === "missed" && target !== null) {
-    const lastLoad = lastWorkingLoad(last, target, loading, ctx);
+    const lastLoad = lastWorkingLoad(last, target, exercise, loading, ctx);
     reasons.push({
       code: "hold_after_miss",
       text: `Missed ${target.repMin} reps last time (${last.date}), so the same weight and effort again.`,
@@ -400,7 +401,7 @@ function doubleProgression(
   const last = state.exposures.at(-1)!;
   const target = last.target ?? null;
   const top = topSet(last.sets);
-  const lastLoad = lastWorkingLoad(last, target, loading, ctx);
+  const lastLoad = lastWorkingLoad(last, target, exercise, loading, ctx);
   const loadFromFallback = target === null || target.load === null;
   const lastBand = target ? target.band : (top?.band ?? null);
   // Extra reps or sets from a step that was too big carry over until it's taken.
