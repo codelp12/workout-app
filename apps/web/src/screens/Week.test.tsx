@@ -4,19 +4,24 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   addDays,
+  defaultSettings,
   localDateAt,
   moveOverrideId,
   newId,
+  SETTINGS_ID,
   sessionLogId,
   weekStartOf,
   type PlannedSession,
   type PlanOverride,
+  type SetLog,
   type SessionLog,
   type Template,
 } from "@workout-app/shared";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Navigation } from "../Navigation";
+import { testExercise } from "../library/test-exercise";
+import { readWeeklyLiftReview } from "../plan/lift-review";
 import { formatLongDate, formatShortDay } from "../plan/sessions";
 import { deviceTimezone } from "../settings/settings";
 import { localDb } from "../sync";
@@ -97,6 +102,9 @@ beforeEach(async () => {
         "planned_item",
         "plan_override",
         "session_log",
+        "set_log",
+        "exercise",
+        "settings",
         "template",
       ] as const
     ).map((t) => localDb.rows(t).clear()),
@@ -294,6 +302,150 @@ describe("Week", () => {
       "–",
       "0 of 1",
     ]);
+  });
+
+  it("shows last week's lift review and hard sets per muscle", async () => {
+    const bench = testExercise({
+      name: "Dumbbell Bench Press",
+      equipment: ["dumbbell"],
+      primaryMuscles: ["chest", "triceps"],
+    });
+    const fly = testExercise({
+      name: "Cable Fly",
+      equipment: ["cable"],
+      primaryMuscles: ["chest"],
+    });
+    const previous = session({
+      date: addDays(monday, -7),
+      templateId: null,
+    });
+    const previousLog = log({
+      id: sessionLogId(previous.id),
+      plannedSessionId: previous.id,
+      localDate: previous.date,
+      startedAt: 10,
+      endedAt: 20,
+    });
+    const onboardingSettings = {
+      ...defaultSettings("UTC", 0),
+      ...sync,
+      id: SETTINGS_ID,
+      onboarding: {
+        completedAt: 0,
+        lifts: [
+          {
+            exerciseId: bench.id,
+            load: { value: 100, unit: "lb" as const },
+            reps: 8,
+            rir: 2,
+          },
+        ],
+        run: null,
+        climb: null,
+      },
+    };
+    const targets = {
+      sets: 3,
+      load: { value: 140, unit: "lb" },
+      band: null,
+      repMin: 8,
+      repMax: 10,
+      targetRir: 2,
+      restSec: 120,
+    };
+    const plannedItem = {
+      id: newId(),
+      ...sync,
+      plannedSessionId: push.id,
+      position: 0,
+      kind: "exercise" as const,
+      exerciseId: bench.id,
+      targets,
+      reasons: ["The plan set this target."],
+    };
+    const sets: SetLog[] = Array.from({ length: 3 }, (_, index) => ({
+      id: newId(),
+      ...sync,
+      sessionLogId: previousLog.id,
+      exerciseId: bench.id,
+      index,
+      loadValue: 135,
+      loadUnit: "lb",
+      band: null,
+      reps: 8,
+      rir: 2,
+      isWarmup: false,
+      completedAt: 20 + index,
+    }));
+    const flySets: SetLog[] = Array.from({ length: 18 }, (_, index) => ({
+      id: newId(),
+      ...sync,
+      sessionLogId: previousLog.id,
+      exerciseId: fly.id,
+      index: index + 3,
+      loadValue: 45,
+      loadUnit: "lb",
+      band: null,
+      reps: 8,
+      rir: 2,
+      isWarmup: false,
+      completedAt: 23 + index,
+    }));
+    await localDb.rows("exercise").bulkPut([bench, fly]);
+    await localDb.rows("settings").put(onboardingSettings);
+    await localDb.rows("planned_session").put(previous);
+    await localDb.rows("planned_item").put(plannedItem);
+    await localDb.rows("session_log").put(previousLog);
+    await localDb.rows("set_log").bulkPut([...sets, ...flySets]);
+
+    const localReview = await readWeeklyLiftReview(monday);
+    expect(localReview.exercises).toHaveLength(2);
+    expect(localReview.muscles).toContainEqual({
+      muscle: "chest",
+      hardSets: 21,
+      cap: 20,
+    });
+
+    renderAt("/week");
+    const review = within(
+      await screen.findByRole("region", { name: "Last week's lifting" }),
+    );
+    const exerciseRowElement = (
+      await review.findByRole("heading", {
+        level: 3,
+        name: "Dumbbell Bench Press",
+      })
+    ).closest("li")!;
+    const exerciseRow = within(exerciseRowElement);
+    expect(exerciseRowElement.textContent).toContain(
+      "Top set 135 lb × 8 · 3 sets · 24 reps",
+    );
+    expect(exerciseRowElement.textContent).toMatch(
+      /e1RM \d+(?:\.\d+)? lb \(\+\d+(?:\.\d+)? lb\)/,
+    );
+    expect(exerciseRowElement.textContent).toContain(
+      "This week: 3 × 8–10 · 140 lb · RIR 2 · rest 2:00",
+    );
+    expect(exerciseRow.getByText("The plan set this target.")).toBeTruthy();
+    const muscles = within(
+      review.getByRole("heading", { name: "Hard sets per muscle" })
+        .parentElement!,
+    );
+    expect(muscles.getByText("Chest")).toBeTruthy();
+    expect(muscles.getByText("Triceps")).toBeTruthy();
+    expect(muscles.getByText("21 / 20")).toBeTruthy();
+    expect(muscles.getByText("Over cap")).toBeTruthy();
+    expect(muscles.getByText("3 / 20")).toBeTruthy();
+  });
+
+  it("shows the empty lift review when last week has no working sets", async () => {
+    renderAt("/week");
+    const review = within(
+      await screen.findByRole("region", { name: "Last week's lifting" }),
+    );
+    expect(
+      await review.findByText("No lifting logged last week."),
+    ).toBeTruthy();
   });
 });
 

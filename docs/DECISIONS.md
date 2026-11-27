@@ -504,3 +504,10 @@ Options considered:
 
 - **Lift targets can show their plain-English reasons from Today, the session preview and the player.** Owner swaps explain what changed; added exercises say the planner did not set their target.
 - **The sheet reads `planned_item.reasons` from the local copy**, so it remains available offline.
+
+## Weekly lifting review (#150)
+
+- **The top set is the heaviest loaded working set**, compared in a common unit; ties go to more reps. Bodyweight and band exercises use the working set with the most reps.
+- **e1RM compares the state before last week's Monday with the state after last Sunday**, folding earlier lift logs in date order and starting from onboarding when present.
+- **Hard sets count once for every primary muscle on each working set.** Secondary muscles do not count; the cap is the engine's weekly hard-set cap.
+- **This week's targets and reasons come from the underlying planned rows**, not owner overrides.
