@@ -370,9 +370,9 @@ function doubleProgression(
   const top = topSet(last.sets);
   const lastLoad =
     target?.load ??
-    (loading.kind === "band"
-      ? null
-      : heaviestLoggedLoad(last.sets, ctx.weightUnit));
+    (loading.kind === "weight"
+      ? heaviestLoggedLoad(last.sets, ctx.weightUnit)
+      : null);
   const lastBand = target ? target.band : (top?.band ?? null);
   // Extra reps or sets from a step that was too big carry over until it's taken.
   const extended =

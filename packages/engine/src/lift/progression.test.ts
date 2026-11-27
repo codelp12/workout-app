@@ -345,6 +345,20 @@ describe("double_progression", () => {
     expect(prescribe(state).load).toEqual({ value: 90, unit: "lb" });
   });
 
+  it("keeps a weighted pull-up load null when its target is null", () => {
+    const weightedPullUp: ProgressionExercise = {
+      ...curl,
+      id: "weighted-pull-up",
+      name: "Weighted pull-up",
+      equipment: ["bodyweight"],
+    };
+    const state = history("weighted-pull-up", {
+      target: target(null),
+      sets: sets(3, 90, 10),
+    });
+    expect(prescribe(state, weightedPullUp).load).toBeNull();
+  });
+
   it("steps up from the last logged load when all sets reach repMax", () => {
     const exercise = { ...curl, increment: { value: 5, unit: "lb" as const } };
     const state = history("curl", {
