@@ -15,6 +15,7 @@ import {
   equipmentRank,
   implementOf,
   topSet,
+  type LiftExposure,
   type LiftSet,
   type LiftTarget,
 } from "../stubs/lift.js";
@@ -96,6 +97,37 @@ function heaviestLoggedLoad(
     }
   }
   return heaviest;
+}
+
+function lastWorkingLoad(
+  last: LiftExposure,
+  target: LiftTarget | null,
+  exercise: ProgressionExercise,
+  loading: Loading,
+  ctx: EngineContext,
+): Weight | null {
+  return (
+    target?.load ??
+    (loading.kind === "weight" || exercise.equipment.includes("kettlebell")
+      ? heaviestLoggedLoad(last.sets, ctx.weightUnit)
+      : null)
+  );
+}
+
+function allSetsAtLoad(
+  sets: readonly LiftSet[],
+  load: Weight,
+  unit: EngineContext["weightUnit"],
+): boolean {
+  const value = toWeightUnit(load, unit);
+  return (
+    sets.length > 0 &&
+    sets.every(
+      (set) =>
+        set.load !== null &&
+        Math.abs(toWeightUnit(set.load, unit) - value) <= EPSILON,
+    )
+  );
 }
 
 /** `load` in the context's unit, rounded to what the equipment can make. */
@@ -233,13 +265,14 @@ export function progressExercise(
     });
     item = base;
   } else if (state.lastOutcome === "missed" && target !== null) {
+    const lastLoad = lastWorkingLoad(last, target, exercise, loading, ctx);
     reasons.push({
       code: "hold_after_miss",
       text: `Missed ${target.repMin} reps last time (${last.date}), so the same weight and effort again.`,
     });
     item = {
       ...base,
-      load: target.load && loadable(target.load, loading, ctx),
+      load: lastLoad && loadable(lastLoad, loading, ctx),
       band: target.band,
       targetRir: target.targetRir,
     };
@@ -368,11 +401,8 @@ function doubleProgression(
   const last = state.exposures.at(-1)!;
   const target = last.target ?? null;
   const top = topSet(last.sets);
-  const lastLoad =
-    target?.load ??
-    (loading.kind === "band"
-      ? null
-      : heaviestLoggedLoad(last.sets, ctx.weightUnit));
+  const lastLoad = lastWorkingLoad(last, target, exercise, loading, ctx);
+  const loadFromFallback = target === null || target.load === null;
   const lastBand = target ? target.band : (top?.band ?? null);
   // Extra reps or sets from a step that was too big carry over until it's taken.
   const extended =
@@ -425,7 +455,10 @@ function doubleProgression(
     const band =
       bandStep(lastBand, beat ? 2 : 1, ctx) ?? bandStep(lastBand, 1, ctx);
     next = band === null ? null : { load: null, band };
-  } else if (lastLoad) {
+  } else if (
+    lastLoad &&
+    (!loadFromFallback || allSetsAtLoad(last.sets, lastLoad, ctx.weightUnit))
+  ) {
     const from = toWeightUnit(lastLoad, ctx.weightUnit);
     let load = stepUp(lastLoad, beat ? 2 : 1, exercise, loading, ctx);
     if (
@@ -449,6 +482,17 @@ function doubleProgression(
       text: `Hit ${held.repMax} reps on every set, so up to ${what(next.load, next.band)} and back toward ${base.repMin} reps.`,
     });
     return { ...base, ...next };
+  }
+  if (
+    loadFromFallback &&
+    lastLoad &&
+    !allSetsAtLoad(last.sets, lastLoad, ctx.weightUnit)
+  ) {
+    reasons.push({
+      code: "repeat_last",
+      text: `Mixed working-set loads last time, so hold the same load and repeat ${base.sets} sets of ${base.repMin}–${base.repMax} reps.`,
+    });
+    return { ...base, load: held.load, band: held.band };
   }
   if (canExtend(held, slot, rules)) {
     const repMax = held.repMax + rules.extraRepsStep;
