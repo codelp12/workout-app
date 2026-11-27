@@ -51,6 +51,14 @@ export type ExerciseState = {
     status: "pending" | "counted" | "ignored";
     progressionOutcome: Outcome | null;
   } | null;
+  /** Loading-target progress for the current or most recently logged block. */
+  blockProgress: {
+    blockId: string;
+    loadingCount: number;
+    progressed: boolean;
+    lastLoadingTarget: LiftTarget;
+    lastLoadingDate: string;
+  } | null;
 };
 
 /**
@@ -173,6 +181,7 @@ const emptyExercise = (): ExerciseState => ({
   plateaus: 0,
   plateau: null,
   blockStall: null,
+  blockProgress: null,
 });
 
 const EPSILON = 1e-6;
@@ -251,78 +260,52 @@ function plateauActive(
 }
 
 function blockStallDate(
-  exposures: readonly LiftExposure[],
-  block: LiftCalendarBlock,
-  calendar: LiftStateCalendar,
+  progress: ExerciseState["blockProgress"],
+  blockId: string,
 ): string | null {
-  const inBlock = exposures.filter((exposure) => {
-    const exposureBlock = calendar.blockOf?.(exposure.date);
-    return (
-      exposure.source === "log" &&
-      exposure.target !== null &&
-      exposure.target !== undefined &&
-      exposureBlock?.id === block.id &&
-      calendar.weekTypeOf?.(exposure.date) === "loading"
-    );
-  });
-  if (inBlock.length < 2) return null;
-
-  const previous = exposures
-    .filter((exposure) => {
-      const exposureBlock = calendar.blockOf?.(exposure.date);
-      return (
-        exposure.source === "log" &&
-        exposure.target !== null &&
-        exposure.target !== undefined &&
-        exposureBlock !== null &&
-        exposureBlock !== undefined &&
-        exposureBlock.startDate < block.startDate &&
-        calendar.weekTypeOf?.(exposure.date) === "loading"
-      );
-    })
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .at(-1);
-  const targets = [
-    ...(previous?.target ? [previous.target] : []),
-    ...inBlock
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .flatMap((exposure) => (exposure.target ? [exposure.target] : [])),
-  ];
-  const progressed =
-    calendar.targetProgressed ??
-    ((before, after) => after.repMax > before.repMax);
   if (
-    targets
-      .slice(1)
-      .some((target, index) => progressed(targets[index]!, target))
+    progress === null ||
+    progress.blockId !== blockId ||
+    progress.loadingCount < 2 ||
+    progress.progressed
   ) {
     return null;
   }
-  return (
-    exposures
-      .filter((exposure) => {
-        const exposureBlock = calendar.blockOf?.(exposure.date);
-        return (
-          exposure.source === "log" &&
-          exposureBlock?.id === block.id &&
-          calendar.weekTypeOf?.(exposure.date) === "loading"
-        );
-      })
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .at(-1)?.date ?? null
-  );
+  return progress.lastLoadingDate;
+}
+
+function updateBlockProgress(
+  next: ExerciseState,
+  block: LiftCalendarBlock,
+  exposure: LiftExposure,
+  calendar: LiftStateCalendar,
+): void {
+  const target = exposure.target;
+  if (target === null || target === undefined) return;
+  const previous = next.blockProgress;
+  const sameBlock = previous !== null && previous.blockId === block.id;
+  const progressedFromPrevious =
+    previous !== null &&
+    (calendar.targetProgressed?.(previous.lastLoadingTarget, target) ??
+      target.repMax > previous.lastLoadingTarget.repMax);
+  next.blockProgress = {
+    blockId: block.id,
+    loadingCount: sameBlock ? (previous?.loadingCount ?? 0) + 1 : 1,
+    progressed:
+      (sameBlock && previous?.progressed === true) || progressedFromPrevious,
+    lastLoadingTarget: target,
+    lastLoadingDate: exposure.date,
+  };
 }
 
 function noteBlockStall(
   next: ExerciseState,
-  exposures: readonly LiftExposure[],
   block: LiftCalendarBlock,
   date: string,
   config: Lift,
-  calendar: LiftStateCalendar,
   pending: boolean,
 ): void {
-  const stalledAt = blockStallDate(exposures, block, calendar);
+  const stalledAt = blockStallDate(next.blockProgress, block.id);
   if (stalledAt === null) return;
   if (plateauActive(next, date, config)) {
     next.blockStall = {
@@ -470,15 +453,7 @@ function foldExposure(
     calendar?.progressionModelOf?.(exerciseId) === "double_progression" &&
     next.blockStall === null
   ) {
-    noteBlockStall(
-      next,
-      previous.exposures,
-      currentBlock,
-      exposure.date,
-      config,
-      calendar,
-      true,
-    );
+    noteBlockStall(next, currentBlock, exposure.date, config, true);
   } else if (
     currentWeekType !== "deload" &&
     previousBlock !== null &&
@@ -492,16 +467,16 @@ function foldExposure(
       previousWeekType === "loading" &&
       calendar?.progressionModelOf?.(exerciseId) === "double_progression"
     ) {
-      noteBlockStall(
-        next,
-        previous.exposures,
-        previousBlock,
-        exposure.date,
-        config,
-        calendar,
-        false,
-      );
+      noteBlockStall(next, previousBlock, exposure.date, config, false);
     }
+  }
+  if (
+    currentWeekType === "loading" &&
+    currentBlock !== null &&
+    calendar !== undefined &&
+    calendar?.progressionModelOf?.(exerciseId) === "double_progression"
+  ) {
+    updateBlockProgress(next, currentBlock, foldedExposure, calendar);
   }
   judgeInto(next, foldedExposure, calibrating, config);
   const unit =
@@ -617,15 +592,7 @@ export function applyBlockStallsBeforePlan(
     if (next.blockStall?.status === "pending") {
       applyPendingBlockStall(next, currentBlockStartDate, config);
     } else if (calendar.weekTypeOf?.(latest.date) === "loading") {
-      noteBlockStall(
-        next,
-        exercise.exposures,
-        latestBlock,
-        currentBlockStartDate,
-        config,
-        calendar,
-        false,
-      );
+      noteBlockStall(next, latestBlock, currentBlockStartDate, config, false);
     }
     exercises[exerciseId] = next;
   }

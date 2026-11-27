@@ -569,6 +569,28 @@ describe("block calendar", () => {
         ),
       ),
     ).flat();
+  const twiceWeeklyBlockLogs = (
+    count: number,
+    loadAt: (block: number, loadingExposure: number) => number,
+  ) =>
+    Array.from({ length: count }, (_, block) => {
+      const startDay = block * 28;
+      const loading = [0, 3, 7, 10, 14, 17].map((day, exposure) =>
+        targeted(addDays(MONDAY, startDay + day), 1, loadAt(block, exposure)),
+      );
+      const deload = [21, 24].map((day) =>
+        targeted(
+          addDays(MONDAY, startDay + day),
+          1,
+          loadAt(block, 5),
+          12,
+          "push_a",
+          10,
+          2,
+        ),
+      );
+      return [...loading, ...deload];
+    }).flat();
   const decisionFor = (plan: WeekPlan, exerciseIndex: number, key = "push_a") =>
     plan.decisions.find(
       (decision) => decision.inputs.exerciseId === slotId(key, exerciseIndex),
@@ -878,22 +900,21 @@ describe("block calendar", () => {
           ? { ...exercise, increment: { value: 5, unit: "lb" as const } }
           : exercise,
       );
-      const deload = targeted(
-        addDays(MONDAY, 21),
-        1,
-        60,
-        12,
-        "push_a",
-        10,
-        2,
-      );
+      const deload = targeted(addDays(MONDAY, 27), 1, 60, 12, "push_a", 10, 2);
       const plan = planWeek(
         input({
           weekStart: addDays(MONDAY, 28),
           blocks: blockRows(2),
           exercises: exercisesWithIncrement,
           logs: logs(
-            ...blockLogs(1, 1, () => 65, () => 12, "push_a", () => reps),
+            ...blockLogs(
+              1,
+              1,
+              () => 65,
+              () => 12,
+              "push_a",
+              () => reps,
+            ),
             deload,
           ),
         }),
@@ -908,6 +929,58 @@ describe("block calendar", () => {
       });
     },
   );
+
+  it("keeps a twice-weekly rollover step when older exposures are trimmed", () => {
+    const plan = planWeek(
+      input({
+        weekStart: addDays(MONDAY, 56),
+        blocks: blockRows(3),
+        logs: logs(
+          ...twiceWeeklyBlockLogs(2, (block, exposure) =>
+            block === 0 ? (exposure === 5 ? 70 : 65) : 75,
+          ),
+        ),
+      }),
+    );
+    const decision = decisionFor(plan, 1);
+    const state = decision.inputs.state!;
+    expect(state.exposures).toHaveLength(6);
+    expect(
+      state.exposures.some((exposure) => exposure.date === addDays(MONDAY, 17)),
+    ).toBe(false);
+    expect(state.blockProgress).toMatchObject({
+      loadingCount: 6,
+      progressed: true,
+      lastLoadingDate: addDays(MONDAY, 45),
+    });
+    expect(state.stallCount).toBe(0);
+    expect(decision.rules).not.toContain("block_stall");
+  });
+
+  it("counts a flat twice-weekly block after exposures roll over", () => {
+    const plan = planWeek(
+      input({
+        weekStart: addDays(MONDAY, 56),
+        blocks: blockRows(3),
+        logs: logs(
+          ...twiceWeeklyBlockLogs(2, (block, exposure) =>
+            block === 0 ? (exposure === 5 ? 70 : 65) : 70,
+          ),
+        ),
+      }),
+    );
+    const decision = decisionFor(plan, 1);
+    expect(decision.inputs.state).toMatchObject({
+      blockProgress: {
+        loadingCount: 6,
+        progressed: false,
+        lastLoadingDate: addDays(MONDAY, 45),
+      },
+      stallCount: 1,
+      lastStallDate: addDays(MONDAY, 45),
+    });
+    expect(decision.rules).toContain("block_stall");
+  });
 
   it("starts the plateau handler after three flat double-progression blocks", () => {
     const startedOn = addDays(MONDAY, 84);

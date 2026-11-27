@@ -284,6 +284,7 @@ describe("lift engine state", () => {
       plateaus: 0,
       plateau: null,
       blockStall: null,
+      blockProgress: null,
     });
     expect(initLiftEngineState(null, config)).toEqual({ exercises: {} });
   });
