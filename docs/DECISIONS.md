@@ -499,3 +499,8 @@ Options considered:
 - **`planWeek` uses the real lift progression engine** for prescriptions, plateau variations and back-off sets, while retaining deload and layoff adjustments. Back-off sets are stored in targets and surfaced as a reason until the player supports them.
 - **After a push with lift-planning inputs, the server replans only this week's unstarted lift sessions from owner-local today onward.** The week/block/type guard prevents moving the calendar mid-week. Existing `plan_override` rows stay on top of regenerated plan rows rather than being superseded (owner-approved exception to §4).
 - **`engine_decision` is server-only**, with one row per lift planned item; regeneration overwrites its inputs, rules and outputs. `PLAN_VERSION` is `plan-3`, and the 50 ms per-lift-session budget is checked in an engine test.
+
+## "Why this?" sheet (#149)
+
+- **Lift targets can show their plain-English reasons from Today, the session preview and the player.** Owner swaps explain what changed; added exercises say the planner did not set their target.
+- **The sheet reads `planned_item.reasons` from the local copy**, so it remains available offline.

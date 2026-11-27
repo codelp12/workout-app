@@ -18,6 +18,7 @@ import { vocabLabel } from "../library/filter";
 import { ExerciseImage } from "../library/ExerciseImage";
 import { addExercise, skipItem, swapExercise } from "../plan/item-overrides";
 import { liftDetail, type SessionView } from "../plan/sessions";
+import { WhyThisSheet } from "../components/WhyThisSheet";
 import { readSettings, type SettingsData } from "../settings/settings";
 import { localDb, syncSoon } from "../sync";
 import { button, buttonBase, card as cardClass } from "../ui";
@@ -570,7 +571,19 @@ function ExerciseCard({
       )}
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 tabular-nums">
         <dt className="text-fg-muted">Target</dt>
-        <dd>{liftDetail(targets, timed)}</dd>
+        <dd className="flex flex-wrap items-center justify-between gap-2">
+          <span>{liftDetail(targets, timed)}</span>
+          <WhyThisSheet
+            ariaLabel={`Why this target for ${name}`}
+            entries={[
+              {
+                exerciseName: name,
+                target: liftDetail(targets, timed),
+                reasons: card.reasons,
+              },
+            ]}
+          />
+        </dd>
         <dt className="text-fg-muted">Last time</dt>
         <dd>{lastTimeLine(card.lastTime, bodyweight, timed)}</dd>
       </dl>

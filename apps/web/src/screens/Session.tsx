@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 import { Loading, Skeleton } from "../components/Skeleton";
+import { WhyThisSheet } from "../components/WhyThisSheet";
 import { modalityStyles } from "../modality";
 import {
   formatLongDate,
@@ -74,11 +75,25 @@ function LiftOverview({ view }: { view: SessionView }) {
         </p>
       ) : (
         <ol className="flex flex-col gap-2">
-          {data.cards.map(({ itemId, exercise, targets, skipped }) => (
-            <li key={itemId} className="flex flex-col">
-              <span className="font-medium">
-                {exercise?.name ?? "Pick an exercise"}
-              </span>
+          {data.cards.map(({ itemId, exercise, targets, skipped, reasons }) => (
+            <li key={itemId} className="flex flex-col gap-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-medium">
+                  {exercise?.name ?? "Pick an exercise"}
+                </span>
+                {!skipped && (
+                  <WhyThisSheet
+                    ariaLabel={`Why this target for ${exercise?.name ?? "Pick an exercise"}`}
+                    entries={[
+                      {
+                        exerciseName: exercise?.name ?? "Pick an exercise",
+                        target: liftDetail(targets, isTimedHold(exercise)),
+                        reasons,
+                      },
+                    ]}
+                  />
+                )}
+              </div>
               <span className="text-fg-muted tabular-nums">
                 {skipped
                   ? "Skipped"

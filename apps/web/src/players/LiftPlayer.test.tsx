@@ -24,11 +24,13 @@ import {
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { testExercise } from "../library/test-exercise";
+import { combineLifts } from "../plan/combine";
+import { addExercise, skipItem, swapExercise } from "../plan/item-overrides";
 import { readSession } from "../plan/sessions";
 import { deviceTimezone } from "../settings/settings";
 import { localDb } from "../sync";
 import { useLiveQuery } from "../use-live-query";
-import { openWorkout, savePosition } from "./lift-log";
+import { openWorkout, readLiftSession, savePosition } from "./lift-log";
 import { LiftPlayer } from "./LiftPlayer";
 
 const today = localDateAt(deviceTimezone(), Date.now());
@@ -65,6 +67,7 @@ const item = (
   position: number,
   exerciseId: string,
   targets: Record<string, unknown>,
+  reasons: string[] = [],
 ): PlannedItem => ({
   id: newId(),
   ...sync,
@@ -73,19 +76,24 @@ const item = (
   kind: "exercise",
   exerciseId,
   targets,
-  reasons: [],
+  reasons,
 });
 
 const items = [
-  item(0, squat.id, {
-    sets: 2,
-    load: { value: 50, unit: "lb" },
-    band: null,
-    repMin: 6,
-    repMax: 10,
-    targetRir: 2,
-    restSec: 150,
-  }),
+  item(
+    0,
+    squat.id,
+    {
+      sets: 2,
+      load: { value: 50, unit: "lb" },
+      band: null,
+      repMin: 6,
+      repMax: 10,
+      targetRir: 2,
+      restSec: 150,
+    },
+    ["The planner chose this target from your recent sets."],
+  ),
   item(1, plank.id, {
     sets: 2,
     load: null,
@@ -644,6 +652,104 @@ describe("swap, skip, add set and warm-ups", () => {
       .filter((s) => s.sessionLogId === sessionLogId(legs.id))
       .sort((a, b) => a.completedAt! - b.completedAt!);
 
+  it("merges reasons from contributing duplicate cards without repeats", async () => {
+    const pull: PlannedSession = {
+      ...legs,
+      id: newId(),
+      workoutType: "pull_a",
+    };
+    const first = {
+      ...items[0]!,
+      reasons: ["A shared reason.", "The first prescription reason."],
+    };
+    const second = item(2, squat.id, { ...items[0]!.targets, sets: 1 }, [
+      "A shared reason.",
+      "The second prescription reason.",
+    ]);
+    const skipped = {
+      ...items[0]!,
+      id: newId(),
+      plannedSessionId: pull.id,
+      reasons: ["A skipped prescription reason."],
+    };
+    await localDb.rows("planned_item").bulkPut([first, second, skipped]);
+    await localDb.rows("planned_session").put(pull);
+    expect(await combineLifts(localDb, legs.id, pull.id)).toBe(true);
+    await skipItem(localDb, skipped, pull, true);
+
+    const view = (await readSession(legs.id))!;
+    const { cards } = await readLiftSession(localDb, view);
+    const merged = cards.find((card) => card.exercise?.id === squat.id)!;
+    expect(merged.targets.sets).toBe(3);
+    expect(merged.reasons).toEqual([
+      "A shared reason.",
+      "The first prescription reason.",
+      "The second prescription reason.",
+    ]);
+  });
+
+  it("omits rep reasons when a planned target is swapped to a timed hold", async () => {
+    const timed = testExercise({
+      name: "Timed Plank",
+      equipment: ["bodyweight"],
+      sourceId: "Plank",
+      substitutionGroup: squat.substitutionGroup,
+    });
+    await localDb.rows("exercise").put(timed);
+    await swapExercise(localDb, items[0]!, legs, timed.id);
+
+    const view = (await readSession(legs.id))!;
+    const { cards } = await readLiftSession(localDb, view);
+    expect(cards[0]?.reasons).toEqual([
+      "You swapped in Timed Plank for Dumbbell Squat.",
+    ]);
+  });
+
+  it("keeps the added-exercise reason when the added card is swapped", async () => {
+    const curl = testExercise({
+      name: "Dumbbell Curl",
+      equipment: ["dumbbell"],
+      repMin: 10,
+      repMax: 15,
+    });
+    const cableCurl = testExercise({
+      name: "Cable Curl",
+      equipment: ["cable"],
+    });
+    await localDb.rows("exercise").bulkPut([curl, cableCurl]);
+    const itemId = await addExercise(localDb, legs, curl);
+    await swapExercise(
+      localDb,
+      { id: itemId, plannedSessionId: legs.id, exerciseId: curl.id },
+      legs,
+      cableCurl.id,
+    );
+
+    const view = (await readSession(legs.id))!;
+    const { cards } = await readLiftSession(localDb, view);
+    const added = cards.find((card) => card.itemId === itemId)!;
+    expect(added.reasons).toEqual([
+      "You swapped in Cable Curl for Dumbbell Curl.",
+      "You added this exercise, so the planner didn't set its target.",
+    ]);
+  });
+
+  it("shows the empty-reasons fallback", async () => {
+    const user = userEvent.setup();
+    renderPlayer();
+    await screen.findByRole("article", { name: "Dumbbell Squat" });
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    const plankCard = await screen.findByRole("article", { name: "Plank" });
+    await user.click(
+      within(plankCard).getByRole("button", {
+        name: "Why this target for Plank",
+      }),
+    );
+    expect(
+      await screen.findByText("No reasons were recorded for this target."),
+    ).toBeTruthy();
+  });
+
   it("swaps within the substitution group, dumbbell and band first, and queues it for sync", async () => {
     const user = userEvent.setup();
     const group = { substitutionGroup: "squat" };
@@ -682,6 +788,19 @@ describe("swap, skip, add set and warm-ups", () => {
     const swapped = await screen.findByRole("article", {
       name: "Barbell Squat",
     });
+    await user.click(
+      within(swapped).getByRole("button", {
+        name: "Why this target for Barbell Squat",
+      }),
+    );
+    const why = await screen.findByRole("dialog", { name: "Why this?" });
+    expect(why.textContent).toContain(
+      "You swapped in Barbell Squat for Dumbbell Squat.",
+    );
+    expect(why.textContent).toContain(
+      "The planner chose this target from your recent sets.",
+    );
+    await user.click(within(why).getByRole("button", { name: "Close" }));
     const override = await localDb
       .rows("plan_override")
       .get(swapOverrideId(items[0]!.id));
@@ -808,6 +927,22 @@ describe("swap, skip, add set and warm-ups", () => {
     const card = await screen.findByRole("article", { name: "Dumbbell Curl" });
     expect(screen.getByText("Exercise 3 of 3")).toBeTruthy();
     expect(within(card).getByText(/^3 × 10–15/)).toBeTruthy();
+    await user.click(
+      within(card).getByRole("button", {
+        name: "Why this target for Dumbbell Curl",
+      }),
+    );
+    expect(
+      await screen.findByText(
+        "You added this exercise, so the planner didn't set its target.",
+      ),
+    ).toBeTruthy();
+    await user.click(
+      within(screen.getByRole("dialog", { name: "Why this?" })).getByRole(
+        "button",
+        { name: "Close" },
+      ),
+    );
     const [added] = (await localDb.rows("plan_override").toArray()).filter(
       (o) => o.kind === "add",
     );
