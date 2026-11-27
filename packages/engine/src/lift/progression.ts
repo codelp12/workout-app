@@ -243,8 +243,14 @@ export function progressExercise(
       text: `Plateau: ${scheme.repMin}–${scheme.repMax} reps instead of ${slot.repMin}–${slot.repMax} for a block.`,
     });
   }
-  const last = state?.exposures.at(-1);
+  const last =
+    state?.exposures.findLast((exposure) => !exposure.deload) ??
+    state?.exposures.at(-1);
   const target = last?.target ?? null;
+  const lastOutcome =
+    state?.blockStall?.status === "counted"
+      ? state.blockStall.progressionOutcome
+      : (state?.lastOutcome ?? null);
   const base: ExercisePrescription = {
     load: null,
     band: null,
@@ -264,7 +270,7 @@ export function progressExercise(
       text: `No history yet: pick a weight you could lift for ${scheme.repMin}–${scheme.repMax} reps${scheme.targetRir === null ? "" : ` with ${scheme.targetRir} in reserve`}.`,
     });
     item = base;
-  } else if (state.lastOutcome === "missed" && target !== null) {
+  } else if (lastOutcome === "missed" && target !== null) {
     const lastLoad = lastWorkingLoad(last, target, exercise, loading, ctx);
     reasons.push({
       code: "hold_after_miss",
@@ -292,6 +298,12 @@ export function progressExercise(
     item = doubleProgression(state, exercise, base, slot, loading, ctx);
   }
 
+  if (state?.blockStall?.status === "counted") {
+    item.reasons.unshift({
+      code: "block_stall",
+      text: "No weight or rep increase all block, so this counts as a stall.",
+    });
+  }
   if (state && isCalibrating(state, ctx.date, config)) {
     item.reasons.push({
       code: "calibrating",
@@ -398,7 +410,9 @@ function doubleProgression(
 ): ExercisePrescription {
   const rules = ctx.config.lift.progression;
   const { reasons } = base;
-  const last = state.exposures.at(-1)!;
+  const last =
+    state.exposures.findLast((exposure) => !exposure.deload) ??
+    state.exposures.at(-1)!;
   const target = last.target ?? null;
   const top = topSet(last.sets);
   const lastLoad = lastWorkingLoad(last, target, exercise, loading, ctx);
@@ -427,7 +441,11 @@ function doubleProgression(
   const what = (load: Weight | null, band: string | null) =>
     load ? fmt(load) : (band ?? "bodyweight");
 
-  if (state.lastOutcome === "stalled") {
+  const lastOutcome =
+    state.blockStall?.status === "counted"
+      ? state.blockStall.progressionOutcome
+      : state.lastOutcome;
+  if (lastOutcome === "stalled") {
     reasons.push({
       code: "cut_after_stall",
       text: `Second miss in a row: lighter for a fresh run at ${base.repMin}–${base.repMax} reps.`,
@@ -439,7 +457,7 @@ function doubleProgression(
       band: lastBand && (bandStep(lastBand, -1, ctx) ?? lastBand),
     };
   }
-  if (state.lastOutcome !== "top" && state.lastOutcome !== "beat") {
+  if (lastOutcome !== "top" && lastOutcome !== "beat") {
     reasons.push({
       code: target ? "build_reps" : "repeat_last",
       text: target
@@ -449,7 +467,7 @@ function doubleProgression(
     return held;
   }
 
-  const beat = state.lastOutcome === "beat";
+  const beat = lastOutcome === "beat";
   let next: { load: Weight | null; band: string | null } | null = null;
   if (loading.kind === "band" && lastBand) {
     const band =

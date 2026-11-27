@@ -40,10 +40,13 @@ import {
   type RampRequest,
 } from "./lift/block.js";
 import {
+  applyBlockStallsBeforePlan,
   initLiftEngineState,
   updateLiftEngineState,
   type ExerciseState,
+  type LiftCalendarBlock,
   type LiftEngineState,
+  type LiftStateCalendar,
   LIFT_ENGINE_VERSION,
 } from "./lift/state.js";
 import { climbStub, type ClimbSessionLog } from "./stubs/climb.js";
@@ -54,6 +57,7 @@ import {
   type LiftSessionLog,
   type LiftTarget,
 } from "./stubs/lift.js";
+import { toWeightUnit } from "./units.js";
 import {
   progressExercise,
   type ProgressionExercise,
@@ -63,7 +67,7 @@ import { runStub, type RunSessionLog } from "./stubs/run.js";
 import type { EngineContext, Reason } from "./types.js";
 
 /** Stored as `engineVersion` on generated blocks and weeks. */
-export const PLAN_VERSION = "plan-4";
+export const PLAN_VERSION = "plan-5";
 
 type SessionSpec = {
   /** Stable within a week; part of the session's id. */
@@ -336,6 +340,56 @@ export type EngineDecision = {
 const weekTypeAt = (index: number, weekCount: number): WeekType =>
   weekCount > 1 && index === weekCount - 1 ? "deload" : "loading";
 
+function liftCalendarFor(input: WeekPlanInput): LiftStateCalendar {
+  const blockOf = (date: string): LiftCalendarBlock | null => {
+    const containing = input.blocks
+      .filter((block) => {
+        const days = daysBetween(block.startDate, date);
+        return (
+          block.deletedAt === null && days >= 0 && days < block.weekCount * 7
+        );
+      })
+      .sort((a, b) => b.startDate.localeCompare(a.startDate))[0];
+    if (!containing) return null;
+    const index = Math.floor(daysBetween(containing.startDate, date) / 7);
+    return {
+      id: containing.id,
+      startDate: containing.startDate,
+      index,
+      weekCount: containing.weekCount,
+    };
+  };
+  return {
+    blockOf,
+    weekTypeOf: (date) => {
+      const block = blockOf(date);
+      return block ? weekTypeAt(block.index, block.weekCount) : null;
+    },
+    progressionModelOf: (exerciseId) => {
+      const exercise = input.exercises.find(
+        (candidate) => candidate.id === exerciseId,
+      );
+      if (!exercise) return null;
+      return exercise.progressionModel === "e1rm_rir"
+        ? "e1rm_rir"
+        : "double_progression";
+    },
+    targetProgressed: (previous, current) => {
+      const loadProgress =
+        previous.load !== null &&
+        current.load !== null &&
+        toWeightUnit(current.load, input.settings.weightUnit) >
+          toWeightUnit(previous.load, input.settings.weightUnit) + 1e-6;
+      const bandProgress =
+        previous.band !== null &&
+        current.band !== null &&
+        input.settings.equipment.bands.indexOf(current.band) >
+          input.settings.equipment.bands.indexOf(previous.band);
+      return loadProgress || bandProgress || current.repMax > previous.repMax;
+    },
+  };
+}
+
 /**
  * The week's place on the global calendar (SPEC §5.1, §5.4). When two or
  * more main lifts stalled earlier in the block, the block ends early with
@@ -496,11 +550,19 @@ const templateFor = (input: WeekPlanInput, key: string) =>
 export function planWeek(input: WeekPlanInput): WeekPlan {
   const config = input.config ?? ENGINE_CONFIG;
   const { now, weekStart, settings } = input;
+  const calendar = liftCalendarFor(input);
   let liftState = initLiftEngineState(settings.onboarding, config.lift);
   for (const log of input.logs.lift) {
-    liftState = updateLiftEngineState(liftState, log, config.lift);
+    liftState = updateLiftEngineState(liftState, log, config.lift, calendar);
   }
   const block = blockFor(input, config, liftState);
+  liftState = applyBlockStallsBeforePlan(
+    liftState,
+    block.id,
+    block.position.startDate,
+    config.lift,
+    calendar,
+  );
   const { position } = block;
   const type = position.type;
   const week: UpsertData<"week"> = {

@@ -9,6 +9,7 @@ import {
   type Template,
 } from "@workout-app/shared";
 import { describe, expect, it } from "vitest";
+import { ENGINE_CONFIG } from "./config.js";
 import { LIFT_ENGINE_VERSION } from "./lift/state.js";
 import type { LiftSessionLog } from "./stubs/lift.js";
 import {
@@ -520,6 +521,80 @@ describe("block calendar", () => {
     },
   });
   const logs = (...lift: LiftSessionLog[]) => ({ lift, run: [], climb: [] });
+  const blockRow = (index: number) =>
+    saved({
+      ...first.block!,
+      id: index === 0 ? first.block!.id : `block-${index}`,
+      startDate: addDays(MONDAY, index * 28),
+      weekCount: 4,
+    });
+  const blockRows = (count: number) =>
+    Array.from({ length: count }, (_, index) => blockRow(index));
+  const targeted = (
+    date: string,
+    exerciseIndex: number,
+    load: number,
+    repMax = 12,
+    key = "push_a",
+    reps = 10,
+    sets = 3,
+  ) => {
+    const exerciseId = slotId(key, exerciseIndex);
+    const log = lifted(date, key, reps, { load, exerciseIndex, sets });
+    return {
+      ...log,
+      targets: {
+        ...log.targets,
+        [exerciseId]: { ...log.targets![exerciseId]!, repMax },
+      },
+    };
+  };
+  const blockLogs = (
+    count: number,
+    exerciseIndex = 1,
+    loadAt: (block: number, week: number) => number = () => 65,
+    repMaxAt: (block: number, week: number) => number = () => 12,
+    key = "push_a",
+    repsAt: (block: number, week: number) => number = () => 10,
+  ) =>
+    Array.from({ length: count }, (_, block) =>
+      Array.from({ length: 3 }, (_, week) =>
+        targeted(
+          addDays(MONDAY, block * 28 + week * 7),
+          exerciseIndex,
+          loadAt(block, week),
+          repMaxAt(block, week),
+          key,
+          repsAt(block, week),
+        ),
+      ),
+    ).flat();
+  const twiceWeeklyBlockLogs = (
+    count: number,
+    loadAt: (block: number, loadingExposure: number) => number,
+  ) =>
+    Array.from({ length: count }, (_, block) => {
+      const startDay = block * 28;
+      const loading = [0, 3, 7, 10, 14, 17].map((day, exposure) =>
+        targeted(addDays(MONDAY, startDay + day), 1, loadAt(block, exposure)),
+      );
+      const deload = [21, 24].map((day) =>
+        targeted(
+          addDays(MONDAY, startDay + day),
+          1,
+          loadAt(block, 5),
+          12,
+          "push_a",
+          10,
+          2,
+        ),
+      );
+      return [...loading, ...deload];
+    }).flat();
+  const decisionFor = (plan: WeekPlan, exerciseIndex: number, key = "push_a") =>
+    plan.decisions.find(
+      (decision) => decision.inputs.exerciseId === slotId(key, exerciseIndex),
+    )!;
 
   it("plans e1rm_rir lifts from onboarding e1RM", () => {
     const exerciseId = slotId("push_a", 0);
@@ -655,6 +730,44 @@ describe("block calendar", () => {
     );
   });
 
+  it("holds a double-progression debut logged during deload", () => {
+    const doubleProgressionExercises = exercises.map((exercise) =>
+      exercise.id === slotId("push_a", 1)
+        ? { ...exercise, progressionModel: "double_progression" as const }
+        : exercise,
+    );
+    const deloadLog = targeted(addDays(MONDAY, 27), 1, 60);
+    const next = planWeek(
+      input({
+        weekStart: addDays(MONDAY, 28),
+        blocks: blockRows(2),
+        exercises: doubleProgressionExercises,
+        logs: logs(deloadLog),
+      }),
+    );
+    const nextItem = item(next, "push_a", 1);
+    expect(nextItem.targets.load).toEqual({ value: 60, unit: "lb" });
+    expect(
+      nextItem.reasons.some((reason) => reason.includes("No history yet")),
+    ).toBe(false);
+  });
+
+  it("derives an e1RM load from a debut logged during deload", () => {
+    const deloadLog = targeted(addDays(MONDAY, 27), 0, 60);
+    const next = planWeek(
+      input({
+        weekStart: addDays(MONDAY, 28),
+        blocks: blockRows(2),
+        logs: logs(deloadLog),
+      }),
+    );
+    const nextItem = item(next, "push_a");
+    expect(nextItem.targets.load).not.toBeNull();
+    expect(nextItem.reasons.some((reason) => reason.includes("e1RM"))).toBe(
+      true,
+    );
+  });
+
   it("plans a year's worth of lift history under the per-session budget", () => {
     const weekdays = [0, 1, 2, 4, 5, 6];
     const keys = Object.keys(TEMPLATE_NAMES);
@@ -775,6 +888,280 @@ describe("block calendar", () => {
 
     const one = weekAt(1, { logs: logs(...stall("push_a", [0, 3])) });
     expect([one.week.type, one.block]).toEqual(["loading", null]);
+  });
+
+  it("counts a flat double-progression block as a stall in the next block", () => {
+    const plan = planWeek(
+      input({
+        weekStart: addDays(MONDAY, 28),
+        blocks: blockRows(2),
+        logs: logs(
+          ...blockLogs(1),
+          lifted(addDays(MONDAY, 27), "push_a", 10, {
+            sets: 2,
+            load: 65,
+            exerciseIndex: 1,
+          }),
+        ),
+      }),
+    );
+    const decision = decisionFor(plan, 1);
+    expect(plan.week.type).toBe("loading");
+    expect(decision.inputs.state).toMatchObject({
+      lastOutcome: "stalled",
+      lastStallDate: addDays(MONDAY, 14),
+      stallCount: 1,
+      blockStall: { status: "counted", progressionOutcome: "done" },
+    });
+    expect(decision.rules[0]).toBe("block_stall");
+    expect(decision.rules).not.toContain("cut_after_stall");
+    expect(decision.outputs.targets.load).toEqual({ value: 65, unit: "lb" });
+    expect(decision.outputs.reasons[0]).toBe(
+      "No weight or rep increase all block, so this counts as a stall.",
+    );
+    expect(
+      decision.outputs.reasons.some((reason) =>
+        reason.includes("Second miss in a row"),
+      ),
+    ).toBe(false);
+  });
+
+  it.each([
+    ["done", 10, 65],
+    ["top", 12, 70],
+  ] as const)(
+    "uses the latest loading target after a deload when outcome is %s",
+    (outcome, reps, expectedLoad) => {
+      const exerciseId = slotId("push_a", 1);
+      const exercisesWithIncrement = exercises.map((exercise) =>
+        exercise.id === exerciseId
+          ? { ...exercise, increment: { value: 5, unit: "lb" as const } }
+          : exercise,
+      );
+      const deload = targeted(addDays(MONDAY, 27), 1, 60, 12, "push_a", 10, 2);
+      const plan = planWeek(
+        input({
+          weekStart: addDays(MONDAY, 28),
+          blocks: blockRows(2),
+          exercises: exercisesWithIncrement,
+          logs: logs(
+            ...blockLogs(
+              1,
+              1,
+              () => 65,
+              () => 12,
+              "push_a",
+              () => reps,
+            ),
+            deload,
+          ),
+        }),
+      );
+      const decision = decisionFor(plan, 1);
+      expect(decision.inputs.state).toMatchObject({
+        blockStall: { status: "counted", progressionOutcome: outcome },
+      });
+      expect(decision.outputs.targets.load).toEqual({
+        value: expectedLoad,
+        unit: "lb",
+      });
+    },
+  );
+
+  it("keeps a twice-weekly rollover step when older exposures are trimmed", () => {
+    const plan = planWeek(
+      input({
+        weekStart: addDays(MONDAY, 56),
+        blocks: blockRows(3),
+        logs: logs(
+          ...twiceWeeklyBlockLogs(2, (block, exposure) =>
+            block === 0 ? (exposure === 5 ? 70 : 65) : 75,
+          ),
+        ),
+      }),
+    );
+    const decision = decisionFor(plan, 1);
+    const state = decision.inputs.state!;
+    expect(state.exposures).toHaveLength(6);
+    expect(
+      state.exposures.some((exposure) => exposure.date === addDays(MONDAY, 17)),
+    ).toBe(false);
+    expect(state.blockProgress).toMatchObject({
+      loadingCount: 6,
+      progressed: true,
+      lastLoadingDate: addDays(MONDAY, 45),
+    });
+    expect(state.stallCount).toBe(0);
+    expect(decision.rules).not.toContain("block_stall");
+  });
+
+  it("counts a flat twice-weekly block after exposures roll over", () => {
+    const plan = planWeek(
+      input({
+        weekStart: addDays(MONDAY, 56),
+        blocks: blockRows(3),
+        logs: logs(
+          ...twiceWeeklyBlockLogs(2, (block, exposure) =>
+            block === 0 ? (exposure === 5 ? 70 : 65) : 70,
+          ),
+        ),
+      }),
+    );
+    const decision = decisionFor(plan, 1);
+    expect(decision.inputs.state).toMatchObject({
+      blockProgress: {
+        loadingCount: 6,
+        progressed: false,
+        lastLoadingDate: addDays(MONDAY, 45),
+      },
+      stallCount: 1,
+      lastStallDate: addDays(MONDAY, 45),
+    });
+    expect(decision.rules).toContain("block_stall");
+  });
+
+  it("starts the plateau handler after three flat double-progression blocks", () => {
+    const startedOn = addDays(MONDAY, 84);
+    const logsThroughPlateauStart = logs(
+      ...blockLogs(3),
+      targeted(startedOn, 1, 65),
+    );
+    const plan = planWeek(
+      input({
+        weekStart: startedOn,
+        blocks: blockRows(4),
+        logs: logsThroughPlateauStart,
+      }),
+    );
+    expect(decisionFor(plan, 1).inputs.state).toMatchObject({
+      stallCount: 0,
+      plateaus: 1,
+      plateau: { action: "rep_scheme", startedOn },
+    });
+    const active = planWeek(
+      input({
+        weekStart: addDays(
+          startedOn,
+          ENGINE_CONFIG.lift.progression.plateauDays - 7,
+        ),
+        blocks: blockRows(4),
+        logs: logsThroughPlateauStart,
+      }),
+    );
+    expect(decisionFor(active, 1).rules).toContain("plateau_rep_scheme");
+    const expired = planWeek(
+      input({
+        weekStart: addDays(
+          startedOn,
+          ENGINE_CONFIG.lift.progression.plateauDays,
+        ),
+        blocks: blockRows(5),
+        logs: logsThroughPlateauStart,
+      }),
+    );
+    expect(decisionFor(expired, 1).rules).not.toContain("plateau_rep_scheme");
+  });
+
+  it("does not count a block with a heavier target load as stalled", () => {
+    const plan = planWeek(
+      input({
+        weekStart: addDays(MONDAY, 28),
+        blocks: blockRows(2),
+        logs: logs(
+          ...blockLogs(1, 1, (_block, week) => (week === 0 ? 65 : 70)),
+        ),
+      }),
+    );
+    expect(decisionFor(plan, 1).rules).not.toContain("block_stall");
+    expect(decisionFor(plan, 1).inputs.state).toMatchObject({
+      lastOutcome: "done",
+      stallCount: 0,
+    });
+  });
+
+  it("counts a repMax extension as progress within a block", () => {
+    const plan = planWeek(
+      input({
+        weekStart: addDays(MONDAY, 28),
+        blocks: blockRows(2),
+        logs: logs(
+          ...blockLogs(
+            1,
+            1,
+            () => 65,
+            (_block, week) => (week === 0 ? 12 : 13),
+          ),
+        ),
+      }),
+    );
+    expect(decisionFor(plan, 1).rules).not.toContain("block_stall");
+    expect(decisionFor(plan, 1).inputs.state).toMatchObject({
+      lastOutcome: "done",
+      stallCount: 0,
+    });
+  });
+
+  it("never block-stalls e1rm_rir lifts", () => {
+    const plan = planWeek(
+      input({
+        weekStart: addDays(MONDAY, 28),
+        blocks: blockRows(2),
+        logs: logs(...blockLogs(1, 0)),
+      }),
+    );
+    expect(decisionFor(plan, 0).rules).not.toContain("block_stall");
+    expect(decisionFor(plan, 0).inputs.state).toMatchObject({
+      lastOutcome: "done",
+      stallCount: 0,
+      blockStall: null,
+    });
+  });
+
+  it("does not early-deload after two double-progression main lifts stall", () => {
+    const mainIds = new Set([slotId("push_a", 0), slotId("legs_a", 0)]);
+    const mainExercises = exercises.map((exercise) =>
+      mainIds.has(exercise.id)
+        ? {
+            ...exercise,
+            progressionModel: "double_progression" as const,
+            increment: { value: 5, unit: "lb" as const },
+          }
+        : exercise,
+    );
+    const logsThroughFirstNextWeek = (key: string) => [
+      ...blockLogs(
+        1,
+        0,
+        () => 65,
+        () => 12,
+        key,
+      ),
+      targeted(addDays(MONDAY, 28), 0, 65, 12, key),
+    ];
+    const plan = planWeek(
+      input({
+        weekStart: addDays(MONDAY, 42),
+        blocks: blockRows(2),
+        exercises: mainExercises,
+        logs: logs(
+          ...logsThroughFirstNextWeek("push_a"),
+          ...logsThroughFirstNextWeek("legs_a"),
+        ),
+      }),
+    );
+    expect(plan.week).toMatchObject({ index: 2, type: "loading" });
+    expect(plan.block).toBeNull();
+    expect(
+      plan.items.some((planned) =>
+        planned.reasons.some((reason) => reason.startsWith("Early deload")),
+      ),
+    ).toBe(false);
+    for (const key of ["push_a", "legs_a"]) {
+      expect(decisionFor(plan, 0, key).inputs.state).toMatchObject({
+        lastStallDate: addDays(MONDAY, 14),
+        stallCount: 1,
+      });
+    }
   });
 
   it("lightens the first session back after a layoff", () => {
