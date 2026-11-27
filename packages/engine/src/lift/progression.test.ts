@@ -388,7 +388,13 @@ describe("double_progression", () => {
       ],
     });
     const item = prescribe(state);
-    expect(item.load).toEqual({ value: 90, unit: "lb" });
+    expect(item).toMatchObject({
+      load: { value: 90, unit: "lb" },
+      sets: 3,
+      repMin: 8,
+      repMax: 12,
+    });
+    expect(item.reasons.map((reason) => reason.code)).toContain("repeat_last");
     expect(item.reasons.map((reason) => reason.code)).not.toContain("increase");
   });
 

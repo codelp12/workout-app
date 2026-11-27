@@ -482,6 +482,17 @@ function doubleProgression(
     });
     return { ...base, ...next };
   }
+  if (
+    loadFromFallback &&
+    lastLoad &&
+    !allSetsAtLoad(last.sets, lastLoad, ctx.weightUnit)
+  ) {
+    reasons.push({
+      code: "repeat_last",
+      text: `Mixed working-set loads last time, so hold the same load and repeat ${base.sets} sets of ${base.repMin}–${base.repMax} reps.`,
+    });
+    return { ...base, load: held.load, band: held.band };
+  }
   if (canExtend(held, slot, rules)) {
     const repMax = held.repMax + rules.extraRepsStep;
     if (repMax <= slot.repMax + rules.maxExtraReps) {
