@@ -49,6 +49,7 @@ export type ExerciseState = {
     blockId: string;
     date: string;
     status: "pending" | "counted" | "ignored";
+    progressionOutcome: Outcome | null;
   } | null;
 };
 
@@ -319,15 +320,31 @@ function noteBlockStall(
   const stalledAt = blockStallDate(exposures, block, calendar);
   if (stalledAt === null) return;
   if (plateauActive(next, date, config)) {
-    next.blockStall = { blockId: block.id, date: stalledAt, status: "ignored" };
+    next.blockStall = {
+      blockId: block.id,
+      date: stalledAt,
+      status: "ignored",
+      progressionOutcome: null,
+    };
     return;
   }
   if (pending) {
-    next.blockStall = { blockId: block.id, date: stalledAt, status: "pending" };
+    next.blockStall = {
+      blockId: block.id,
+      date: stalledAt,
+      status: "pending",
+      progressionOutcome: null,
+    };
     return;
   }
+  const progressionOutcome = next.lastOutcome;
   recordStall(next, stalledAt, config);
-  next.blockStall = { blockId: block.id, date: stalledAt, status: "counted" };
+  next.blockStall = {
+    blockId: block.id,
+    date: stalledAt,
+    status: "counted",
+    progressionOutcome,
+  };
 }
 
 function applyPendingBlockStall(
