@@ -220,15 +220,20 @@ export function judgeExposure(
 }
 
 /** Records either kind of stall and starts a plateau at the shared threshold. */
-function recordStall(next: ExerciseState, date: string, config: Lift): void {
+function recordStall(
+  next: ExerciseState,
+  lastStallDate: string,
+  startedOn: string,
+  config: Lift,
+): void {
   next.lastOutcome = "stalled";
-  next.lastStallDate = date;
+  next.lastStallDate = lastStallDate;
   next.stallCount += 1;
   if (next.stallCount >= config.progression.stallsToPlateau) {
     next.stallCount = 0;
     next.plateau = {
       action: PLATEAU_ACTIONS[next.plateaus % PLATEAU_ACTIONS.length]!,
-      startedOn: date,
+      startedOn,
     };
     next.plateaus += 1;
   }
@@ -338,7 +343,7 @@ function noteBlockStall(
     return;
   }
   const progressionOutcome = next.lastOutcome;
-  recordStall(next, stalledAt, config);
+  recordStall(next, stalledAt, date, config);
   next.blockStall = {
     blockId: block.id,
     date: stalledAt,
@@ -358,7 +363,7 @@ function applyPendingBlockStall(
     next.blockStall = null;
     return;
   }
-  recordStall(next, pending.date, config);
+  recordStall(next, pending.date, date, config);
   next.blockStall = { ...pending, status: "counted" };
 }
 
@@ -393,7 +398,7 @@ function judgeInto(
     return;
   }
   next.missStreak = 0;
-  recordStall(next, exposure.date, config);
+  recordStall(next, exposure.date, exposure.date, config);
 }
 
 /**

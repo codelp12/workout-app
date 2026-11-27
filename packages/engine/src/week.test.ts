@@ -9,6 +9,7 @@ import {
   type Template,
 } from "@workout-app/shared";
 import { describe, expect, it } from "vitest";
+import { ENGINE_CONFIG } from "./config.js";
 import { LIFT_ENGINE_VERSION } from "./lift/state.js";
 import type { LiftSessionLog } from "./stubs/lift.js";
 import {
@@ -909,19 +910,45 @@ describe("block calendar", () => {
   );
 
   it("starts the plateau handler after three flat double-progression blocks", () => {
+    const startedOn = addDays(MONDAY, 84);
+    const logsThroughPlateauStart = logs(
+      ...blockLogs(3),
+      targeted(startedOn, 1, 65),
+    );
     const plan = planWeek(
       input({
-        weekStart: addDays(MONDAY, 84),
+        weekStart: startedOn,
         blocks: blockRows(4),
-        logs: logs(...blockLogs(3)),
+        logs: logsThroughPlateauStart,
       }),
     );
     expect(decisionFor(plan, 1).inputs.state).toMatchObject({
-      lastOutcome: "stalled",
       stallCount: 0,
       plateaus: 1,
-      plateau: { action: "rep_scheme" },
+      plateau: { action: "rep_scheme", startedOn },
     });
+    const active = planWeek(
+      input({
+        weekStart: addDays(
+          startedOn,
+          ENGINE_CONFIG.lift.progression.plateauDays - 7,
+        ),
+        blocks: blockRows(4),
+        logs: logsThroughPlateauStart,
+      }),
+    );
+    expect(decisionFor(active, 1).rules).toContain("plateau_rep_scheme");
+    const expired = planWeek(
+      input({
+        weekStart: addDays(
+          startedOn,
+          ENGINE_CONFIG.lift.progression.plateauDays,
+        ),
+        blocks: blockRows(5),
+        logs: logsThroughPlateauStart,
+      }),
+    );
+    expect(decisionFor(expired, 1).rules).not.toContain("plateau_rep_scheme");
   });
 
   it("does not count a block with a heavier target load as stalled", () => {
