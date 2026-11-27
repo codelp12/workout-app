@@ -150,12 +150,14 @@ export async function readLiftSession(
     const reasons = overrides.swaps.has(item.id)
       ? [
           `You swapped in ${exercise?.name ?? "another exercise"} for ${planned?.name ?? "the planned exercise"}.`,
-          ...(plannedItem &&
-          JSON.stringify(item.targets) ===
-            JSON.stringify(plannedItem.targets) &&
-          isTimedHold(exercise) === isTimedHold(planned)
-            ? plannedItem.reasons
-            : []),
+          ...(addedIds.has(item.id)
+            ? ["You added this exercise, so the planner didn't set its target."]
+            : plannedItem &&
+                JSON.stringify(item.targets) ===
+                  JSON.stringify(plannedItem.targets) &&
+                isTimedHold(exercise) === isTimedHold(planned)
+              ? plannedItem.reasons
+              : []),
         ]
       : addedIds.has(item.id)
         ? ["You added this exercise, so the planner didn't set its target."]

@@ -25,7 +25,7 @@ import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { testExercise } from "../library/test-exercise";
 import { combineLifts } from "../plan/combine";
-import { skipItem, swapExercise } from "../plan/item-overrides";
+import { addExercise, skipItem, swapExercise } from "../plan/item-overrides";
 import { readSession } from "../plan/sessions";
 import { deviceTimezone } from "../settings/settings";
 import { localDb } from "../sync";
@@ -702,6 +702,35 @@ describe("swap, skip, add set and warm-ups", () => {
     const { cards } = await readLiftSession(localDb, view);
     expect(cards[0]?.reasons).toEqual([
       "You swapped in Timed Plank for Dumbbell Squat.",
+    ]);
+  });
+
+  it("keeps the added-exercise reason when the added card is swapped", async () => {
+    const curl = testExercise({
+      name: "Dumbbell Curl",
+      equipment: ["dumbbell"],
+      repMin: 10,
+      repMax: 15,
+    });
+    const cableCurl = testExercise({
+      name: "Cable Curl",
+      equipment: ["cable"],
+    });
+    await localDb.rows("exercise").bulkPut([curl, cableCurl]);
+    const itemId = await addExercise(localDb, legs, curl);
+    await swapExercise(
+      localDb,
+      { id: itemId, plannedSessionId: legs.id, exerciseId: curl.id },
+      legs,
+      cableCurl.id,
+    );
+
+    const view = (await readSession(legs.id))!;
+    const { cards } = await readLiftSession(localDb, view);
+    const added = cards.find((card) => card.itemId === itemId)!;
+    expect(added.reasons).toEqual([
+      "You swapped in Cable Curl for Dumbbell Curl.",
+      "You added this exercise, so the planner didn't set its target.",
     ]);
   });
 
