@@ -168,6 +168,9 @@ describe("Week", () => {
     const tally = within(screen.getByRole("table"));
     expect(tally.getByRole("rowheader", { name: "Running" })).toBeTruthy();
     expect(tally.queryByRole("rowheader", { name: "Lifting" })).toBeNull();
+    expect(
+      screen.queryByRole("region", { name: "Last week's lifting" }),
+    ).toBeNull();
 
     cleanup();
     renderAt("/week?show=climb");
@@ -175,6 +178,15 @@ describe("Week", () => {
       await screen.findByRole("button", { name: "Limit climb, PM" }),
     ).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Easy run, PM" })).toBeNull();
+    expect(
+      screen.queryByRole("region", { name: "Last week's lifting" }),
+    ).toBeNull();
+
+    cleanup();
+    renderAt("/week?show=lift");
+    expect(
+      await screen.findByRole("region", { name: "Last week's lifting" }),
+    ).toBeTruthy();
   });
 
   it("moves a session as a synced override and can put it back", async () => {

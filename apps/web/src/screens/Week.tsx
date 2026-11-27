@@ -489,7 +489,9 @@ function Plan({ weekStart, today }: { weekStart: string; today: string }) {
           </ol>
         </div>
       )}
-      <LastWeekLiftReview weekStart={weekStart} />
+      {(filter === "all" || filter === "lift") && (
+        <LastWeekLiftReview weekStart={weekStart} />
+      )}
       <BottomSheet
         title={selected?.title ?? ""}
         open={selected !== undefined}
