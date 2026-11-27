@@ -5,17 +5,12 @@ import {
   type LiftReview,
 } from "@workout-app/engine";
 import { addDays, SETTINGS_ID } from "@workout-app/shared";
+import { isTimedHold } from "../players/lift-log";
 import { localDb } from "../sync";
 
 export type WeeklyLiftReview = LiftReview & {
   timedExerciseIds: string[];
 };
-
-const TIMED_HOLD_SOURCE_IDS = new Set([
-  "Plank",
-  "Side_Bridge",
-  "Kneeling_Hip_Flexor",
-]);
 
 export async function readWeeklyLiftReview(
   weekStart: string,
@@ -89,11 +84,7 @@ export async function readWeeklyLiftReview(
     return {
       ...review,
       timedExerciseIds: exercises
-        .filter(
-          (exercise) =>
-            exercise.sourceId !== null &&
-            TIMED_HOLD_SOURCE_IDS.has(exercise.sourceId),
-        )
+        .filter(isTimedHold)
         .map((exercise) => exercise.id),
     };
   });

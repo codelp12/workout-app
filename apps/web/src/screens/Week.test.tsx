@@ -315,6 +315,11 @@ describe("Week", () => {
       equipment: ["cable"],
       primaryMuscles: ["chest"],
     });
+    const plank = testExercise({
+      name: "Plank",
+      sourceId: "Plank",
+      primaryMuscles: ["abs"],
+    });
     const previous = session({
       date: addDays(monday, -7),
       templateId: null,
@@ -391,15 +396,29 @@ describe("Week", () => {
       isWarmup: false,
       completedAt: 23 + index,
     }));
-    await localDb.rows("exercise").bulkPut([bench, fly]);
+    const plankSets: SetLog[] = Array.from({ length: 3 }, (_, index) => ({
+      id: newId(),
+      ...sync,
+      sessionLogId: previousLog.id,
+      exerciseId: plank.id,
+      index: index + 21,
+      loadValue: null,
+      loadUnit: null,
+      band: null,
+      reps: 30,
+      rir: null,
+      isWarmup: false,
+      completedAt: 41 + index,
+    }));
+    await localDb.rows("exercise").bulkPut([bench, fly, plank]);
     await localDb.rows("settings").put(onboardingSettings);
     await localDb.rows("planned_session").put(previous);
     await localDb.rows("planned_item").put(plannedItem);
     await localDb.rows("session_log").put(previousLog);
-    await localDb.rows("set_log").bulkPut([...sets, ...flySets]);
+    await localDb.rows("set_log").bulkPut([...sets, ...flySets, ...plankSets]);
 
     const localReview = await readWeeklyLiftReview(monday);
-    expect(localReview.exercises).toHaveLength(2);
+    expect(localReview.exercises).toHaveLength(3);
     expect(localReview.muscles).toContainEqual({
       muscle: "chest",
       hardSets: 21,
@@ -407,9 +426,16 @@ describe("Week", () => {
     });
 
     renderAt("/week");
-    const review = within(
-      await screen.findByRole("region", { name: "Last week's lifting" }),
-    );
+    const reviewElement = await screen.findByRole("region", {
+      name: "Last week's lifting",
+    });
+    const review = within(reviewElement);
+    expect(
+      screen
+        .getByRole("list", { name: "Days" })
+        .compareDocumentPosition(reviewElement) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     const exerciseRowElement = (
       await review.findByRole("heading", {
         level: 3,
@@ -427,6 +453,12 @@ describe("Week", () => {
       "This week: 3 × 8–10 · 140 lb · RIR 2 · rest 2:00",
     );
     expect(exerciseRow.getByText("The plan set this target.")).toBeTruthy();
+    const plankRow = (
+      await review.findByRole("heading", { level: 3, name: "Plank" })
+    ).closest("li")!;
+    expect(plankRow.textContent).toContain(
+      "Top set Bodyweight × 30 s · 3 sets · 90 s total",
+    );
     const muscles = within(
       review.getByRole("heading", { name: "Hard sets per muscle" })
         .parentElement!,
@@ -435,7 +467,7 @@ describe("Week", () => {
     expect(muscles.getByText("Triceps")).toBeTruthy();
     expect(muscles.getByText("21 / 20")).toBeTruthy();
     expect(muscles.getByText("Over cap")).toBeTruthy();
-    expect(muscles.getByText("3 / 20")).toBeTruthy();
+    expect(muscles.getAllByText("3 / 20")).toHaveLength(2);
   });
 
   it("shows the empty lift review when last week has no working sets", async () => {

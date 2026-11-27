@@ -232,48 +232,55 @@ function LastWeekLiftReview({ weekStart }: { weekStart: string }) {
             <p className="text-fg-muted">No lifting logged last week.</p>
           ) : (
             <ul className="flex flex-col gap-3">
-              {review.exercises.map((exercise) => (
-                <li
-                  key={exercise.exerciseId}
-                  className="flex flex-col gap-1 border-b border-border pb-3 last:border-0 last:pb-0"
-                >
-                  <h3 className="font-medium">{exercise.name}</h3>
-                  <p className="text-sm">
-                    Top set{" "}
-                    {exercise.topSet.load
-                      ? formatAmount(
-                          exercise.topSet.load.value,
-                          exercise.topSet.load.unit,
-                        )
-                      : (exercise.topSet.band ?? "Bodyweight")}{" "}
-                    × {exercise.topSet.reps} · {exercise.workingSets} sets ·{" "}
-                    {exercise.totalReps} reps
-                  </p>
-                  <p className="text-sm">{e1rmSummary(exercise)}</p>
-                  {exercise.thisWeek ? (
-                    <>
-                      <p className="text-sm">
-                        This week:{" "}
-                        {liftDetail(
-                          exercise.thisWeek.targets as LiftTargets,
-                          review.timedExerciseIds.includes(exercise.exerciseId),
-                        )}
-                      </p>
-                      {exercise.thisWeek.reasons.length > 0 && (
-                        <ul className="list-disc pl-5 text-sm text-fg-muted">
-                          {exercise.thisWeek.reasons.map((reason, index) => (
-                            <li key={`${index}:${reason}`}>{reason}</li>
-                          ))}
-                        </ul>
-                      )}
-                    </>
-                  ) : (
-                    <p className="text-sm text-fg-muted">
-                      Not planned this week
+              {review.exercises.map((exercise) => {
+                const timed = review.timedExerciseIds.includes(
+                  exercise.exerciseId,
+                );
+                return (
+                  <li
+                    key={exercise.exerciseId}
+                    className="flex flex-col gap-1 border-b border-border pb-3 last:border-0 last:pb-0"
+                  >
+                    <h3 className="font-medium">{exercise.name}</h3>
+                    <p className="text-sm">
+                      Top set{" "}
+                      {exercise.topSet.load
+                        ? formatAmount(
+                            exercise.topSet.load.value,
+                            exercise.topSet.load.unit,
+                          )
+                        : (exercise.topSet.band ?? "Bodyweight")}{" "}
+                      × {exercise.topSet.reps}
+                      {timed ? " s" : ""} · {exercise.workingSets} sets ·{" "}
+                      {exercise.totalReps}
+                      {timed ? " s total" : " reps"}
                     </p>
-                  )}
-                </li>
-              ))}
+                    <p className="text-sm">{e1rmSummary(exercise)}</p>
+                    {exercise.thisWeek ? (
+                      <>
+                        <p className="text-sm">
+                          This week:{" "}
+                          {liftDetail(
+                            exercise.thisWeek.targets as LiftTargets,
+                            timed,
+                          )}
+                        </p>
+                        {exercise.thisWeek.reasons.length > 0 && (
+                          <ul className="list-disc pl-5 text-sm text-fg-muted">
+                            {exercise.thisWeek.reasons.map((reason, index) => (
+                              <li key={`${index}:${reason}`}>{reason}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-sm text-fg-muted">
+                        Not planned this week
+                      </p>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
           <div className="flex flex-col gap-2">
@@ -455,7 +462,6 @@ function Plan({ weekStart, today }: { weekStart: string; today: string }) {
         }
       />
       <Tally tally={plan.tally} filter={filter} />
-      <LastWeekLiftReview weekStart={weekStart} />
       {empty ? (
         <p className={`${card} text-fg-muted`}>
           Nothing planned this week yet.
@@ -483,6 +489,7 @@ function Plan({ weekStart, today }: { weekStart: string; today: string }) {
           </ol>
         </div>
       )}
+      <LastWeekLiftReview weekStart={weekStart} />
       <BottomSheet
         title={selected?.title ?? ""}
         open={selected !== undefined}
