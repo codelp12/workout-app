@@ -332,6 +332,49 @@ describe("double_progression", () => {
       "progress_reps",
     );
   });
+
+  it("holds the last logged load when the planned target load is null", () => {
+    const state = history("curl", {
+      target: target(null),
+      sets: [
+        [85, 10, 2],
+        [90, 10, 2],
+        [80, 10, 2],
+      ],
+    });
+    expect(prescribe(state).load).toEqual({ value: 90, unit: "lb" });
+  });
+
+  it("steps up from the last logged load when all sets reach repMax", () => {
+    const exercise = { ...curl, increment: { value: 5, unit: "lb" as const } };
+    const state = history("curl", {
+      target: target(null),
+      sets: sets(3, 90, 12),
+    });
+    expect(prescribe(state, exercise).load).toEqual({ value: 95, unit: "lb" });
+  });
+
+  it("cuts the last logged load after a second miss with null targets", () => {
+    const exercise = { ...curl, increment: { value: 5, unit: "lb" as const } };
+    const miss = {
+      target: target(null),
+      sets: sets(3, 90, 6, 0),
+    };
+    const state = history("curl", miss, miss);
+    const item = prescribe(state, exercise);
+    expect(item.reasons.map((reason) => reason.code)).toContain(
+      "cut_after_stall",
+    );
+    expect(item.load?.value).toBe(85);
+  });
+
+  it("keeps the load null when the latest exposure has no logged load", () => {
+    const state = history("curl", {
+      target: target(null),
+      sets: sets(3, null, 10),
+    });
+    expect(prescribe(state).load).toBeNull();
+  });
 });
 
 describe("e1rm_rir", () => {
@@ -346,7 +389,7 @@ describe("e1rm_rir", () => {
     const state = withE1rm(history("bench", met(60, main)), 80);
     // 80 / (1 + (6 + 2) / 30) = 63.2 lb
     expect(prescribe(state)).toMatchObject({
-      load: { value: 65, unit: "lb" },
+      load: { value: 60, unit: "lb" },
       repMin: 6,
       repMax: 8,
       targetRir: 2,

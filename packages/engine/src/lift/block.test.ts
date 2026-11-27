@@ -14,7 +14,11 @@ import {
   weekScheme,
   type BlockPosition,
 } from "./block.js";
-import { updateLiftEngineState, type LiftEngineState } from "./state.js";
+import {
+  prescribedLoad,
+  updateLiftEngineState,
+  type LiftEngineState,
+} from "./state.js";
 
 const config = ENGINE_CONFIG.lift;
 const START = "2026-11-02";
@@ -290,6 +294,32 @@ describe("deload loads", () => {
     expect(scale(5, 0.9)).toBe(5);
     expect(scaleLoad({ value: 100, unit: "lb" }, 0.9, null, ctx)).toEqual({
       value: 90,
+      unit: "lb",
+    });
+  });
+
+  it("applies deload and layoff cuts to a rounded-down e1RM base", () => {
+    const db = {
+      id: "db",
+      name: "DB",
+      equipment: ["dumbbell"],
+      substitutionGroup: null,
+    };
+    const base = prescribedLoad(
+      { value: 80, unit: "lb" },
+      8,
+      3,
+      "lb",
+      DEFAULT_EQUIPMENT,
+      "dumbbell",
+    )!;
+    expect(base).toEqual({ value: 55, unit: "lb" });
+    expect(scaleLoad(base, config.block.deloadLoad, db, ctx)).toEqual({
+      value: 50,
+      unit: "lb",
+    });
+    expect(scaleLoad(base, 1 - config.layoff.longCut, db, ctx)).toEqual({
+      value: 45,
       unit: "lb",
     });
   });

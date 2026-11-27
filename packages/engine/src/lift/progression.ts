@@ -6,11 +6,16 @@ import {
   type Weight,
 } from "@workout-app/shared";
 import type { EngineConfig } from "../config.js";
-import { roundToLoadable, type WeightImplement } from "../loads.js";
+import {
+  roundDownToLoadable,
+  roundToLoadable,
+  type WeightImplement,
+} from "../loads.js";
 import {
   equipmentRank,
   implementOf,
   topSet,
+  type LiftSet,
   type LiftTarget,
 } from "../stubs/lift.js";
 import type { EngineContext, Reason } from "../types.js";
@@ -75,6 +80,23 @@ function loadingOf(exercise: ProgressionExercise, ctx: EngineContext): Loading {
 }
 
 const fmt = (w: Weight) => formatAmount(w.value, w.unit);
+
+function heaviestLoggedLoad(
+  sets: readonly LiftSet[],
+  unit: EngineContext["weightUnit"],
+): Weight | null {
+  let heaviest: Weight | null = null;
+  for (const set of sets) {
+    if (
+      set.load !== null &&
+      (heaviest === null ||
+        toWeightUnit(set.load, unit) > toWeightUnit(heaviest, unit))
+    ) {
+      heaviest = set.load;
+    }
+  }
+  return heaviest;
+}
 
 /** `load` in the context's unit, rounded to what the equipment can make. */
 function loadable(
@@ -292,7 +314,7 @@ function e1rmPrescription(
   const raw = loadFor(e1rm, base.repMin, rir);
   const overMax =
     roundToLoadable(ctx.equipment, loading.implement, raw, "up") === null;
-  let value = roundToLoadable(ctx.equipment, loading.implement, raw);
+  let value = roundDownToLoadable(ctx.equipment, loading.implement, raw);
   if (value === null) {
     reasons.push({
       code: "not_loadable",
@@ -346,7 +368,11 @@ function doubleProgression(
   const last = state.exposures.at(-1)!;
   const target = last.target ?? null;
   const top = topSet(last.sets);
-  const lastLoad = target ? target.load : (top?.load ?? null);
+  const lastLoad =
+    target?.load ??
+    (loading.kind === "band"
+      ? null
+      : heaviestLoggedLoad(last.sets, ctx.weightUnit));
   const lastBand = target ? target.band : (top?.band ?? null);
   // Extra reps or sets from a step that was too big carry over until it's taken.
   const extended =

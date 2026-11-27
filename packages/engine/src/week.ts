@@ -63,7 +63,7 @@ import { runStub, type RunSessionLog } from "./stubs/run.js";
 import type { EngineContext, Reason } from "./types.js";
 
 /** Stored as `engineVersion` on generated blocks and weeks. */
-export const PLAN_VERSION = "plan-3";
+export const PLAN_VERSION = "plan-4";
 
 type SessionSpec = {
   /** Stable within a week; part of the session's id. */

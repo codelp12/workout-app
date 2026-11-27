@@ -456,6 +456,12 @@ Options considered:
   - A double increment that would exceed +5% falls back to one step.
   - Three stalls start the plateau handler for 28 days, rotating rep scheme (range shifted by 3 reps), a back-off set at 85%, and a same-group variation (a back-off set when there's none).
 
+## Lift load prescriptions (prerequisite for #151)
+
+- **e1RM-derived working loads round down** to the heaviest loadable weight at or below the raw prescription, falling back to the lightest available weight when none is low enough. This is the owner's choice; SPEC §5.1 only says to round to a loadable weight. Warm-ups still use nearest-load rounding. Deload and layoff scaling remain nearest-rounded and at least one step lighter where possible.
+- **Double progression uses the latest logged working-set load** when its latest planned target has a null load, so holds, increments and stall cuts have a load to work from. It remains null when no working-set load was logged; band progression is unchanged.
+- The lift engine and plan versions are `lift-2` and `plan-4`.
+
 ## Lift workout preview and resume (#156, #159)
 
 - **Preview does not start a lift.** It uses the same exercise order, overrides and targets as the player. Start workout creates the existing offline-first session log; no schema change is needed. (§3.1, §6.3)

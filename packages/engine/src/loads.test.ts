@@ -5,6 +5,7 @@ import {
   availableLoads,
   isLoadable,
   roundBandLevel,
+  roundDownToLoadable,
   roundToLoadable,
   type ListedImplement,
   type Rounding,
@@ -61,6 +62,15 @@ describe("default inventory", () => {
     expect(roundToLoadable(defaults, implement, target, rounding)).toBe(
       expected,
     );
+  });
+
+  it.each([
+    [58.5, 55],
+    [60, 60],
+    [2, 5],
+    [130, 120],
+  ])("rounds down for target %d to %s", (target, expected) => {
+    expect(roundDownToLoadable(defaults, "dumbbell", target)).toBe(expected);
   });
 
   it.each<[number, Rounding, string | null]>([

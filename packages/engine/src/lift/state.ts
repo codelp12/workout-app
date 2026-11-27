@@ -7,7 +7,7 @@ import {
   type WeightUnit,
 } from "@workout-app/shared";
 import type { EngineConfig } from "../config.js";
-import { roundToLoadable, type WeightImplement } from "../loads.js";
+import { roundDownToLoadable, type WeightImplement } from "../loads.js";
 import type {
   LiftExposure,
   LiftSessionLog,
@@ -17,7 +17,7 @@ import type {
 import { toWeightUnit } from "../units.js";
 
 /** Stored with every `fitness_state` row the lift engine writes. */
-export const LIFT_ENGINE_VERSION = "lift-1";
+export const LIFT_ENGINE_VERSION = "lift-2";
 
 /** One exercise's engine state (SPEC §5.1). */
 export type ExerciseState = {
@@ -69,8 +69,9 @@ export const loadFor = (e1rm: number, reps: number, rir: number): number =>
   e1rm / (1 + (reps + rir) / 30);
 
 /**
- * The prescribed load for `reps` at `rir`, in `unit`, rounded to the nearest
- * load the equipment can make (ties go lighter). Null when it can't make one.
+ * The prescribed load for `reps` at `rir`, in `unit`, rounded down to the
+ * heaviest load the equipment can make. If none is light enough, use the
+ * lightest available load. Null when the equipment can't make one.
  */
 export function prescribedLoad(
   e1rm: Weight,
@@ -81,7 +82,7 @@ export function prescribedLoad(
   implement: WeightImplement,
 ): Weight | null {
   const target = loadFor(toWeightUnit(e1rm, unit), reps, rir);
-  const value = roundToLoadable(equipment, implement, target);
+  const value = roundDownToLoadable(equipment, implement, target);
   return value === null ? null : { value, unit };
 }
 
