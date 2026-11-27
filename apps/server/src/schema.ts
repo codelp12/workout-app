@@ -35,6 +35,7 @@ import type {
   Onboarding,
   ProblemReportStatus,
 } from "@workout-app/shared";
+import type { EngineDecision } from "@workout-app/engine";
 import {
   index,
   integer,
@@ -376,4 +377,14 @@ export const opReceipt = sqliteTable("op_receipt", {
 export const syncCounter = sqliteTable("sync_counter", {
   id: integer("id").primaryKey(),
   lastSeq: integer("last_seq").notNull(),
+});
+
+/** The engine inputs, rules and outputs for one server-generated planned item. */
+export const engineDecision = sqliteTable("engine_decision", {
+  id: text("id").primaryKey(),
+  createdAt: integer("created_at").notNull(),
+  engineVersion: text("engine_version").notNull(),
+  inputs: json<EngineDecision["inputs"]>("inputs").notNull(),
+  rules: json<EngineDecision["rules"]>("rules").notNull(),
+  outputs: json<EngineDecision["outputs"]>("outputs").notNull(),
 });

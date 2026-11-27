@@ -478,7 +478,7 @@ Options considered:
 
 ## 2026-11-23: Blocks and deloads on the global calendar (#146)
 
-- **`planWeek` applies the block to every lift slot** (`lift/block.ts`, §5.1 Block structure). Main lifts (`e1rm_rir`) step RIR 3 → 2 → 1, spread over longer blocks (`blockRir`); `double_progression` slots keep their template RIR. Deload weeks halve sets (rounded up) at 3+ RIR and load 90% of the exercise's week-1 load. The tunables are in `ENGINE_CONFIG.lift.block` and `ENGINE_CONFIG.lift.layoff`. Plans, blocks and weeks now carry `engine_version` `plan-2`.
+- **`planWeek` applies the block to every lift slot** (`lift/block.ts`, §5.1 Block structure). Main lifts (`e1rm_rir`) step RIR 3 → 2 → 1, spread over longer blocks (`blockRir`); `double_progression` slots keep their template RIR. Deload weeks halve sets (rounded up) at 3+ RIR and load 90% of the exercise's week-1 load. The tunables are in `ENGINE_CONFIG.lift.block` and `ENGINE_CONFIG.lift.layoff`. Plans, blocks and weeks now carry `engine_version` `plan-3` (#148).
 - **Ramp sets.** A `ramp` slot gains one set in loading weeks 2 and 3 when its exercise's last exposure this block met its targets (`top`, `beat` or `done`); a missed week holds the earned sets. Readiness is always green until Phase 5. Ramp sets are granted in week order and never push a primary muscle past 20 hard sets a week; template sets always count in full.
 - **Early deload.** When two or more main lifts stalled since the block started, the current week becomes the deload and the block's `weekCount` shrinks to end there, so the next block starts the week after for every modality.
 - **Lift logs carry their planned targets.** `groupLogs` takes `planned_item` rows and attaches each lift log's targets via its `plannedSessionId`, so ramp sets and stalls work from synced data. An absorbed lift of a combined workout has no targets yet.
@@ -493,3 +493,9 @@ Options considered:
 - **An unpinned barbell, cable or machine exercise is planned as the first dumbbell or band exercise in its substitution group that the inventory covers**, by `ownedRank`, then the most similar name (shared words, ignoring equipment words), then name; "closest" means same substitution group and most similar name. With no such variant it stays. Its reason says what it replaced and how to keep it. A swap never picks an exercise another slot in the same workout already uses; with no unused variant the original stays. (§5.1)
 - **"Owned" means the inventory has dumbbells or at least one band; bodyweight always counts.** Group-only slots use the same order, so without dumbbells they pick a band or bodyweight exercise first. The player's swap list keeps plain `equipmentRank`. (§5.1)
 - **The warm-up ramp needed no change**: #54's player already rounds 40/60/80% to loadable weights and skips later cards sharing a movement pattern. (§5.1)
+
+## Server lift planning (#148)
+
+- **`planWeek` uses the real lift progression engine** for prescriptions, plateau variations and back-off sets, while retaining deload and layoff adjustments. Back-off sets are stored in targets and surfaced as a reason until the player supports them.
+- **After a push with lift-planning inputs, the server replans only this week's unstarted lift sessions from owner-local today onward.** The week/block/type guard prevents moving the calendar mid-week. Existing `plan_override` rows stay on top of regenerated plan rows rather than being superseded (owner-approved exception to §4).
+- **`engine_decision` is server-only**, with one row per lift planned item; regeneration overwrites its inputs, rules and outputs. `PLAN_VERSION` is `plan-3`, and the 50 ms per-lift-session budget is checked in an engine test.

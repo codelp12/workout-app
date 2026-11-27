@@ -1,7 +1,10 @@
 import {
   combineOverrideId,
+  defaultSettings,
+  defaultTemplateId,
   MAX_PUSH_OPS,
   newId,
+  plannedSessionId,
   sessionLogId,
   type EntityName,
   type PullResponse,
@@ -10,10 +13,23 @@ import {
   type SyncOp,
   type UpsertData,
 } from "@workout-app/shared";
+import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "./app.js";
 import { setPassword } from "./auth.js";
-import { openDb, runMigrations } from "./db.js";
+import { openDb, runMigrations, type Db } from "./db.js";
+import { planCurrentWeek, replanLifts } from "./plan.js";
+import {
+  engineDecision,
+  exercise,
+  planOverride,
+  plannedItem,
+  settings,
+  syncCounter,
+  template,
+} from "./schema.js";
+import { seedExercises, seedTemplates } from "./seed.js";
+import { OWNER_USER_ID } from "./sync.js";
 
 const PASSWORD = "correct horse battery";
 const T0 = Date.UTC(2026, 9, 31, 14);
@@ -21,11 +37,14 @@ const json = { "content-type": "application/json" };
 
 let app: ReturnType<typeof createApp>;
 let cookie: string;
+let db: Db;
+let now = T0;
 
 beforeEach(async () => {
-  const db = openDb(":memory:");
+  db = openDb(":memory:");
   runMigrations(db);
-  app = createApp(db, { now: () => T0, planWeeks: false });
+  now = T0;
+  app = createApp(db, { now: () => now, planWeeks: false });
   await setPassword(db, PASSWORD);
   const res = await app.request("/api/auth/login", {
     method: "POST",
@@ -420,5 +439,202 @@ describe("GET /api/sync/pull", () => {
       });
       expect(res.status).toBe(400);
     }
+  });
+});
+
+describe("server lift replanning", () => {
+  it("updates only future unstarted lift items on a log push", async () => {
+    now = Date.UTC(2026, 10, 4, 15);
+    seedExercises(db, 0);
+    seedTemplates(db, 0);
+    db.insert(settings)
+      .values({
+        ...defaultSettings("UTC", 0),
+        userId: OWNER_USER_ID,
+        serverSeq: 0,
+      })
+      .run();
+    const weekStart = "2026-11-02";
+    planCurrentWeek(db, now);
+
+    const mondayId = plannedSessionId(weekStart, "push_a");
+    const mondayItem = db
+      .select()
+      .from(plannedItem)
+      .where(eq(plannedItem.plannedSessionId, mondayId))
+      .orderBy(plannedItem.position)
+      .get()!;
+    expect(mondayItem.exerciseId).not.toBeNull();
+    const exerciseId = mondayItem.exerciseId!;
+    db.update(exercise)
+      .set({
+        equipment: ["dumbbell"],
+        substitutionGroup: null,
+        progressionModel: "e1rm_rir",
+        increment: null,
+      })
+      .where(eq(exercise.id, exerciseId))
+      .run();
+    const pushBId = defaultTemplateId("push_b");
+    const pushB = db
+      .select()
+      .from(template)
+      .where(eq(template.id, pushBId))
+      .get()!;
+    db.update(template)
+      .set({
+        slots: pushB.slots.map((slot, index) =>
+          index === 0 ? { ...slot, exerciseId, substitutionGroup: null } : slot,
+        ),
+      })
+      .where(eq(template.id, pushBId))
+      .run();
+    expect(db.transaction((tx) => replanLifts(tx, now))).toBeGreaterThan(0);
+
+    const tuesdayId = plannedSessionId(weekStart, "pull_a");
+    const loggedTodayId = plannedSessionId(weekStart, "legs_a");
+    const fridayId = plannedSessionId(weekStart, "push_b");
+    const rowsFor = (sessionId: string) =>
+      db
+        .select()
+        .from(plannedItem)
+        .where(eq(plannedItem.plannedSessionId, sessionId))
+        .orderBy(plannedItem.position)
+        .all();
+    const mondayBefore = rowsFor(mondayId);
+    const tuesdayBefore = rowsFor(tuesdayId);
+    const loggedTodayBefore = rowsFor(loggedTodayId);
+    const futureBefore = rowsFor(fridayId).find((item) => item.position === 0)!;
+    expect(futureBefore.targets.load).toBeNull();
+    const futureDecisionBefore = db
+      .select()
+      .from(engineDecision)
+      .where(eq(engineDecision.id, futureBefore.id))
+      .get()!;
+    const override: UpsertData<"plan_override"> = {
+      id: newId(),
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
+      kind: "move",
+      plannedSessionId: fridayId,
+      weekId: null,
+      data: { date: "2026-11-06", slot: "am" },
+      opId: newId(),
+      supersededAt: null,
+    };
+    const cursor =
+      db.select({ seq: syncCounter.lastSeq }).from(syncCounter).get()?.seq ?? 0;
+    const mondayLog = {
+      id: sessionLogId(mondayId),
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
+      plannedSessionId: mondayId,
+      modality: "lift",
+      startedAt: Date.UTC(2026, 10, 2, 14),
+      endedAt: Date.UTC(2026, 10, 2, 15),
+      localDate: weekStart,
+      timezone: "UTC",
+      rpe: null,
+      notes: null,
+      checked: [],
+    } satisfies UpsertData<"session_log">;
+    const loggedToday = {
+      id: sessionLogId(loggedTodayId),
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
+      plannedSessionId: loggedTodayId,
+      modality: "lift",
+      startedAt: Date.UTC(2026, 10, 4, 15),
+      endedAt: null,
+      localDate: "2026-11-04",
+      timezone: "UTC",
+      rpe: null,
+      notes: null,
+      checked: [],
+    } satisfies UpsertData<"session_log">;
+    const sets = Array.from({ length: 3 }, (_, index) => ({
+      id: newId(),
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
+      sessionLogId: mondayLog.id,
+      exerciseId,
+      index,
+      loadValue: 40,
+      loadUnit: "lb" as const,
+      band: null,
+      reps: 8,
+      rir: 2,
+      isWarmup: false,
+      completedAt: Date.UTC(2026, 10, 2, 15),
+    })) satisfies UpsertData<"set_log">[];
+    now += 60_000;
+    const response = await push([
+      upsert("session_log", mondayLog),
+      upsert("session_log", loggedToday),
+      ...sets.map((set) => upsert("set_log", set)),
+      upsert("plan_override", override, override.opId),
+    ]);
+    expect(
+      response.results.every((result) => result.status === "applied"),
+    ).toBe(true);
+    const changes = await pull(cursor, 1000);
+
+    expect(rowsFor(mondayId)).toEqual(mondayBefore);
+    expect(rowsFor(tuesdayId)).toEqual(tuesdayBefore);
+    expect(rowsFor(loggedTodayId)).toEqual(loggedTodayBefore);
+    const futureAfter = rowsFor(fridayId).find((item) => item.position === 0)!;
+    const futureDecisionAfter = db
+      .select()
+      .from(engineDecision)
+      .where(eq(engineDecision.id, futureAfter.id))
+      .get()!;
+    expect(futureDecisionAfter.createdAt).toBeGreaterThan(
+      futureDecisionBefore.createdAt,
+    );
+    expect(futureAfter.targets.load).not.toBeNull();
+    expect(futureAfter.reasons.some((reason) => reason.includes("e1RM"))).toBe(
+      true,
+    );
+    expect(futureAfter.serverSeq).toBeGreaterThan(futureBefore.serverSeq);
+    expect(
+      changes.changes.some(
+        (change) =>
+          change.entity === "planned_item" && change.row.id === futureAfter.id,
+      ),
+    ).toBe(true);
+    expect(
+      db
+        .select()
+        .from(planOverride)
+        .where(eq(planOverride.id, override.id))
+        .get(),
+    ).toMatchObject(override);
+
+    const plannedSeqs = new Map(
+      db
+        .select()
+        .from(plannedItem)
+        .all()
+        .map((item) => [item.id, item.serverSeq] as const),
+    );
+    const nextCursor =
+      db.select({ seq: syncCounter.lastSeq }).from(syncCounter).get()?.seq ?? 0;
+    now += 60_000;
+    await push([upsert("session_log", mondayLog)]);
+    const repeated = await pull(nextCursor, 1000);
+    expect(
+      repeated.changes.filter((change) => change.entity === "planned_item"),
+    ).toEqual([]);
+    expect(
+      db
+        .select()
+        .from(plannedItem)
+        .all()
+        .every((item) => item.serverSeq === plannedSeqs.get(item.id)),
+    ).toBe(true);
   });
 });
