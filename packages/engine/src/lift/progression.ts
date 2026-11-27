@@ -113,6 +113,22 @@ function lastWorkingLoad(
   );
 }
 
+function allSetsAtLoad(
+  sets: readonly LiftSet[],
+  load: Weight,
+  unit: EngineContext["weightUnit"],
+): boolean {
+  const value = toWeightUnit(load, unit);
+  return (
+    sets.length > 0 &&
+    sets.every(
+      (set) =>
+        set.load !== null &&
+        Math.abs(toWeightUnit(set.load, unit) - value) <= EPSILON,
+    )
+  );
+}
+
 /** `load` in the context's unit, rounded to what the equipment can make. */
 function loadable(
   load: Weight,
@@ -385,6 +401,7 @@ function doubleProgression(
   const target = last.target ?? null;
   const top = topSet(last.sets);
   const lastLoad = lastWorkingLoad(last, target, loading, ctx);
+  const loadFromFallback = target === null || target.load === null;
   const lastBand = target ? target.band : (top?.band ?? null);
   // Extra reps or sets from a step that was too big carry over until it's taken.
   const extended =
@@ -437,7 +454,10 @@ function doubleProgression(
     const band =
       bandStep(lastBand, beat ? 2 : 1, ctx) ?? bandStep(lastBand, 1, ctx);
     next = band === null ? null : { load: null, band };
-  } else if (lastLoad) {
+  } else if (
+    lastLoad &&
+    (!loadFromFallback || allSetsAtLoad(last.sets, lastLoad, ctx.weightUnit))
+  ) {
     const from = toWeightUnit(lastLoad, ctx.weightUnit);
     let load = stepUp(lastLoad, beat ? 2 : 1, exercise, loading, ctx);
     if (

@@ -378,6 +378,20 @@ describe("double_progression", () => {
     expect(prescribe(state, exercise).load).toEqual({ value: 95, unit: "lb" });
   });
 
+  it("holds at the heaviest logged load when null-target sets use mixed loads", () => {
+    const state = history("curl", {
+      target: target(null),
+      sets: [
+        [90, 12, 2],
+        [80, 12, 2],
+        [80, 12, 2],
+      ],
+    });
+    const item = prescribe(state);
+    expect(item.load).toEqual({ value: 90, unit: "lb" });
+    expect(item.reasons.map((reason) => reason.code)).not.toContain("increase");
+  });
+
   it("cuts the last logged load after a second miss with null targets", () => {
     const exercise = { ...curl, increment: { value: 5, unit: "lb" as const } };
     const miss = {
