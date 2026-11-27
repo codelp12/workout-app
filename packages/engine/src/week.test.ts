@@ -730,6 +730,44 @@ describe("block calendar", () => {
     );
   });
 
+  it("holds a double-progression debut logged during deload", () => {
+    const doubleProgressionExercises = exercises.map((exercise) =>
+      exercise.id === slotId("push_a", 1)
+        ? { ...exercise, progressionModel: "double_progression" as const }
+        : exercise,
+    );
+    const deloadLog = targeted(addDays(MONDAY, 27), 1, 60);
+    const next = planWeek(
+      input({
+        weekStart: addDays(MONDAY, 28),
+        blocks: blockRows(2),
+        exercises: doubleProgressionExercises,
+        logs: logs(deloadLog),
+      }),
+    );
+    const nextItem = item(next, "push_a", 1);
+    expect(nextItem.targets.load).toEqual({ value: 60, unit: "lb" });
+    expect(
+      nextItem.reasons.some((reason) => reason.includes("No history yet")),
+    ).toBe(false);
+  });
+
+  it("derives an e1RM load from a debut logged during deload", () => {
+    const deloadLog = targeted(addDays(MONDAY, 27), 0, 60);
+    const next = planWeek(
+      input({
+        weekStart: addDays(MONDAY, 28),
+        blocks: blockRows(2),
+        logs: logs(deloadLog),
+      }),
+    );
+    const nextItem = item(next, "push_a");
+    expect(nextItem.targets.load).not.toBeNull();
+    expect(nextItem.reasons.some((reason) => reason.includes("e1RM"))).toBe(
+      true,
+    );
+  });
+
   it("plans a year's worth of lift history under the per-session budget", () => {
     const weekdays = [0, 1, 2, 4, 5, 6];
     const keys = Object.keys(TEMPLATE_NAMES);
