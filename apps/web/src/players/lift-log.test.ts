@@ -42,6 +42,7 @@ const card = (
   substitutes: [],
   skipped: false,
   targets: targets(fields),
+  reasons: [],
   sets: [],
   warmups: [],
   lastTime: [],

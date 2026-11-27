@@ -18,6 +18,7 @@ const card = (restSec: number, completedAt: number[]): LiftCard => ({
     targetRir: 2,
     restSec,
   },
+  reasons: [],
   sets: completedAt.map((at, index) => ({ index, completedAt: at }) as SetLog),
   warmups: [],
   lastTime: [],

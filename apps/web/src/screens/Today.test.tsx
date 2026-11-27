@@ -80,6 +80,7 @@ const item = (
   kind: PlannedItem["kind"],
   targets: Record<string, unknown>,
   exerciseId: string | null = null,
+  reasons: string[] = [],
 ): PlannedItem => ({
   id: newId(),
   ...sync,
@@ -88,7 +89,7 @@ const item = (
   kind,
   exerciseId,
   targets,
-  reasons: [],
+  reasons,
 });
 
 const push = session({ templateId: pushA.id });
@@ -130,6 +131,7 @@ beforeEach(async () => {
         restSec: 180,
       },
       bench.id,
+      ["The planner chose this target from your recent sets."],
     ),
     item(run, "run_segment", {
       workoutType: "easy",
@@ -374,6 +376,38 @@ describe("Today", () => {
     expect(screen.getByRole("region", { name: "Coach note" })).toBeTruthy();
   });
 
+  it("lists every lift target and reason in Today's sheet", async () => {
+    const curl = testExercise({ name: "Dumbbell Curl" });
+    await localDb.rows("exercise").put(curl);
+    await localDb.rows("planned_item").put({
+      ...item(
+        push,
+        "exercise",
+        {
+          sets: 2,
+          load: { value: 20, unit: "lb" },
+          band: null,
+          repMin: 8,
+          repMax: 12,
+          targetRir: 2,
+          restSec: 90,
+        },
+        curl.id,
+        ["An accessory target reason."],
+      ),
+      position: 1,
+    });
+    renderAt("/");
+    await userEvent
+      .setup()
+      .click(await screen.findByRole("button", { name: "Why this? Push A" }));
+    const why = await screen.findByRole("dialog", { name: "Why this?" });
+    expect(why.textContent).toContain("Dumbbell Bench Press");
+    expect(why.textContent).toContain("The planner chose this target");
+    expect(why.textContent).toContain("Dumbbell Curl");
+    expect(why.textContent).toContain("An accessory target reason.");
+  });
+
   it("opens each session in its modality's player", async () => {
     const user = userEvent.setup();
     renderAt("/");
@@ -390,6 +424,14 @@ describe("Today", () => {
     expect(
       preview.getByText("3 × 6–10 · 50 lb · RIR 2 · rest 3:00"),
     ).toBeTruthy();
+    await user.click(
+      preview.getByRole("button", {
+        name: "Why this target for Dumbbell Bench Press",
+      }),
+    );
+    const why = await screen.findByRole("dialog", { name: "Why this?" });
+    expect(why.textContent).toContain("The planner chose this target");
+    await user.click(within(why).getByRole("button", { name: "Close" }));
     expect(
       await localDb.rows("session_log").get(sessionLogId(push.id)),
     ).toBeUndefined();

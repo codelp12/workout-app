@@ -123,3 +123,65 @@ test("same-slot lifts combine offline after confirmation and appear once in hist
     page.getByRole("link", { name: /Legs A \+ Legs B/ }),
   ).toHaveCount(1);
 });
+
+test("lift target reasons are available from Today and the player offline", async ({
+  page,
+  context,
+}, testInfo) => {
+  const title = sessions[testInfo.project.name] ?? "Pull A";
+  await signIn(page);
+  await page.getByRole("button", { name: new RegExp(`^${title}, `) }).click();
+  const move = page.getByRole("dialog", { name: title });
+  await move.getByRole("radio", { name: /^Fri/ }).click();
+  await move.getByRole("radio", { name: "AM" }).click();
+  await move.getByRole("button", { name: "Move", exact: true }).click();
+  await expect(page.getByTestId("sync-chip")).toHaveText("Synced");
+
+  await page.goto("/");
+  await expect(page.getByRole("region", { name: "Coach note" })).toBeVisible();
+  await context.setOffline(true);
+  await page.reload();
+  const todayButton = page
+    .getByRole("button", { name: /^Why this\? / })
+    .first();
+  await expect(todayButton).toBeVisible();
+  const sessionTitle = (await todayButton.getAttribute("aria-label"))!.replace(
+    "Why this? ",
+    "",
+  );
+  await todayButton.click();
+  const todaySheet = page.getByRole("dialog", { name: "Why this?" });
+  await expect(
+    todaySheet.getByRole("heading", { level: 3 }).first(),
+  ).toBeVisible();
+  await expect(todaySheet.locator("ul li").first()).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("why-this-today-390x844.png"),
+  });
+  await todaySheet.getByRole("button", { name: "Close" }).click();
+
+  await page
+    .getByRole("listitem", { name: sessionTitle, exact: true })
+    .getByRole("button", { name: /^(Preview|Resume) / })
+    .click();
+  await expect(
+    page.getByRole("heading", { level: 1, name: sessionTitle }),
+  ).toBeVisible();
+  const start = page.getByRole("button", { name: "Start workout" });
+  if (await start.isVisible()) await start.click();
+  const player = page.getByRole("region", { name: "Lift player" });
+  const card = player.getByRole("article").first();
+  const exerciseName = (await card
+    .getByRole("heading", { level: 2 })
+    .textContent())!;
+  await card
+    .getByRole("button", {
+      name: `Why this target for ${exerciseName}`,
+    })
+    .click();
+  const playerSheet = page.getByRole("dialog", { name: "Why this?" });
+  await expect(playerSheet.locator("ul li").first()).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("why-this-player-390x844.png"),
+  });
+});

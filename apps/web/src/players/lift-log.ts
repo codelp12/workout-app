@@ -46,6 +46,7 @@ export type LiftCard = {
   substitutes: Exercise[];
   skipped: boolean;
   targets: LiftTargets;
+  reasons: string[];
   /** This session's working sets of the exercise, in order. */
   sets: SetLog[];
   /** This session's warm-up sets of the exercise, in order. */
@@ -101,6 +102,8 @@ export async function readLiftSession(
     isTemplateModality(e.modality),
   );
   const byId = new Map(exercises.map((e) => [e.id, e]));
+  const plannedById = new Map(view.items.map((item) => [item.id, item]));
+  const addedIds = new Set(overrides.added.map((item) => item.id));
   const substitutes = (planned: Exercise | null, current: Exercise | null) => {
     const group = (planned ?? current)?.substitutionGroup ?? null;
     const options = exercises.filter(
@@ -137,12 +140,24 @@ export async function readLiftSession(
   };
 
   const cards = items.map((item): LiftCard => {
+    const plannedItem = plannedById.get(item.id);
     const planned = (item.exerciseId && byId.get(item.exerciseId)) || null;
     const exerciseId = exerciseOf(item);
     const exercise = (exerciseId && byId.get(exerciseId)) || null;
     const mine = sets
       .filter((s) => s.sessionLogId === logId && s.exerciseId === exerciseId)
       .sort((a, b) => a.index - b.index);
+    const reasons = overrides.swaps.has(item.id)
+      ? [
+          `You swapped in ${exercise?.name ?? "another exercise"} for ${planned?.name ?? "the planned exercise"}.`,
+          ...(plannedItem &&
+          JSON.stringify(item.targets) === JSON.stringify(plannedItem.targets)
+            ? plannedItem.reasons
+            : []),
+        ]
+      : addedIds.has(item.id)
+        ? ["You added this exercise, so the planner didn't set its target."]
+        : (plannedItem?.reasons ?? []);
     return {
       itemId: item.id,
       item: {
@@ -154,6 +169,7 @@ export async function readLiftSession(
       substitutes: substitutes(planned, exercise),
       skipped: overrides.skips.has(item.id),
       targets: item.targets as LiftTargets,
+      reasons,
       sets: mine.filter((s) => !s.isWarmup),
       warmups: mine.filter((s) => s.isWarmup),
       lastTime: exerciseId ? lastTime(exerciseId) : [],

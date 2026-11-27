@@ -1,18 +1,22 @@
 import type { DaySlot } from "@workout-app/shared";
-import { useCallback, useId } from "react";
+import { useCallback, useId, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { Loading, Skeleton } from "../components/Skeleton";
+import { WhyThisSheet, type WhyThisEntry } from "../components/WhyThisSheet";
 import { modalityStyles } from "../modality";
 import {
   dayPlan,
   formatLongDate,
+  liftDetail,
   sessionSummary,
   type DayPlan,
   type SessionView,
 } from "../plan/sessions";
 import { useLocalDate } from "../plan/use-local-date";
+import { isTimedHold, readLiftSession } from "../players/lift-log";
 import { Projects } from "../Projects";
 import { readSettings } from "../settings/settings";
+import { localDb } from "../sync";
 import { buttonBase, card } from "../ui";
 import { useLiveQuery } from "../use-live-query";
 import { Screen } from "./Screen";
@@ -22,6 +26,10 @@ const SLOT_LABELS: Record<DaySlot, string> = { am: "AM", pm: "PM" };
 function SessionCard({ view }: { view: SessionView }) {
   const navigate = useNavigate();
   const { session, title } = view;
+  const [whyOpen, setWhyOpen] = useState(false);
+  const [whyLoading, setWhyLoading] = useState(false);
+  const [whyEntries, setWhyEntries] = useState<WhyThisEntry[]>([]);
+  const whyRequest = useRef(0);
   const style = modalityStyles[session.modality];
   const summary = sessionSummary(view);
   const action = view.inProgress
@@ -29,6 +37,35 @@ function SessionCard({ view }: { view: SessionView }) {
     : session.modality === "lift"
       ? "Preview"
       : "Start";
+  const changeWhyOpen = (open: boolean) => {
+    setWhyOpen(open);
+    if (!open) {
+      whyRequest.current += 1;
+      setWhyLoading(false);
+      return;
+    }
+    if (session.modality !== "lift") return;
+    const request = ++whyRequest.current;
+    setWhyLoading(true);
+    setWhyEntries([]);
+    void readLiftSession(localDb, view)
+      .then(({ cards }) => {
+        if (request !== whyRequest.current) return;
+        setWhyEntries(
+          cards.map((card) => ({
+            exerciseName: card.exercise?.name ?? "Pick an exercise",
+            target: liftDetail(card.targets, isTimedHold(card.exercise)),
+            reasons: card.reasons,
+          })),
+        );
+      })
+      .catch(() => {
+        if (request === whyRequest.current) setWhyEntries([]);
+      })
+      .finally(() => {
+        if (request === whyRequest.current) setWhyLoading(false);
+      });
+  };
   return (
     <li
       className={`${card} ${style.accent} flex items-center gap-3`}
@@ -49,6 +86,16 @@ function SessionCard({ view }: { view: SessionView }) {
           </span>
         )}
       </div>
+      {session.modality === "lift" && session.status === "planned" && (
+        <WhyThisSheet
+          ariaLabel={`Why this? ${title}`}
+          entries={whyEntries}
+          open={whyOpen}
+          loading={whyLoading}
+          onOpenChange={changeWhyOpen}
+          triggerClassName={style.fill}
+        />
+      )}
       {session.status === "planned" ? (
         <button
           type="button"
