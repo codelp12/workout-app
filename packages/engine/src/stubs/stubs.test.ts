@@ -207,6 +207,53 @@ describe("lift stub", () => {
     });
   });
 
+  it("keeps the barbell when its only owned substitute is used by another slot", () => {
+    const barbell = exercises[5]!;
+    const intent: LiftIntent = {
+      ...pushA,
+      exercises: exercises.filter(
+        (exercise) => exercise.id === squat || exercise.id === barbell.id,
+      ),
+      slots: [slot({ exerciseId: squat! }), slot({ exerciseId: barbell.id })],
+    };
+    const [dumbbellItem, barbellItem] = liftStub.prescribe(
+      liftStub.initState(null),
+      intent,
+      ctx,
+    ).items;
+    expect(dumbbellItem?.exerciseId).toBe(squat);
+    expect(barbellItem?.exerciseId).toBe(barbell.id);
+    expect(codes(barbellItem?.reasons ?? [])).not.toContain("substituted");
+  });
+
+  it("uses a second owned variant when the first is already used by another slot", () => {
+    const barbell = exercises[5]!;
+    const secondDumbbell = {
+      id: "00000000-0000-4000-8000-000000000006",
+      name: "Goblet dumbbell squat",
+      equipment: ["dumbbell"],
+      substitutionGroup: "squat_quads",
+    } satisfies LiftExercise;
+    const intent: LiftIntent = {
+      ...pushA,
+      exercises: [
+        ...exercises.filter(
+          (exercise) => exercise.id === squat || exercise.id === barbell.id,
+        ),
+        secondDumbbell,
+      ],
+      slots: [slot({ exerciseId: squat! }), slot({ exerciseId: barbell.id })],
+    };
+    const [dumbbellItem, barbellItem] = liftStub.prescribe(
+      liftStub.initState(null),
+      intent,
+      ctx,
+    ).items;
+    expect(dumbbellItem?.exerciseId).toBe(squat);
+    expect(barbellItem?.exerciseId).toBe(secondDumbbell.id);
+    expect(barbellItem?.exerciseId).not.toBe(dumbbellItem?.exerciseId);
+  });
+
   it("prefers the most similar name among explicit-slot dumbbell candidates", () => {
     const barbellId = exercises[5]?.id ?? null;
     const similar: LiftIntent = {

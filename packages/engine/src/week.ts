@@ -47,7 +47,7 @@ import {
 import { climbStub, type ClimbSessionLog } from "./stubs/climb.js";
 import {
   liftStub,
-  resolveSlot,
+  resolveSlots,
   type LiftExercise,
   type LiftSessionLog,
   type LiftTarget,
@@ -409,9 +409,14 @@ function planSlots(
     const template = templateFor(input, spec.template);
     if (!template) continue;
     const ctx = ctxFor(addDays(input.weekStart, spec.weekday - 1));
+    const resolved = resolveSlots(
+      template.slots,
+      input.exercises,
+      ctx.equipment,
+    );
     template.slots.forEach((slot, i) => {
-      const resolved = resolveSlot(slot, input.exercises, ctx.equipment);
-      const exercise = resolved && (byId.get(resolved.id) ?? null);
+      const selected = resolved[i];
+      const exercise = selected ? (byId.get(selected.id) ?? null) : null;
       const scheme = weekScheme(
         slot,
         exercise,
