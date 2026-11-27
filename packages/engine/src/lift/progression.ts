@@ -243,7 +243,7 @@ export function progressExercise(
       text: `Plateau: ${scheme.repMin}–${scheme.repMax} reps instead of ${slot.repMin}–${slot.repMax} for a block.`,
     });
   }
-  const last = state?.exposures.at(-1);
+  const last = state?.exposures.findLast((exposure) => !exposure.deload);
   const target = last?.target ?? null;
   const lastOutcome =
     state?.blockStall?.status === "counted"
@@ -408,7 +408,7 @@ function doubleProgression(
 ): ExercisePrescription {
   const rules = ctx.config.lift.progression;
   const { reasons } = base;
-  const last = state.exposures.at(-1)!;
+  const last = state.exposures.findLast((exposure) => !exposure.deload)!;
   const target = last.target ?? null;
   const top = topSet(last.sets);
   const lastLoad = lastWorkingLoad(last, target, exercise, loading, ctx);

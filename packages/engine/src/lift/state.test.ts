@@ -415,10 +415,11 @@ describe("lift engine state", () => {
     expect(state.exercises[squat]).toMatchObject({
       stallCount: 2,
       lastStallDate: "2026-11-02",
-      lastOutcome: null,
+      lastOutcome: "stalled",
       missStreak: 1,
       plateau: { action: "back_off", startedOn: "2026-10-20" },
     });
+    expect(state.exercises[squat]?.exposures.at(-1)?.deload).toBe(true);
     expect(updated.exercises[squat]?.e1rm?.value).toBeGreaterThan(
       initial.e1rm!.value,
     );

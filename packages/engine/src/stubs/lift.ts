@@ -36,6 +36,7 @@ export type LiftExposure = {
   date: string;
   source: "log" | "onboarding";
   sets: LiftSet[];
+  deload?: true;
   /** What the plan asked for, when the session was planned. */
   target?: LiftTarget | null;
 };

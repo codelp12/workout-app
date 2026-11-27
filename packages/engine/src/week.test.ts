@@ -535,9 +535,11 @@ describe("block calendar", () => {
     load: number,
     repMax = 12,
     key = "push_a",
+    reps = 10,
+    sets = 3,
   ) => {
     const exerciseId = slotId(key, exerciseIndex);
-    const log = lifted(date, key, 10, { load, exerciseIndex });
+    const log = lifted(date, key, reps, { load, exerciseIndex, sets });
     return {
       ...log,
       targets: {
@@ -552,6 +554,7 @@ describe("block calendar", () => {
     loadAt: (block: number, week: number) => number = () => 65,
     repMaxAt: (block: number, week: number) => number = () => 12,
     key = "push_a",
+    repsAt: (block: number, week: number) => number = () => 10,
   ) =>
     Array.from({ length: count }, (_, block) =>
       Array.from({ length: 3 }, (_, week) =>
@@ -561,6 +564,7 @@ describe("block calendar", () => {
           loadAt(block, week),
           repMaxAt(block, week),
           key,
+          repsAt(block, week),
         ),
       ),
     ).flat();
@@ -846,7 +850,7 @@ describe("block calendar", () => {
       lastOutcome: "stalled",
       lastStallDate: addDays(MONDAY, 14),
       stallCount: 1,
-      blockStall: { status: "counted", progressionOutcome: null },
+      blockStall: { status: "counted", progressionOutcome: "done" },
     });
     expect(decision.rules[0]).toBe("block_stall");
     expect(decision.rules).not.toContain("cut_after_stall");
@@ -860,6 +864,49 @@ describe("block calendar", () => {
       ),
     ).toBe(false);
   });
+
+  it.each([
+    ["done", 10, 65],
+    ["top", 12, 70],
+  ] as const)(
+    "uses the latest loading target after a deload when outcome is %s",
+    (outcome, reps, expectedLoad) => {
+      const exerciseId = slotId("push_a", 1);
+      const exercisesWithIncrement = exercises.map((exercise) =>
+        exercise.id === exerciseId
+          ? { ...exercise, increment: { value: 5, unit: "lb" as const } }
+          : exercise,
+      );
+      const deload = targeted(
+        addDays(MONDAY, 21),
+        1,
+        60,
+        12,
+        "push_a",
+        10,
+        2,
+      );
+      const plan = planWeek(
+        input({
+          weekStart: addDays(MONDAY, 28),
+          blocks: blockRows(2),
+          exercises: exercisesWithIncrement,
+          logs: logs(
+            ...blockLogs(1, 1, () => 65, () => 12, "push_a", () => reps),
+            deload,
+          ),
+        }),
+      );
+      const decision = decisionFor(plan, 1);
+      expect(decision.inputs.state).toMatchObject({
+        blockStall: { status: "counted", progressionOutcome: outcome },
+      });
+      expect(decision.outputs.targets.load).toEqual({
+        value: expectedLoad,
+        unit: "lb",
+      });
+    },
+  );
 
   it("starts the plateau handler after three flat double-progression blocks", () => {
     const plan = planWeek(

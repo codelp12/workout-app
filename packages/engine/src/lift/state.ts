@@ -333,7 +333,7 @@ function noteBlockStall(
       blockId: block.id,
       date: stalledAt,
       status: "pending",
-      progressionOutcome: null,
+      progressionOutcome: next.lastOutcome,
     };
     return;
   }
@@ -368,12 +368,8 @@ function judgeInto(
   exposure: LiftExposure,
   calibrating: boolean,
   config: Lift,
-  calendar?: LiftStateCalendar,
 ): void {
-  if (calendar?.weekTypeOf?.(exposure.date) === "deload") {
-    next.lastOutcome = null;
-    return;
-  }
+  if (exposure.deload) return;
   const target = exposure.target ?? null;
   if (target !== null) next.blockStall = null;
   const outcome =
@@ -435,13 +431,19 @@ function foldExposure(
   config: Lift,
   calendar?: LiftStateCalendar,
 ): ExerciseState {
+  const foldedExposure =
+    calendar?.weekTypeOf?.(exposure.date) === "deload"
+      ? { ...exposure, deload: true as const }
+      : exposure;
   const firstLoggedDate = previous.firstLoggedDate ?? exposure.date;
   const lastLogged = previous.exposures.findLast((e) => e.source === "log");
   const calibrating = isCalibrating({ firstLoggedDate }, exposure.date, config);
   const next: ExerciseState = {
     ...previous,
     firstLoggedDate,
-    exposures: [...previous.exposures, exposure].slice(-config.exposuresKept),
+    exposures: [...previous.exposures, foldedExposure].slice(
+      -config.exposuresKept,
+    ),
   };
   const previousBlock =
     lastLogged === undefined
@@ -496,7 +498,7 @@ function foldExposure(
       );
     }
   }
-  judgeInto(next, exposure, calibrating, config, calendar);
+  judgeInto(next, foldedExposure, calibrating, config);
   const unit =
     previous.e1rm?.unit ??
     exposure.sets.find((s) => s.load !== null)?.load?.unit;
