@@ -73,6 +73,21 @@ export function roundToLoadable(
   return rounded === null ? null : fromMilli(rounded);
 }
 
+/**
+ * Round down to the heaviest available load at or below `target`, or use the
+ * lightest load when the inventory has no load that light.
+ */
+export function roundDownToLoadable(
+  equipment: Equipment,
+  implement: WeightImplement,
+  target: number,
+): number | null {
+  return (
+    roundToLoadable(equipment, implement, target, "down") ??
+    roundToLoadable(equipment, implement, target, "up")
+  );
+}
+
 /** A band from the inventory: its index (0 is the lightest) and name. */
 export interface BandLevel {
   level: number;

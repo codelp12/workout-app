@@ -79,7 +79,7 @@ describe("e1RM formulas", () => {
     expect(loadFor(e1rm, reps, rir)).toBeCloseTo(load, 2);
   });
 
-  it("rounds the prescribed load to the rack, ties going lighter", () => {
+  it("rounds prescribed e1RM loads down to the rack", () => {
     // 80 ÷ (1 + 10/30) = 60 exactly.
     expect(
       prescribedLoad(
@@ -91,6 +91,17 @@ describe("e1RM formulas", () => {
         "dumbbell",
       ),
     ).toEqual({ value: 60, unit: "lb" });
+    // 80 ÷ (1 + 11/30) ≈ 58.5, so use 55 rather than 60.
+    expect(
+      prescribedLoad(
+        { value: 80, unit: "lb" },
+        8,
+        3,
+        "lb",
+        DEFAULT_EQUIPMENT,
+        "dumbbell",
+      ),
+    ).toEqual({ value: 55, unit: "lb" });
     // 75 ÷ 1.3333 = 56.25 → 55.
     expect(
       prescribedLoad(
@@ -102,6 +113,17 @@ describe("e1RM formulas", () => {
         "dumbbell",
       ),
     ).toEqual({ value: 55, unit: "lb" });
+    // Below the rack's lightest 5 lb dumbbell, use that lightest weight.
+    expect(
+      prescribedLoad(
+        { value: 6.5, unit: "lb" },
+        8,
+        3,
+        "lb",
+        DEFAULT_EQUIPMENT,
+        "dumbbell",
+      ),
+    ).toEqual({ value: 5, unit: "lb" });
   });
 
   it("converts an e1RM to the prescription's unit", () => {

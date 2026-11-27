@@ -396,7 +396,7 @@ describe("planWeek", () => {
     expect(
       next.items.find((i) => i.exerciseId === bench!.exerciseId)?.targets,
     ).toMatchObject({
-      load: { value: 50, unit: "lb" },
+      load: { value: 45, unit: "lb" },
     });
     const easy = next.sessions.find((s) => s.workoutType === "easy")!;
     expect(
